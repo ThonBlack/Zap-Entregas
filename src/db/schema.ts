@@ -1,0 +1,60 @@
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+
+export const users = sqliteTable("users", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    phone: text("phone").notNull().unique(), // Login principal via telefone
+    role: text("role", { enum: ["admin", "shopkeeper", "motoboy"] }).default("motoboy").notNull(),
+    password: text("password"), // Opcional se for magic link, mas bom ter para auth simples
+    avatarUrl: text("avatar_url"),
+    lastAvatarUpdate: text("last_avatar_update"), // Data da última troca de foto
+    plan: text("plan", { enum: ["free", "pro", "enterprise"] }).default("free").notNull(),
+    subscriptionStatus: text("subscription_status", { enum: ["active", "inactive", "trial"] }).default("active").notNull(),
+    twoFactorSecret: text("two_factor_secret"),
+    twoFactorEnabled: integer("two_factor_enabled", { mode: 'boolean' }).default(false),
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const deliveries = sqliteTable("deliveries", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    shopkeeperId: integer("shopkeeper_id").references(() => users.id),
+    motoboyId: integer("motoboy_id").references(() => users.id),
+    status: text("status", { enum: ["pending", "assigned", "picked_up", "delivered", "canceled"] }).default("pending").notNull(),
+    customerName: text("customer_name"),
+    customerPhone: text("customer_phone"),
+    address: text("address").notNull(),
+    lat: real("lat"),
+    lng: real("lng"),
+    value: real("value").default(0), // Valor do pedido (se motoboy precisar cobrar)
+    fee: real("fee").default(0), // Taxa de entrega (ganho do motoboy ou custo do lojista)
+    observation: text("observation"),
+    stopOrder: integer("stop_order"), // Ordem da entrega na rota (1, 2, 3...)
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const transactions = sqliteTable("transactions", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => users.id).notNull(), // Quem sofreu a alteração de saldo
+    amount: real("amount").notNull(),
+    type: text("type", { enum: ["credit", "debit"] }).notNull(),
+    description: text("description"),
+    relatedDeliveryId: integer("related_delivery_id").references(() => deliveries.id),
+    creatorId: integer("creator_id").references(() => users.id), // Quem lançou mov
+    status: text("status", { enum: ["pending", "confirmed", "rejected"] }).default("confirmed").notNull(), // Default confirmed for old records or same-user actions
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const financialRecords = sqliteTable("financial_records", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => users.id).notNull(), // Dono do registro (Lojista)
+    type: text("type", { enum: ["income", "expense"] }).notNull(),
+    amount: real("amount").notNull(),
+    description: text("description").notNull(),
+    category: text("category").default("Geral"),
+    dueDate: text("due_date").notNull(), // Data de vencimento
+    status: text("status", { enum: ["pending", "paid", "overdue"] }).default("pending").notNull(),
+    paymentMethod: text("payment_method"),
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});

@@ -1,0 +1,150 @@
+"use server";
+
+import { db } from "@/db";
+import { deliveries } from "@/db/schema";
+import { eq, inArray } from "drizzle-orm";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { geocodeAddress, optimizeRoute } from "@/lib/routeUtils";
+
+// 1. Quick Add Delivery (Single, no optimization yet)
+export async function addDeliveryAction(formData: FormData) {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+    if (!userId) return { error: "Não autenticado" };
+
+    const address = formData.get("address") as string;
+    const customerName = formData.get("customerName") as string;
+    const value = parseFloat((formData.get("value") as string)?.replace(',', '.') || "0");
+    const observation = formData.get("observation") as string;
+
+    if (!address) return { error: "Endereço obrigatório" };
+
+    // Try to geocode immediately, but don't blocking if fails (can be done later or in background)
+    let lat = 0, lng = 0;
+    try {
+        const coords = await geocodeAddress(address);
+        if (coords) {
+            lat = coords.lat;
+            lng = coords.lng;
+        }
+    } catch (e) {
+        console.error("Geocode failed for quick add", e);
+    }
+
+    await db.insert(deliveries).values({
+        shopkeeperId: Number(userId),
+        address,
+        customerName,
+        value,
+        observation,
+        lat,
+        lng,
+        status: "pending",
+        stopOrder: 999 // High number, effectively unordered
+    });
+
+    redirect("/");
+}
+
+// 2. Optimize Selected Deliveries
+export async function optimizeSelectedRouteAction(formData: FormData) {
+    const deliveryIds = formData.getAll("selectedDelivery") as string[];
+
+    if (!deliveryIds.length) {
+        return { error: "Selecione pelo menos uma entrega." };
+    }
+
+    // Fetch full delivery objects
+    const targets = await db.select().from(deliveries).where(inArray(deliveries.id, deliveryIds.map(Number)));
+
+    // Ensure all have coordinates
+    const points = await Promise.all(targets.map(async (d, index) => {
+        let lat = d.lat || 0;
+        let lng = d.lng || 0;
+
+        // If missing coords, try geocode again
+        if (lat === 0 || lng === 0) {
+            const coords = await geocodeAddress(d.address);
+            if (coords) {
+                lat = coords.lat;
+                lng = coords.lng;
+                // Update DB so we don't fetch again
+                await db.update(deliveries).set({ lat, lng }).where(eq(deliveries.id, d.id));
+            }
+        }
+
+        return {
+            id: d.id,
+            index, // Keep track of original index if needed, but ID is better
+            lat,
+            lng,
+            address: d.address
+        };
+    }));
+
+    // Filter valid points for optimization
+    const validPoints = points.filter(p => p.lat !== 0);
+
+    // Run Optimization (TSP / Nearest Neighbor)
+    // We assume the route starts from the "first selected" or just optimizes the set locally?
+    // Let's optimize relative to the very first item in the selection list (or nearest to Shop if we knew where it was)
+    // For now: First valid point is the anchor.
+
+    // NOTE: optimizeRoute in lib/routeUtils currently expects specific shape.
+    // Let's rely on validPoints.
+
+    let optimized: typeof validPoints = [];
+    if (validPoints.length > 0) {
+        optimized = optimizeRoute(validPoints[0], validPoints);
+    } else {
+        // Fallback for all failed geocodes
+        optimized = points;
+    }
+
+    // Missing/Failed points go to the end
+    const failedPoints = points.filter(p => p.lat === 0);
+    const finalOrder = [...optimized, ...failedPoints];
+
+    // Update stopOrder in DB
+    // Usage of Promise.all for parallel updates
+    await Promise.all(finalOrder.map((p, i) => {
+        return db.update(deliveries)
+            .set({ stopOrder: i + 1 })
+            .where(eq(deliveries.id, p.id!));
+    }));
+
+    redirect("/");
+}
+// 3. Delete Delivery
+export async function deleteDeliveryAction(id: number) {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+    if (!userId) return { error: "Não autenticado" };
+
+    try {
+        await db.delete(deliveries).where(eq(deliveries.id, id));
+        revalidatePath("/");
+        return { success: true };
+    } catch (e) {
+        return { error: "Erro ao excluir" };
+    }
+}
+
+// 4. Complete Delivery (with privacy implications handled in History view)
+export async function completeDeliveryAction(id: number) {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+    if (!userId) return { error: "Não autenticado" };
+
+    try {
+        await db.update(deliveries)
+            .set({ status: 'delivered' }) // History view will filter address based on this
+            .where(eq(deliveries.id, id));
+        revalidatePath("/");
+        return { success: true };
+    } catch (e) {
+        return { error: "Erro ao finalizar" };
+    }
+}
