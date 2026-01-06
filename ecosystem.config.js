@@ -3,9 +3,8 @@ module.exports = {
         {
             name: "zap-entregas",
             script: "npm",
-            args: "start",
+            args: "start -- -p 4000",
             env: {
-                PORT: 4000, // Running on 4000 to avoid conflict with other app on 3000
                 NODE_ENV: "production"
             }
         }
