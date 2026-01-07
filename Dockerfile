@@ -21,6 +21,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/sqlite.db ./sqlite.db
 
+# Rebuild sqlite for alpine runner environment if needed
+RUN apk add --no-cache python3 make g++ && npm rebuild better-sqlite3 && apk del python3 make g++
+
 EXPOSE 3000
 
 CMD ["node", "server.js"]
