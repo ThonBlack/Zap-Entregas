@@ -23,6 +23,12 @@ echo "Atualizando codigo..."
 git pull
 
 # 3. Build & Restart
+# Garantir que o arquivo de banco de dados exista para o volume do Docker
+if [ ! -f "sqlite.db" ]; then
+  echo "Criando arquivo sqlite.db vazio para evitar erro de diretório..."
+  touch sqlite.db
+fi
+
 echo "Construindo e Iniciando Container..."
 # Stop old PM2 if running (migration)
 pm2 stop zap-entregas 2>/dev/null || true
