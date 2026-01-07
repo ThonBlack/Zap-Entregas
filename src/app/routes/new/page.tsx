@@ -1,12 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import { createRouteAction } from "../../actions/route";
-import { Plus, Trash, MapPin, User, DollarSign, ArrowLeft } from "lucide-react";
+import { Plus, Trash, MapPin, User, DollarSign, ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
+
+const initialState = {
+    message: "",
+    error: ""
+};
 
 export default function NewRoutePage() {
     const [items, setItems] = useState([{ id: 1 }]);
+    const [state, formAction, isPending] = useActionState(createRouteAction, initialState);
 
     const addItem = () => {
         setItems([...items, { id: Date.now() }]);
@@ -27,7 +33,7 @@ export default function NewRoutePage() {
                     <h1 className="text-2xl font-bold text-zinc-900">Nova Rota de Entrega</h1>
                 </header>
 
-                <form action={createRouteAction} className="space-y-6">
+                <form action={formAction} className="space-y-6">
                     <div className="space-y-4">
                         {items.map((item, index) => (
                             <div key={item.id} className="bg-white p-6 rounded-xl shadow-sm border border-zinc-200 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -107,13 +113,30 @@ export default function NewRoutePage() {
                         ))}
                     </div>
 
+                    {state?.error && (
+                        <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 text-center">
+                            {state.error}
+                        </div>
+                    )}
+
                     <div className="flex flex-col md:flex-row gap-4">
                         <button type="button" onClick={addItem} className="flex-1 py-4 border-2 border-dashed border-zinc-300 rounded-xl text-zinc-500 font-semibold hover:border-green-500 hover:text-green-600 hover:bg-green-50 transition-all flex items-center justify-center gap-2">
                             <Plus size={20} />
                             Adicionar Entrega
                         </button>
-                        <button type="submit" className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold shadow-green-900/20 shadow-lg hover:bg-green-500 active:scale-[0.98] transition-all">
-                            Finalizar e Criar Rota
+                        <button
+                            type="submit"
+                            disabled={isPending}
+                            className="flex-1 py-4 bg-green-600 text-white rounded-xl font-bold shadow-green-900/20 shadow-lg hover:bg-green-500 active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                            {isPending ? (
+                                <>
+                                    <Loader2 size={24} className="animate-spin" />
+                                    Criando Rota...
+                                </>
+                            ) : (
+                                "Finalizar e Criar Rota"
+                            )}
                         </button>
                     </div>
                 </form>

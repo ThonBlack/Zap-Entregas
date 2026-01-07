@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 
 import { geocodeAddress, optimizeRoute } from "@/lib/routeUtils";
 
-export async function createRouteAction(formData: FormData) {
+export async function createRouteAction(prevState: any, formData: FormData) {
     const cookieStore = await cookies();
     const userId = cookieStore.get("user_id")?.value;
     if (!userId) return { error: "Não autenticado" };
