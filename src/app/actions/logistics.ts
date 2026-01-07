@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { deliveries } from "@/db/schema";
-import { eq, inArray } from "drizzle-orm";
+import { deliveries, transactions, shopSettings, users } from "@/db/schema";
+import { eq, inArray, and } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -140,16 +140,64 @@ export async function completeDeliveryAction(id: number) {
     if (!userId) return { error: "Não autenticado" };
 
     try {
+        // 1. Get Shop Settings for calculation
+        // We need to know WHO is the shopkeeper for this delivery to get their settings
+        const delivery = await db.query.deliveries.findFirst({
+            where: eq(deliveries.id, id),
+            with: {
+                shopkeeper: true
+            }
+        });
+
+        if (!delivery) return { error: "Entrega não encontrada." };
+
+        const shopId = delivery.shopkeeperId;
+        if (shopId) {
+            const settings = await db.query.shopSettings.findFirst({
+                where: eq(shopSettings.userId, shopId)
+            });
+
+            if (settings) {
+                let fee = 0;
+                // Simple MVP Logic: Fixed Value Only for now (as requested)
+                // Expanded logic:
+                if (settings.remunerationModel === 'fixed' || settings.remunerationModel === 'hybrid') {
+                    fee += (settings.fixedValue || 0);
+                }
+
+                // If distance calculation is needed, we would need distance between points.
+                // For now, MVP assumes Fixed.
+
+                if (fee > 0) {
+                    // Create Transaction: Credit to Motoboy
+                    await db.insert(transactions).values({
+                        userId: Number(userId), // Motoboy receives
+                        amount: fee,
+                        type: 'credit',
+                        description: `Corrida #${id} - ${delivery.customerName || 'Cliente'}`,
+                        relatedDeliveryId: id,
+                        creatorId: shopId, // Shopkeeper "pays" (conceptually)
+                        status: 'confirmed'
+                    });
+
+                    // Update delivery fee for record
+                    await db.update(deliveries).set({ fee }).where(eq(deliveries.id, id));
+                }
+            }
+        }
+
         await db.update(deliveries)
             .set({
                 status: 'delivered',
-                motoboyId: Number(userId), // Ensure the completing user is recorded as the deliverer
+                motoboyId: Number(userId),
                 updatedAt: new Date().toISOString()
-            }) // History view will filter address based on this
+            })
             .where(eq(deliveries.id, id));
+
         revalidatePath("/");
         return { success: true };
     } catch (e) {
+        console.error(e);
         return { error: "Erro ao finalizar" };
     }
 }

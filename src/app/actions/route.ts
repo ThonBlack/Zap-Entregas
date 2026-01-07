@@ -2,6 +2,7 @@
 
 import { db } from "@/db";
 import { deliveries } from "@/db/schema";
+import { and, eq, gt } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -20,6 +21,21 @@ export async function createRouteAction(prevState: any, formData: FormData) {
     const observations = formData.getAll("observation");
 
     if (!addresses.length) return { error: "Adicione ao menos um endereço" };
+
+    // Prevent double submission (Idempotency Check)
+    // Check if there are any deliveries created by this user with the same first address in the last minute
+    const recentDelivery = await db.query.deliveries.findFirst({
+        where: and(
+            eq(deliveries.shopkeeperId, Number(userId)),
+            eq(deliveries.address, addresses[0] as string),
+            gt(deliveries.createdAt, new Date(Date.now() - 60000).toISOString()) // Created in last 60s
+        )
+    });
+
+    if (recentDelivery) {
+        // Likely a double click or re-submission
+        return { error: "Rota já criada recentemente. Aguarde um momento." };
+    }
 
     // 1. Geocode all addresses
     const points = await Promise.all(addresses.map(async (addr, index) => {
