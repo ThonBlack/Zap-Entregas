@@ -57,7 +57,10 @@ export default function LoginPage() {
                     </form>
 
                     <div className="text-center text-sm text-zinc-500 mt-6">
-                        Não tem conta? Fale com o administrador.
+                        Não tem conta?{" "}
+                        <Link href="/register" className="text-green-500 hover:text-green-400 font-medium">
+                            Cadastre-se agora
+                        </Link>
                     </div>
                 </div>
             </div>
