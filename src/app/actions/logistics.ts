@@ -141,7 +141,11 @@ export async function completeDeliveryAction(id: number) {
 
     try {
         await db.update(deliveries)
-            .set({ status: 'delivered' }) // History view will filter address based on this
+            .set({
+                status: 'delivered',
+                motoboyId: Number(userId), // Ensure the completing user is recorded as the deliverer
+                updatedAt: new Date().toISOString()
+            }) // History view will filter address based on this
             .where(eq(deliveries.id, id));
         revalidatePath("/");
         return { success: true };

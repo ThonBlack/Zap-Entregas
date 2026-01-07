@@ -57,12 +57,16 @@ export default async function HistoryPage() {
             )
             .orderBy(desc(deliveries.updatedAt));
 
-        // MASK DATA for Motoboy
+        // MASK DATA for Motoboy: Hide strictly sensitive location/contact info.
+        // Keep Customer Name (for reference) and finance values.
         history = rawHistory.map(d => ({
             ...d,
-            address: "🔒 Endereço Oculto (LGPD)",
+            address: "🔒 Endereço Protegido (LGPD)",
             customerPhone: "🔒 (xx) xxxxx-xxxx",
-            observation: "🔒 Dados Ocultos"
+            observation: "🔒 Dados Ocultos",
+            // Explicitly ensure other fields are passed through
+            customerName: d.customerName,
+            stopOrder: d.stopOrder
         }));
     }
 
@@ -109,7 +113,14 @@ export default async function HistoryPage() {
                                         {new Date(item.updatedAt || "").toLocaleString('pt-BR')}
                                     </span>
                                 </div>
-                                <h3 className="font-bold text-zinc-900 text-lg">{item.customerName || "Cliente"}</h3>
+                                <h3 className="font-bold text-zinc-900 text-lg">
+                                    {item.customerName || "Cliente"}
+                                    {item.stopOrder && (
+                                        <span className="ml-2 text-xs font-normal text-zinc-500 bg-zinc-100 px-2 py-0.5 rounded-full border border-zinc-200">
+                                            Parada #{item.stopOrder}
+                                        </span>
+                                    )}
+                                </h3>
                                 <div className="flex items-center gap-2 text-zinc-600">
                                     <MapPin size={16} />
                                     <span className={user.role === 'motoboy' ? "italic text-zinc-400" : ""}>
