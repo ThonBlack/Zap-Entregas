@@ -58,3 +58,14 @@ export const financialRecords = sqliteTable("financial_records", {
     paymentMethod: text("payment_method"),
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const shopSettings = sqliteTable("shop_settings", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => users.id).notNull().unique(), // Configuração única por lojista
+    remunerationModel: text("remuneration_model", { enum: ["fixed", "distance", "daily", "hybrid"] }).default("fixed").notNull(),
+    fixedValue: real("fixed_value").default(0), // Valor fixo por entrega
+    valuePerKm: real("value_per_km").default(0), // Valor por KM
+    dailyvalue: real("daily_value").default(0), // Valor da diária
+    guaranteedMinimum: real("guaranteed_minimum").default(0), // Mínimo garantido (opcional)
+    updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
