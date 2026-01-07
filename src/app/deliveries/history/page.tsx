@@ -23,7 +23,15 @@ export default async function HistoryPage() {
     // If motoboy, fetch all assigned/delivered by him.
     let history: any[] = [];
 
-    if (user.role === 'shopkeeper') {
+    if (user.role === 'admin') {
+        // Admin sees ALL delivered history
+        history = await db.select()
+            .from(deliveries)
+            .where(eq(deliveries.status, 'delivered'))
+            .orderBy(desc(deliveries.updatedAt));
+
+    } else if (user.role === 'shopkeeper') {
+        // Shopkeeper sees only their own delivered history
         history = await db.select()
             .from(deliveries)
             .where(
@@ -33,25 +41,13 @@ export default async function HistoryPage() {
                 )
             )
             .orderBy(desc(deliveries.updatedAt));
+
     } else {
         const rawHistory = await db.select()
             .from(deliveries)
             .where(
                 and(
-                    eq(deliveries.motoboyId, user.id), // Assuming motoboyId is set upon assignment
-                    // Wait, currently we might not be setting motoboyId? 
-                    // Let's assume for now scope is "All Pending" -> "All Delivered" for simplicty in MVPv1 
-                    // BUT task says "Histórico de Corridas (Lojista e Motoboy)".
-                    // If the system is shared pool, maybe we need to fetch all 'delivered'?
-                    // For now, let's stick to the schema: deliveries has motoboyId. 
-                    // If logic doesn't set it yet, we need to fix assignment. 
-                    // Assuming for now SaaS logic: items completed by THIS motoboy.
-                    // If motoboyId is null in DB for completed items, this list will be empty.
-                    // Let's fallback to "All Delivered" if motoboyId is not strictly enforced yet 
-                    // OR better: check if we need to assign motoboyId on completion?
-                    // Re-checking completeDeliveryAction... it just sets status.
-                    // FIX: We need to assign motoboyId when completing if not set!
-                    // For this step, I'll fetch 'delivered' items.
+                    eq(deliveries.motoboyId, user.id),
                     eq(deliveries.status, 'delivered')
                 )
             )
