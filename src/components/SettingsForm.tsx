@@ -47,11 +47,39 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                         </div>
                         <div>
                             <p className="text-blue-100 text-sm font-medium">Modelo Atual</p>
-                            <h2 className="text-xl font-bold">
-                                {model === "fixed" && "Taxa Fixa"}
-                                {model === "distance" && "Por KM"}
-                                {model === "hybrid" && "Híbrido (Fixo + KM)"}
-                                {model === "daily" && "Diária"}
+                            <h2 className="text-xl font-bold flex items-center gap-2">
+                                {model === "fixed" && (
+                                    <>
+                                        Taxa Fixa
+                                        <span className="text-white/80 font-normal">
+                                            (R$ {initialData?.fixedValue?.toFixed(2).replace('.', ',') || '0,00'})
+                                        </span>
+                                    </>
+                                )}
+                                {model === "distance" && (
+                                    <>
+                                        Por KM
+                                        <span className="text-white/80 font-normal">
+                                            (R$ {initialData?.valuePerKm?.toFixed(2).replace('.', ',') || '0,00'}/km)
+                                        </span>
+                                    </>
+                                )}
+                                {model === "hybrid" && (
+                                    <>
+                                        Híbrido
+                                        <span className="text-white/80 font-normal text-sm">
+                                            (R$ {initialData?.fixedValue?.toFixed(2).replace('.', ',')} + R$ {initialData?.valuePerKm?.toFixed(2).replace('.', ',')}/km)
+                                        </span>
+                                    </>
+                                )}
+                                {model === "daily" && (
+                                    <>
+                                        Diária
+                                        <span className="text-white/80 font-normal">
+                                            (R$ {initialData?.dailyvalue?.toFixed(2).replace('.', ',') || '0,00'})
+                                        </span>
+                                    </>
+                                )}
                             </h2>
                         </div>
                     </div>

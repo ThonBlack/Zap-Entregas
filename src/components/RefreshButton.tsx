@@ -17,10 +17,10 @@ export default function RefreshButton() {
     return (
         <button
             onClick={handleRefresh}
-            className="p-2 text-zinc-500 hover:text-blue-600 hover:bg-zinc-100 rounded-full transition-all active:scale-95"
+            className="p-2 text-zinc-600 bg-white border border-zinc-200 hover:border-blue-300 hover:text-blue-600 rounded-lg shadow-sm transition-all active:scale-95"
             title="Atualizar lista"
         >
-            <RefreshCw size={20} className={isLoading ? "animate-spin" : ""} />
+            <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
         </button>
     );
 }
