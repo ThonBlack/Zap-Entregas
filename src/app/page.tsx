@@ -241,7 +241,7 @@ export default async function Dashboard() {
                                 <Wallet size={24} className="text-zinc-400" />
                                 <span className="text-sm">Pagar Motoboy</span>
                             </Link>
-                            <Link href="/finance/manager" className="flex items-center justify-center gap-3 w-full bg-emerald-600 text-white p-4 rounded-xl font-bold shadow-sm active:bg-emerald-700 transition-colors hover:bg-emerald-700">
+                            <Link href="/finance/dashboard" className="flex items-center justify-center gap-3 w-full bg-emerald-600 text-white p-4 rounded-xl font-bold shadow-sm active:bg-emerald-700 transition-colors hover:bg-emerald-700">
                                 <DollarSign size={24} className="text-white" />
                                 <span className="text-sm">Gestor Financeiro</span>
                             </Link>
@@ -305,7 +305,7 @@ export default async function Dashboard() {
 
                         {/* Motoboy Actions (SaaS) */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Link href="/finance/manager" className="flex items-center justify-center gap-3 w-full bg-emerald-600 text-white p-4 rounded-xl font-bold shadow-sm active:bg-emerald-700 transition-colors hover:bg-emerald-700">
+                            <Link href="/finance/dashboard" className="flex items-center justify-center gap-3 w-full bg-emerald-600 text-white p-4 rounded-xl font-bold shadow-sm active:bg-emerald-700 transition-colors hover:bg-emerald-700">
                                 <DollarSign size={24} className="text-white" />
                                 <span className="text-sm">Meu Gestor Financeiro</span>
                             </Link>
