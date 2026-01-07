@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { deliveries, transactions, shopSettings, users } from "@/db/schema";
-import { eq, inArray, and } from "drizzle-orm";
+import { eq, inArray, and, gt } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -32,6 +32,8 @@ export async function addDeliveryAction(formData: FormData) {
 
     if (recent) return { error: "Entrega já adicionada recentemente." };
 
+    // Try to geocode immediately, but don't blocking if fails (can be done later or in background)
+    let lat = 0, lng = 0;
     try {
         const coords = await geocodeAddress(address);
         if (coords) {
