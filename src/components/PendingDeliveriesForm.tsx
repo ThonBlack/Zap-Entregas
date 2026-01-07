@@ -47,7 +47,23 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
             requireWord: "EXCLUIR",
             variant: "danger",
             action: async () => {
-                await import("@/app/actions/logistics").then(m => m.deleteDeliveryAction(id));
+                try {
+                    const m = await import("@/app/actions/logistics");
+                    const res = await m.deleteDeliveryAction(id);
+                    if (res?.error) {
+                        alert(res.error);
+                    } else {
+                        // Success
+                        // Force a router refresh to ensure UI sync
+                        // (Though revalidatePath should handle it, this is a fallback)
+                        import("next/navigation").then(({ useRouter }) => {
+                            // Can't use hook in callback easily, but we can assume revalidate works or reload
+                            window.location.reload();
+                        });
+                    }
+                } catch (e) {
+                    alert("Erro ao conectar com servidor.");
+                }
             }
         });
     };
@@ -59,7 +75,9 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
             description: "ATENÇÃO: Ao confirmar a entrega, os dados sensíveis do cliente (endereço, telefone) ficarão ocultos para proteção de privacidade (LGPD). Confirma a entrega?",
             variant: "warning",
             action: async () => {
-                await import("@/app/actions/logistics").then(m => m.completeDeliveryAction(id));
+                const m = await import("@/app/actions/logistics");
+                await m.completeDeliveryAction(id);
+                window.location.reload();
             }
         });
     };
