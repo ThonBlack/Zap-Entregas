@@ -109,7 +109,7 @@ export default async function AdminPage() {
                                             u.role === 'motoboy' ? 'bg-blue-100 text-blue-800' :
                                                 'bg-purple-100 text-purple-800'
                                             }`}>
-                                            {u.role === 'shopkeeper' ? 'Lojista' : u.role === 'motoboy' ? 'Motoboy' : 'Admin'}
+                                            {u.role === 'shopkeeper' ? 'Lojista' : u.role === 'motoboy' ? 'Motoboy' : 'Gestor'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
