@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
-import { sql } from "drizzle-orm";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sql, relations } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
     id: integer("id").primaryKey({ autoIncrement: true }),
@@ -69,3 +70,29 @@ export const shopSettings = sqliteTable("shop_settings", {
     guaranteedMinimum: real("guaranteed_minimum").default(0), // Mínimo garantido (opcional)
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
+
+// RELATIONS
+export const usersRelations = relations(users, ({ many, one }) => ({
+    shopSettings: one(shopSettings, {
+        fields: [users.id],
+        references: [shopSettings.userId],
+    }),
+}));
+
+export const deliveriesRelations = relations(deliveries, ({ one }) => ({
+    shopkeeper: one(users, {
+        fields: [deliveries.shopkeeperId],
+        references: [users.id],
+    }),
+    motoboy: one(users, {
+        fields: [deliveries.motoboyId],
+        references: [users.id],
+    }),
+}));
+
+export const shopSettingsRelations = relations(shopSettings, ({ one }) => ({
+    user: one(users, {
+        fields: [shopSettings.userId],
+        references: [users.id],
+    }),
+}));
