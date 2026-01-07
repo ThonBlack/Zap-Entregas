@@ -1,0 +1,13 @@
+version: '3'
+services:
+  zap-entregas:
+    build: .
+    container_name: zap-entregas
+    restart: always
+    ports:
+      - "4000:3000" # Map Host 4000 -> Container 3000
+    volumes:
+      - ./sqlite.db:/app/sqlite.db # Persist database
+      - ./uploads:/app/uploads # Persist uploads if any
+    environment:
+      - NODE_ENV=production
