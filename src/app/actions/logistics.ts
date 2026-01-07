@@ -60,7 +60,76 @@ export async function addDeliveryAction(formData: FormData) {
     return { success: true };
 }
 
-// ... (optimizeSelectedRouteAction stays same) ...
+// 2. Optimize Selected Deliveries
+export async function optimizeSelectedRouteAction(selectedIds: number[]) {
+    if (!selectedIds.length) {
+        return { error: "Selecione pelo menos uma entrega." };
+    }
+
+    // Fetch full delivery objects
+    const targets = await db.select().from(deliveries).where(inArray(deliveries.id, selectedIds));
+
+    // Ensure all have coordinates
+    const points = await Promise.all(targets.map(async (d, index) => {
+        let lat = d.lat || 0;
+        let lng = d.lng || 0;
+
+        // If missing coords, try geocode again
+        if (lat === 0 || lng === 0) {
+            const coords = await geocodeAddress(d.address);
+            if (coords) {
+                lat = coords.lat;
+                lng = coords.lng;
+                // Update DB so we don't fetch again
+                await db.update(deliveries).set({ lat, lng }).where(eq(deliveries.id, d.id));
+            }
+        }
+
+        return {
+            id: d.id,
+            index, // Keep track of original index if needed, but ID is better
+            lat,
+            lng,
+            address: d.address
+        };
+    }));
+
+    // Filter valid points for optimization
+    const validPoints = points.filter(p => p.lat !== 0);
+
+    // Run Optimization (TSP / Nearest Neighbor)
+    let optimized: typeof validPoints = [];
+    if (validPoints.length > 0) {
+        optimized = optimizeRoute(validPoints[0], validPoints);
+    } else {
+        // Fallback for all failed geocodes
+        optimized = points;
+    }
+
+    // Missing/Failed points go to the end
+    const failedPoints = points.filter(p => p.lat === 0);
+    const finalOrder = [...optimized, ...failedPoints];
+
+    // Update stopOrder in DB
+    await Promise.all(finalOrder.map((p, i) => {
+        return db.update(deliveries)
+            .set({ stopOrder: i + 1 })
+            .where(eq(deliveries.id, p.id!));
+    }));
+
+    revalidatePath("/");
+
+    // Generate Maps URL
+    if (finalOrder.length > 0) {
+        // Destination is the last one, others are waypoints
+        const destination = finalOrder[finalOrder.length - 1].address;
+        const waypoints = finalOrder.slice(0, -1).map(p => p.address).join('|');
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&waypoints=${encodeURIComponent(waypoints)}`;
+        return { success: true, url };
+    }
+
+    return { success: true, url: "" };
+}
 
 // 3. Delete Delivery
 export async function deleteDeliveryAction(id: number) {
