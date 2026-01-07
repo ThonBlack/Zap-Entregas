@@ -1,25 +1,26 @@
-FROM node:20-alpine
-
+FROM node:20-alpine AS builder
 WORKDIR /app
+RUN apk add --no-cache libc6-compat python3 make g++
 
-# Install build dependencies for native modules (better-sqlite3)
-RUN apk add --no-cache python3 make g++
-
-# Install dependencies (only production if possible, but build needs devDeps)
 COPY package*.json ./
 RUN npm ci
 
-# Copy source
 COPY . .
-
-# Build Next.js app
 RUN npm run build
 
-# Prune dev dependencies for lighter image
-RUN npm prune --production
+# Runner Stage
+FROM node:20-alpine AS runner
+WORKDIR /app
 
-# Expose port (internal container port)
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Copy necessary files from builder
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/sqlite.db ./sqlite.db
+
 EXPOSE 3000
 
-# Start command
-CMD ["npm", "start"]
+CMD ["node", "server.js"]
