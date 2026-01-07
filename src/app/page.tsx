@@ -257,10 +257,6 @@ export default async function Dashboard() {
                         </div>
 
                         <section>
-                            <div className="flex justify-between items-center mb-3">
-                                <h2 className="font-bold text-zinc-800">Entregas Pendentes</h2>
-                                <RefreshButton />
-                            </div>
                             <PendingDeliveriesForm deliveries={pendingDeliveries} />
                         </section>
 
@@ -321,10 +317,6 @@ export default async function Dashboard() {
 
                         {/* Route Generation / Pending Deliveries */}
                         <section>
-                            <div className="flex justify-between items-center mb-3">
-                                <h3 className="font-bold text-zinc-800">Gerar Rota</h3>
-                                <RefreshButton />
-                            </div>
                             <PendingDeliveriesForm deliveries={pendingDeliveries} />
                         </section>
                     </div>
