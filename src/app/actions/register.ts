@@ -43,5 +43,9 @@ export async function registerAction(prevState: any, formData: FormData) {
         maxAge: 60 * 60 * 24 * 7 // 1 week
     });
 
-    redirect("/");
+    if (role === 'shopkeeper' || role === 'admin') {
+        redirect("/settings");
+    } else {
+        redirect("/");
+    }
 }

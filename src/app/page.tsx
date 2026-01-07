@@ -4,7 +4,7 @@ import { users, transactions, deliveries } from "@/db/schema";
 import { eq, sql, desc, and } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { LogOut, Plus, Wallet, TrendingUp, TrendingDown, DollarSign, AlertCircle, ShieldCheck } from "lucide-react";
+import { LogOut, Plus, Wallet, TrendingUp, TrendingDown, DollarSign, AlertCircle, ShieldCheck, Settings } from "lucide-react";
 import PendingDeliveriesForm from "@/components/PendingDeliveriesForm";
 import { confirmTransactionAction, rejectTransactionAction } from "@/app/actions/finance";
 
@@ -160,6 +160,11 @@ export default async function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {(user.role === 'shopkeeper' || user.role === 'admin') && (
+                        <Link href="/settings" className="p-2 text-zinc-400 hover:text-blue-500 transition-colors" title="Configurações da Loja">
+                            <Settings size={20} />
+                        </Link>
+                    )}
                     <Link href="/security/2fa-setup" className="p-2 text-zinc-400 hover:text-blue-500 transition-colors" title="Segurança / 2FA">
                         <ShieldCheck size={20} />
                     </Link>
