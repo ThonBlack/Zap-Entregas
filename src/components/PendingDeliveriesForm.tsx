@@ -75,14 +75,24 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                 variant={modalConfig.variant}
                 confirmText="Confirmar"
             />
-            <form action={async (formData) => {
-                await optimizeSelectedRouteAction(formData);
-            }}>
+            <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-zinc-800">Entregas Pendentes ({deliveries.length})</h3>
                     <button
-                        disabled={selected.length < 2}
-                        className="flex items-center gap-2 bg-blue-600 disabled:bg-zinc-300 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+                        onClick={async () => {
+                            if (selected.length < 1) return;
+
+                            // Call server action to optimize and get URL
+                            const result = await optimizeSelectedRouteAction(selected);
+
+                            if (result.success && result.url) {
+                                window.open(result.url, '_blank');
+                            } else {
+                                alert("Erro ao gerar rota ou rota vazia.");
+                            }
+                        }}
+                        disabled={selected.length < 1}
+                        className="flex items-center gap-2 bg-blue-600 disabled:bg-zinc-300 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-blue-900/10 active:scale-95"
                     >
                         <Play size={16} fill="currentColor" />
                         Gerar Rota ({selected.length})
@@ -141,7 +151,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                         Nenhuma entrega cadastrada.
                     </div>
                 )}
-            </form>
+            </div>
         </>
     );
 }

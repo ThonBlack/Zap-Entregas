@@ -49,15 +49,13 @@ export async function addDeliveryAction(formData: FormData) {
 }
 
 // 2. Optimize Selected Deliveries
-export async function optimizeSelectedRouteAction(formData: FormData) {
-    const deliveryIds = formData.getAll("selectedDelivery") as string[];
-
-    if (!deliveryIds.length) {
+export async function optimizeSelectedRouteAction(selectedIds: number[]) {
+    if (!selectedIds.length) {
         return { error: "Selecione pelo menos uma entrega." };
     }
 
     // Fetch full delivery objects
-    const targets = await db.select().from(deliveries).where(inArray(deliveries.id, deliveryIds.map(Number)));
+    const targets = await db.select().from(deliveries).where(inArray(deliveries.id, selectedIds));
 
     // Ensure all have coordinates
     const points = await Promise.all(targets.map(async (d, index) => {
@@ -88,13 +86,6 @@ export async function optimizeSelectedRouteAction(formData: FormData) {
     const validPoints = points.filter(p => p.lat !== 0);
 
     // Run Optimization (TSP / Nearest Neighbor)
-    // We assume the route starts from the "first selected" or just optimizes the set locally?
-    // Let's optimize relative to the very first item in the selection list (or nearest to Shop if we knew where it was)
-    // For now: First valid point is the anchor.
-
-    // NOTE: optimizeRoute in lib/routeUtils currently expects specific shape.
-    // Let's rely on validPoints.
-
     let optimized: typeof validPoints = [];
     if (validPoints.length > 0) {
         optimized = optimizeRoute(validPoints[0], validPoints);
@@ -108,14 +99,24 @@ export async function optimizeSelectedRouteAction(formData: FormData) {
     const finalOrder = [...optimized, ...failedPoints];
 
     // Update stopOrder in DB
-    // Usage of Promise.all for parallel updates
     await Promise.all(finalOrder.map((p, i) => {
         return db.update(deliveries)
             .set({ stopOrder: i + 1 })
             .where(eq(deliveries.id, p.id!));
     }));
 
-    redirect("/");
+    revalidatePath("/");
+
+    // Generate Maps URL
+    if (finalOrder.length > 0) {
+        // Destination is the last one, others are waypoints
+        const destination = finalOrder[finalOrder.length - 1].address;
+        const waypoints = finalOrder.slice(0, -1).map(p => p.address).join('|');
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&waypoints=${encodeURIComponent(waypoints)}`;
+        return { success: true, url };
+    }
+
+    return { success: true, url: "" };
 }
 // 3. Delete Delivery
 export async function deleteDeliveryAction(id: number) {
