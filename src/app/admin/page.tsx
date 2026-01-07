@@ -99,13 +99,15 @@ export default async function AdminPage() {
                             {allUsers.map((u) => (
                                 <tr key={u.id} className="hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4">
-                                        <div className="font-medium text-slate-900">{u.name}</div>
-                                        <div className="text-xs text-slate-500">{u.phone}</div>
+                                        <Link href={`/admin/users/${u.id}`} className="block group">
+                                            <div className="font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">{u.name}</div>
+                                            <div className="text-xs text-slate-500">{u.phone}</div>
+                                        </Link>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${u.role === 'shopkeeper' ? 'bg-orange-100 text-orange-800' :
-                                                u.role === 'motoboy' ? 'bg-blue-100 text-blue-800' :
-                                                    'bg-purple-100 text-purple-800'
+                                            u.role === 'motoboy' ? 'bg-blue-100 text-blue-800' :
+                                                'bg-purple-100 text-purple-800'
                                             }`}>
                                             {u.role === 'shopkeeper' ? 'Lojista' : u.role === 'motoboy' ? 'Motoboy' : 'Admin'}
                                         </span>
