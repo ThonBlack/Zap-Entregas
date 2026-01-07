@@ -6,20 +6,20 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-export async function registerAction(formData: FormData) {
+export async function registerAction(prevState: any, formData: FormData) {
     const name = formData.get("name") as string;
     const phone = formData.get("phone") as string;
     const password = formData.get("password") as string;
     const role = formData.get("role") as "shopkeeper" | "motoboy";
 
     if (!name || !phone || !password || !role) {
-        return { error: "Preencha todos os campos obrigatórios." };
+        return { message: "Preencha todos os campos obrigatórios." };
     }
 
     // Check if user already exists
     const existingUser = await db.select().from(users).where(eq(users.phone, phone)).get();
     if (existingUser) {
-        return { error: "Este número de celular já está cadastrado." };
+        return { message: "Este número de celular já está cadastrado." };
     }
 
     // Create user
@@ -33,7 +33,7 @@ export async function registerAction(formData: FormData) {
     }).returning().get();
 
     if (!newUser) {
-        return { error: "Erro ao criar conta. Tente novamente." };
+        return { message: "Erro ao criar conta. Tente novamente." };
     }
 
     // Auto-login after registration

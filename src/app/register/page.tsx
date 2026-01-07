@@ -2,10 +2,15 @@
 
 import { registerAction } from "../actions/register";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useActionState } from "react";
+
+const initialState = {
+    message: "",
+};
 
 export default function RegisterPage() {
     const [role, setRole] = useState<"shopkeeper" | "motoboy">("shopkeeper");
+    const [state, formAction, isPending] = useActionState(registerAction, initialState);
 
     return (
         <div className="min-h-screen bg-zinc-900 flex items-center justify-center p-4">
@@ -15,15 +20,15 @@ export default function RegisterPage() {
                     <p className="text-zinc-400">Junte-se ao Zap Entregas</p>
                 </div>
 
-                <form action={registerAction} className="space-y-6">
+                <form action={formAction} className="space-y-6">
                     {/* Role Selection */}
                     <div className="grid grid-cols-2 gap-4 p-1 bg-zinc-700/50 rounded-lg">
                         <button
                             type="button"
                             onClick={() => setRole("shopkeeper")}
                             className={`p-3 rounded-md text-sm font-medium transition-all ${role === "shopkeeper"
-                                ? "bg-green-600 text-white shadow-lg"
-                                : "text-zinc-400 hover:text-white hover:bg-zinc-600"
+                                    ? "bg-green-600 text-white shadow-lg"
+                                    : "text-zinc-400 hover:text-white hover:bg-zinc-600"
                                 }`}
                         >
                             Sou Lojista
@@ -32,8 +37,8 @@ export default function RegisterPage() {
                             type="button"
                             onClick={() => setRole("motoboy")}
                             className={`p-3 rounded-md text-sm font-medium transition-all ${role === "motoboy"
-                                ? "bg-green-600 text-white shadow-lg"
-                                : "text-zinc-400 hover:text-white hover:bg-zinc-600"
+                                    ? "bg-green-600 text-white shadow-lg"
+                                    : "text-zinc-400 hover:text-white hover:bg-zinc-600"
                                 }`}
                         >
                             Sou Motoboy
@@ -76,11 +81,18 @@ export default function RegisterPage() {
                         </div>
                     </div>
 
+                    {state?.message && (
+                        <div className="bg-red-500/10 text-red-500 text-sm p-3 rounded-lg text-center">
+                            {state.message}
+                        </div>
+                    )}
+
                     <button
                         type="submit"
-                        className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition-all transform active:scale-[0.98] shadow-lg shadow-green-900/20"
+                        disabled={isPending}
+                        className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg transition-all transform active:scale-[0.98] shadow-lg shadow-green-900/20"
                     >
-                        Cadastrar
+                        {isPending ? "Criando conta..." : "Cadastrar"}
                     </button>
                 </form>
 
