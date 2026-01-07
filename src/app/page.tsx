@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LogOut, Plus, Wallet, TrendingUp, TrendingDown, DollarSign, AlertCircle, ShieldCheck, Settings } from "lucide-react";
 import PendingDeliveriesForm from "@/components/PendingDeliveriesForm";
+import RefreshButton from "@/components/RefreshButton";
 import { confirmTransactionAction, rejectTransactionAction } from "@/app/actions/finance";
 
 // Helpers modified to filter confirmed transactions for balance
@@ -256,6 +257,10 @@ export default async function Dashboard() {
                         </div>
 
                         <section>
+                            <div className="flex justify-between items-center mb-3">
+                                <h2 className="font-bold text-zinc-800">Entregas Pendentes</h2>
+                                <RefreshButton />
+                            </div>
                             <PendingDeliveriesForm deliveries={pendingDeliveries} />
                         </section>
 
@@ -316,7 +321,10 @@ export default async function Dashboard() {
 
                         {/* Route Generation / Pending Deliveries */}
                         <section>
-                            <h3 className="font-bold text-zinc-800 mb-3">Gerar Rota</h3>
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-zinc-800">Gerar Rota</h3>
+                                <RefreshButton />
+                            </div>
                             <PendingDeliveriesForm deliveries={pendingDeliveries} />
                         </section>
                     </div>
