@@ -1,6 +1,6 @@
 "use client";
 
-import { registerAction } from "../../actions/register";
+import { registerAction } from "../actions/register";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -22,8 +22,8 @@ export default function RegisterPage() {
                             type="button"
                             onClick={() => setRole("shopkeeper")}
                             className={`p-3 rounded-md text-sm font-medium transition-all ${role === "shopkeeper"
-                                    ? "bg-green-600 text-white shadow-lg"
-                                    : "text-zinc-400 hover:text-white hover:bg-zinc-600"
+                                ? "bg-green-600 text-white shadow-lg"
+                                : "text-zinc-400 hover:text-white hover:bg-zinc-600"
                                 }`}
                         >
                             Sou Lojista
@@ -32,8 +32,8 @@ export default function RegisterPage() {
                             type="button"
                             onClick={() => setRole("motoboy")}
                             className={`p-3 rounded-md text-sm font-medium transition-all ${role === "motoboy"
-                                    ? "bg-green-600 text-white shadow-lg"
-                                    : "text-zinc-400 hover:text-white hover:bg-zinc-600"
+                                ? "bg-green-600 text-white shadow-lg"
+                                : "text-zinc-400 hover:text-white hover:bg-zinc-600"
                                 }`}
                         >
                             Sou Motoboy
