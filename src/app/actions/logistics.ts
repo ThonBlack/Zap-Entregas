@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { deliveries, transactions, shopSettings, users } from "@/db/schema";
-import { eq, inArray, and, gt } from "drizzle-orm";
+import { deliveries, transactions, shopSettings, users, subscriptions, plans } from "@/db/schema";
+import { eq, inArray, and, gt, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -43,6 +43,9 @@ export async function addDeliveryAction(formData: FormData) {
     } catch (e) {
         console.error("Geocode form failed", e);
     }
+
+    // TODO: Add plan limits verification when needed
+    // For MVP, allow all deliveries
 
     await db.insert(deliveries).values({
         shopkeeperId: Number(userId),

@@ -1,11 +1,12 @@
 "use server";
 
 import { db } from "@/db";
-import { shopSettings } from "@/db/schema";
+import { shopSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { saveFile } from "@/lib/upload";
 
 export async function updateSettingsAction(prevState: any, formData: FormData) {
     const cookieStore = await cookies();
@@ -48,5 +49,43 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
     } catch (e) {
         console.error(e);
         return { message: "Erro ao salvar configurações.", success: false };
+    }
+}
+
+export async function updateProfileAction(prevState: any, formData: FormData) {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+
+    if (!userId) redirect("/login");
+
+    const name = formData.get("name") as string;
+    const file = formData.get("avatar") as File;
+    const removeAvatar = formData.get("removeAvatar") === "true";
+
+    try {
+        const currentUser = await db.select().from(users).where(eq(users.id, Number(userId))).get();
+        if (!currentUser) return { message: "Usuário não encontrado", success: false };
+
+        let avatarUrl = currentUser.avatarUrl;
+        let lastUpdate = currentUser.lastAvatarUpdate;
+
+        if (removeAvatar) {
+            avatarUrl = null;
+        } else if (file && file.size > 0 && file.name !== "undefined") {
+            avatarUrl = await saveFile(file);
+            lastUpdate = new Date().toISOString();
+        }
+
+        await db.update(users).set({
+            name: name || currentUser.name,
+            avatarUrl,
+            lastAvatarUpdate: lastUpdate
+        }).where(eq(users.id, Number(userId)));
+
+        revalidatePath("/");
+        return { message: "Perfil atualizado com sucesso!", success: true };
+    } catch (e) {
+        console.error(e);
+        return { message: "Erro ao atualizar perfil.", success: false };
     }
 }

@@ -1,11 +1,12 @@
 "use server";
 
 import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, shopSettings, subscriptions } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { saveFile } from "@/lib/upload";
+import { revalidatePath } from "next/cache";
 
 export async function createMotoboyAction(formData: FormData) {
     const cookieStore = await cookies();
@@ -27,6 +28,9 @@ export async function createMotoboyAction(formData: FormData) {
     if (!name || !phone) {
         return { error: "Nome e Telefone são obrigatórios" };
     }
+
+    // TODO: Add plan limits verification when subscription relations are properly set up
+    // For now, motoboys are global/freelancers, so no limit on creation
 
     try {
         await db.insert(users).values({
@@ -83,4 +87,21 @@ export async function updateMotoboyAction(formData: FormData) {
         .where(eq(users.id, Number(id)));
 
     redirect("/motoboys");
+}
+
+export async function deleteMotoboyAction(formData: FormData) {
+    const id = formData.get("id") as string;
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+
+    if (!userId || !id) return { error: "Operação inválida" };
+
+    try {
+        await db.delete(users).where(eq(users.id, Number(id)));
+    } catch (e) {
+        return { error: "Erro ao excluir. O motoboy pode ter entregas vinculadas." };
+    }
+
+    revalidatePath("/motoboys");
+    return { success: true };
 }

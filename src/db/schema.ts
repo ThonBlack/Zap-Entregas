@@ -13,6 +13,9 @@ export const users = sqliteTable("users", {
     subscriptionStatus: text("subscription_status", { enum: ["active", "inactive", "trial"] }).default("active").notNull(),
     twoFactorSecret: text("two_factor_secret"),
     twoFactorEnabled: integer("two_factor_enabled", { mode: 'boolean' }).default(false),
+    currentLat: real("current_lat"),
+    currentLng: real("current_lng"),
+    lastLocationUpdate: text("last_location_update"),
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
@@ -93,5 +96,39 @@ export const shopSettingsRelations = relations(shopSettings, ({ one }) => ({
     user: one(users, {
         fields: [shopSettings.userId],
         references: [users.id],
+    }),
+}));
+
+export const plans = sqliteTable("plans", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(), // Starter, Growth, Unlimited
+    price: real("price").notNull(),
+    maxMotoboys: integer("max_motoboys").default(1),
+    maxDeliveries: integer("max_deliveries").default(50),
+    pricePerExtraDelivery: real("price_per_extra_delivery").default(1.0),
+    isActive: integer("is_active", { mode: 'boolean' }).default(true),
+});
+
+export const subscriptions = sqliteTable("subscriptions", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => users.id).notNull(),
+    planId: integer("plan_id").references(() => plans.id).notNull(),
+    asaasCustomerId: text("asaas_customer_id"),
+    asaasSubscriptionId: text("asaas_subscription_id"),
+    status: text("status", { enum: ["active", "overdue", "canceled"] }).default("active"),
+    currentPeriodStart: text("current_period_start"),
+    currentPeriodEnd: text("current_period_end"),
+    usageCount: integer("usage_count").default(0), // Count deliveries in cycle
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+    user: one(users, {
+        fields: [subscriptions.userId],
+        references: [users.id],
+    }),
+    plan: one(plans, {
+        fields: [subscriptions.planId],
+        references: [plans.id],
     }),
 }));

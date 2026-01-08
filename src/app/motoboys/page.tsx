@@ -2,8 +2,8 @@ import Link from "next/link";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { ArrowLeft, Plus, Edit2, User } from "lucide-react";
-import { createMotoboyAction, updateMotoboyAction } from "@/app/actions/motoboy"; // You'll need to create this or adjust import
+import { ArrowLeft, Plus, Edit2, User, Trash2 } from "lucide-react";
+import { createMotoboyAction, updateMotoboyAction, deleteMotoboyAction } from "@/app/actions/motoboy"; // You'll need to create this or adjust import
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 
@@ -102,6 +102,16 @@ export default async function MotoboysPage() {
                                 <Link href={`/motoboys/${motoboy.id}`} className="p-2 text-zinc-400 hover:text-blue-600 transition-colors bg-zinc-50 rounded-lg hover:bg-blue-50">
                                     <Edit2 size={20} />
                                 </Link>
+                                <form action={deleteMotoboyAction} className="ml-2">
+                                    <input type="hidden" name="id" value={motoboy.id} />
+                                    <button
+                                        type="submit"
+                                        className="p-2 text-zinc-400 hover:text-red-600 transition-colors bg-zinc-50 rounded-lg hover:bg-red-50"
+                                        title="Excluir Motoboy"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                </form>
                             </div>
                         ))
                     )}
