@@ -2,16 +2,10 @@ import { db } from "@/db";
 import { deliveries, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { getMotoboyLocationAction } from "@/app/actions/tracking";
-
-// Dynamic import for Map to avoid SSR issues with Leaflet
-const TrackingMap = dynamic(() => import("@/components/TrackingMap"), {
-    ssr: false,
-    loading: () => <div className="h-[400px] w-full bg-zinc-100 rounded-xl animate-pulse mt-4"></div>
-});
+import TrackingMapWrapper from "@/components/TrackingMapWrapper";
 
 export default async function TrackingPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -87,7 +81,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
 
                     <div className="mt-6">
                         {delivery.motoboyId && motoboyLocation ? (
-                            <TrackingMap motoboyLocation={motoboyLocation} />
+                            <TrackingMapWrapper motoboyLocation={motoboyLocation} />
                         ) : (
                             <div className="h-[200px] bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400 text-sm text-center p-4">
                                 {delivery.motoboyId ? "Aguardando sinal do motoboy..." : "Aguardando um motoboy aceitar seu pedido."}
