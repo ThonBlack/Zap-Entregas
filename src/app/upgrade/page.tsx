@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Check, Sparkles, Zap, Crown, Rocket, Shield, Clock, Users, Star, TrendingUp, MessageCircle, ChevronRight, PartyPopper, Package } from "lucide-react";
+import { Check, Sparkles, Zap, Crown, Rocket, Shield, Clock, Users, Star, TrendingUp, MessageCircle, ChevronRight, PartyPopper, Package, MapPin } from "lucide-react";
 
 export default async function UpgradePage() {
     const cookieStore = await cookies();
@@ -211,6 +211,14 @@ export default async function UpgradePage() {
                                             </div>
                                             Dashboard completo
                                         </li>
+                                        {!isFree && (
+                                            <li className="flex items-center gap-3 text-green-400 font-medium">
+                                                <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
+                                                    <MapPin size={14} className="text-white" />
+                                                </div>
+                                                Rastreamento GPS em tempo real 📍
+                                            </li>
+                                        )}
                                         {isUnlimited && (
                                             <li className="flex items-center gap-3 text-amber-400 font-medium">
                                                 <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">
