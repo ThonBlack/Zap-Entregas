@@ -174,7 +174,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                                 <div className="absolute top-2 right-2 flex gap-2">
                                     {delivery.customerPhone && (
                                         <a
-                                            href={`https://wa.me/55${delivery.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️\nAcompanhe em tempo real: http://192.168.1.17:4000/tracking/${delivery.id}`)}`}
+                                            href={`https://wa.me/55${delivery.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️\nAcompanhe em tempo real: https://zapentregas.duckdns.org/tracking/${delivery.id}`)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="p-1 px-2 bg-green-500 text-white text-xs font-bold rounded flex items-center gap-1 hover:bg-green-400 shadow-sm"
