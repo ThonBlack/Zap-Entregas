@@ -89,3 +89,23 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
         return { message: "Erro ao atualizar perfil.", success: false };
     }
 }
+
+export async function updateDailyGoalAction(goal: number) {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+
+    if (!userId) redirect("/login");
+
+    try {
+        await db.update(users).set({
+            dailyGoal: goal
+        }).where(eq(users.id, Number(userId)));
+
+        revalidatePath("/");
+        revalidatePath("/settings/motoboy");
+        return { success: true };
+    } catch (e) {
+        console.error(e);
+        return { error: "Erro ao salvar meta diária." };
+    }
+}

@@ -16,6 +16,9 @@ export const users = sqliteTable("users", {
     currentLat: real("current_lat"),
     currentLng: real("current_lng"),
     lastLocationUpdate: text("last_location_update"),
+    dailyGoal: integer("daily_goal").default(10), // Meta diária de entregas do motoboy
+    trialEndsAt: text("trial_ends_at"), // Data fim do trial (ISO string)
+    isTrialUser: integer("is_trial_user", { mode: 'boolean' }).default(false), // Usuário de trial
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 

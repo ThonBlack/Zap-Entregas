@@ -132,7 +132,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
             />
             <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-bold text-zinc-800">Entregas Pendentes ({deliveries.length})</h3>
+                    <h3 className="font-bold text-white">Entregas Pendentes ({deliveries.length})</h3>
                     <div className="flex items-center gap-2">
                         <RefreshButton />
                         <button
@@ -149,7 +149,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                                 }
                             }}
                             disabled={selected.length < 1}
-                            className="flex items-center gap-2 bg-blue-600 disabled:bg-zinc-300 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg shadow-blue-900/10 active:scale-95"
+                            className="flex items-center gap-2 bg-green-600 disabled:bg-zinc-700 disabled:text-zinc-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors shadow-lg active:scale-95"
                         >
                             <Play size={16} fill="currentColor" />
                             Gerar Rota ({selected.length})
@@ -169,7 +169,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                         }
 
                         return (
-                            <div key={delivery.id} className={`group relative block bg-white p-4 rounded-xl shadow-sm border transition-all ${selected.includes(delivery.id) ? 'border-blue-500 ring-1 ring-blue-500 bg-blue-50' : 'border-zinc-200'}`}>
+                            <div key={delivery.id} className={`group relative block bg-zinc-800 p-4 rounded-xl shadow-sm border transition-all ${selected.includes(delivery.id) ? 'border-green-500 ring-1 ring-green-500 bg-zinc-700' : 'border-zinc-700'}`}>
                                 {/* Actions Overlay */}
                                 <div className="absolute top-2 right-2 flex gap-2">
                                     {delivery.customerPhone && (
@@ -177,7 +177,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                                             href={`https://wa.me/55${delivery.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️\nAcompanhe em tempo real: http://192.168.1.17:4000/tracking/${delivery.id}`)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="p-1 px-2 bg-green-500 text-white text-xs font-bold rounded flex items-center gap-1 hover:bg-green-600 shadow-sm"
+                                            className="p-1 px-2 bg-green-500 text-white text-xs font-bold rounded flex items-center gap-1 hover:bg-green-400 shadow-sm"
                                             title="Enviar Link de Rastreio"
                                         >
                                             <Phone size={14} />
@@ -191,8 +191,8 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                                         disabled={!canDeliver}
                                         className={`p-1 px-2 text-xs font-bold rounded flex items-center gap-1 shadow-sm transition-colors
                                         ${canDeliver
-                                                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                                : 'bg-zinc-200 text-zinc-400 cursor-not-allowed'
+                                                ? 'bg-green-600 text-white hover:bg-green-500'
+                                                : 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
                                             }`}
                                         title={!canDeliver ? `Você está a ${Math.round(distance)}m do local. Aproxime-se para finalizar.` : "Marcar como Entregue"}
                                     >
@@ -203,7 +203,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                                     <button
                                         type="button"
                                         onClick={(e) => { e.preventDefault(); handleDeleteClick(delivery.id); }}
-                                        className="p-1 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                                        className="p-1 bg-red-600 text-white rounded hover:bg-red-500"
                                         title="Excluir"
                                     >
                                         <Trash2 size={16} />
@@ -217,19 +217,19 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                                         value={delivery.id}
                                         checked={selected.includes(delivery.id)}
                                         onChange={() => toggle(delivery.id)}
-                                        className="mt-1 w-5 h-5 rounded border-zinc-300 text-blue-600 focus:ring-blue-500"
+                                        className="mt-1 w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-green-500 focus:ring-green-500"
                                     />
                                     <div className="flex-1">
                                         <div className="flex justify-between items-start mb-1">
-                                            <h4 className="font-bold text-zinc-900 text-sm">{delivery.customerName || "Cliente"}</h4>
-                                            <span className="text-zinc-500 text-xs font-mono mr-12 md:mr-32">#{delivery.id}</span>
+                                            <h4 className="font-bold text-white text-sm">{delivery.customerName || "Cliente"}</h4>
+                                            <span className="text-zinc-400 text-xs font-mono mr-12 md:mr-32">#{delivery.id}</span>
                                         </div>
-                                        <p className="text-zinc-600 text-sm mb-1">{delivery.address}</p>
-                                        <div className="flex items-center gap-4 text-xs text-zinc-500">
+                                        <p className="text-zinc-300 text-sm mb-1">{delivery.address}</p>
+                                        <div className="flex items-center gap-4 text-xs text-zinc-400">
                                             <span>Ordem: {delivery.stopOrder || '-'}</span>
                                             <span>Valor: R$ {delivery.value || 0}</span>
                                             {currentLocation && delivery.lat && (
-                                                <span className={distance > 150 ? "text-orange-500" : "text-green-600"}>
+                                                <span className={distance > 150 ? "text-orange-400" : "text-green-400"}>
                                                     Distância: {distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : Math.round(distance) + 'm'}
                                                 </span>
                                             )}
@@ -242,7 +242,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                 </div>
 
                 {deliveries.length === 0 && (
-                    <div className="p-8 text-center text-zinc-400 bg-zinc-50 rounded-xl border border-dashed border-zinc-200">
+                    <div className="p-8 text-center text-zinc-400 bg-zinc-800 rounded-xl border border-dashed border-zinc-700">
                         Nenhuma entrega cadastrada.
                     </div>
                 )}

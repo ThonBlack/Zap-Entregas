@@ -2,9 +2,8 @@
 
 import { updateSettingsAction } from "@/app/actions/settings";
 import { useActionState, useState } from "react";
-import { CheckCircle, Save, HelpCircle } from "lucide-react";
+import { CheckCircle, Save, HelpCircle, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const initialState = {
@@ -36,25 +35,25 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
     return (
         <form action={formAction} className="space-y-8">
             {/* Remuneration Model Section */}
-            <Card className="p-6">
+            <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
                 <div className="flex items-center gap-2 mb-6">
-                    <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                        <Save size={20} />
+                    <div className="p-2 bg-green-600 rounded-lg">
+                        <DollarSign size={20} className="text-white" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-zinc-900">Modelo de Pagamento</h2>
-                        <p className="text-sm text-zinc-500">Como você paga seus entregadores?</p>
+                        <h2 className="text-lg font-bold text-white">Modelo de Pagamento</h2>
+                        <p className="text-sm text-zinc-400">Como você paga seus entregadores?</p>
                     </div>
                 </div>
 
                 {/* Active Status Summary */}
-                <div className="bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl p-6 text-white shadow-lg mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="bg-green-600 rounded-xl p-6 text-white shadow-lg mb-8">
                     <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
+                        <div className="p-2 bg-white/20 rounded-lg">
                             <CheckCircle size={24} className="text-white" />
                         </div>
                         <div>
-                            <p className="text-blue-100 text-sm font-medium">Modelo Atual</p>
+                            <p className="text-green-100 text-sm font-medium">Modelo Atual</p>
                             <h2 className="text-xl font-bold flex items-center gap-2">
                                 {model === "fixed" && <>Taxa Fixa <span className="text-white/80 font-normal">(R$ {initialData?.fixedValue?.toFixed(2).replace('.', ',') || '0,00'})</span></>}
                                 {model === "distance" && <>Por KM <span className="text-white/80 font-normal">(R$ {initialData?.valuePerKm?.toFixed(2).replace('.', ',') || '0,00'}/km)</span></>}
@@ -73,22 +72,22 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                             className={cn(
                                 "cursor-pointer border-2 rounded-xl p-4 transition-all relative overflow-hidden",
                                 model === item.id
-                                    ? "border-blue-500 bg-blue-50 shadow-md ring-2 ring-blue-200 ring-offset-2"
-                                    : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50"
+                                    ? "border-green-500 bg-green-900/30"
+                                    : "border-zinc-600 hover:border-zinc-500 bg-zinc-700/50"
                             )}
                         >
                             {model === item.id && (
-                                <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-bl-lg">
+                                <div className="absolute top-0 right-0 bg-green-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-bl-lg">
                                     Ativo
                                 </div>
                             )}
                             <div className="flex justify-between items-center mb-2">
-                                <span className={`font-bold ${model === item.id ? "text-blue-700" : "text-zinc-700"}`}>
+                                <span className={`font-bold ${model === item.id ? "text-green-400" : "text-white"}`}>
                                     {item.label}
                                 </span>
-                                {model === item.id && <CheckCircle size={20} className="text-blue-600" />}
+                                {model === item.id && <CheckCircle size={20} className="text-green-400" />}
                             </div>
-                            <p className={cn("text-xs", model === item.id ? "text-blue-600" : "text-zinc-500")}>
+                            <p className={cn("text-xs", model === item.id ? "text-green-300" : "text-zinc-400")}>
                                 {item.description}
                             </p>
                         </div>
@@ -100,7 +99,7 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                 <div className="space-y-4">
                     {(model === "fixed" || model === "hybrid") && (
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-1">Taxa Fixa (por entrega)</label>
+                            <label className="block text-sm font-medium text-zinc-300 mb-1">Taxa Fixa (por entrega)</label>
                             <div className="relative">
                                 <span className="absolute left-3 top-3 text-zinc-400">R$</span>
                                 <input
@@ -108,7 +107,7 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                                     type="text"
                                     defaultValue={initialData?.fixedValue?.toFixed(2).replace('.', ',')}
                                     placeholder="5,00"
-                                    className="w-full pl-10 pr-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                    className="w-full pl-10 pr-4 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                                 />
                             </div>
                         </div>
@@ -116,7 +115,7 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
 
                     {(model === "distance" || model === "hybrid") && (
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-1">Valor por KM</label>
+                            <label className="block text-sm font-medium text-zinc-300 mb-1">Valor por KM</label>
                             <div className="relative">
                                 <span className="absolute left-3 top-3 text-zinc-400">R$</span>
                                 <input
@@ -124,7 +123,7 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                                     type="text"
                                     defaultValue={initialData?.valuePerKm?.toFixed(2).replace('.', ',')}
                                     placeholder="1,50"
-                                    className="w-full pl-10 pr-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                    className="w-full pl-10 pr-4 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                                 />
                             </div>
                         </div>
@@ -132,7 +131,7 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
 
                     {model === "daily" && (
                         <div>
-                            <label className="block text-sm font-medium text-zinc-700 mb-1">Valor da Diária</label>
+                            <label className="block text-sm font-medium text-zinc-300 mb-1">Valor da Diária</label>
                             <div className="relative">
                                 <span className="absolute left-3 top-3 text-zinc-400">R$</span>
                                 <input
@@ -140,16 +139,16 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                                     type="text"
                                     defaultValue={initialData?.dailyvalue?.toFixed(2).replace('.', ',')}
                                     placeholder="50,00"
-                                    className="w-full pl-10 pr-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                    className="w-full pl-10 pr-4 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                                 />
                             </div>
                         </div>
                     )}
 
-                    <div className="pt-4 border-t border-zinc-100">
-                        <label className="flex items-center gap-2 text-sm font-medium text-zinc-700 mb-1">
+                    <div className="pt-4 border-t border-zinc-700">
+                        <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-1">
                             Mínimo Garantido (Opcional)
-                            <div title="Se o motoboy não atingir esse valor no dia, você completa." className="text-zinc-400 cursor-help">
+                            <div title="Se o motoboy não atingir esse valor no dia, você completa." className="text-zinc-500 cursor-help">
                                 <HelpCircle size={14} />
                             </div>
                         </label>
@@ -160,16 +159,16 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                                 type="text"
                                 defaultValue={initialData?.guaranteedMinimum?.toFixed(2).replace('.', ',')}
                                 placeholder="0,00"
-                                className="w-full pl-10 pr-4 py-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                className="w-full pl-10 pr-4 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                             />
                         </div>
                         <p className="text-xs text-zinc-500 mt-1">Valor mínimo que o motoboy recebe no dia, independente das entregas.</p>
                     </div>
                 </div>
-            </Card>
+            </div>
 
             {state?.message && (
-                <div className={`p-4 rounded-xl text-center font-medium ${state.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                <div className={`p-4 rounded-xl text-center font-medium ${state.success ? 'bg-green-900/50 text-green-400 border border-green-700' : 'bg-red-900/50 text-red-400 border border-red-700'}`}>
                     {state.message}
                 </div>
             )}
@@ -177,7 +176,7 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
             <Button
                 type="submit"
                 disabled={isPending}
-                className="w-full h-14 text-base font-bold bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-900/10"
+                className="w-full h-14 text-base font-bold bg-green-600 hover:bg-green-500"
             >
                 {isPending ? "Salvando..." : (
                     <>

@@ -3,7 +3,7 @@
 import { useState, useTransition, useEffect } from "react";
 import { getFinancialStatsAction } from "@/app/actions/finance";
 import DailyChart from "./DailyChart";
-import { ChevronLeft, ChevronRight, Loader2, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, TrendingDown, TrendingUp, Calendar, Target, Zap } from "lucide-react";
 
 export default function FinancialDashboard() {
     const today = new Date();
@@ -51,58 +51,108 @@ export default function FinancialDashboard() {
     const monthName = new Date(year, month - 1).toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
     const daysInMonth = new Date(year, month, 0).getDate();
 
+    // Calculate daily average and best day
+    const dailyAverage = stats ? (stats.total / daysInMonth) : 0;
+    const bestDay = stats?.data?.length ? Math.max(...stats.data.map(d => d.value)) : 0;
+    const activeDays = stats?.data?.filter(d => d.value > 0).length || 0;
+
     return (
         <div className="space-y-6">
             {/* Header / Controls */}
-            <div className="flex items-center justify-between bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
+            <div className="flex items-center justify-between bg-zinc-800 p-4 rounded-xl border border-zinc-700">
                 <button
                     onClick={handlePreviousMonth}
-                    className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-600 transition-colors"
+                    className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors"
                 >
                     <ChevronLeft size={20} />
                 </button>
-                <h2 className="text-lg font-bold text-zinc-800 capitalize flex items-center gap-2">
-                    {isPending && <Loader2 size={16} className="animate-spin text-blue-500" />}
+                <h2 className="text-lg font-bold text-white capitalize flex items-center gap-2">
+                    {isPending && <Loader2 size={16} className="animate-spin text-green-400" />}
+                    <Calendar size={18} className="text-green-400" />
                     {monthName}
                 </h2>
                 <button
                     onClick={handleNextMonth}
-                    className="p-2 hover:bg-zinc-100 rounded-lg text-zinc-600 transition-colors"
+                    className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors"
                 >
                     <ChevronRight size={20} />
                 </button>
             </div>
 
-            {/* Value Card */}
-            <div className={`p-6 rounded-2xl shadow-sm border ${stats?.role === 'motoboy' ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                <div className="flex items-center gap-3 mb-2">
-                    <div className={`p-2 rounded-lg ${stats?.role === 'motoboy' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
-                        {stats?.role === 'motoboy' ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
+            {/* Stats Cards Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {/* Total */}
+                <div className={`p-4 rounded-xl border ${stats?.role === 'motoboy' ? 'bg-green-900/30 border-green-700' : 'bg-red-900/30 border-red-700'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                        {stats?.role === 'motoboy' ? <TrendingUp size={18} className="text-green-400" /> : <TrendingDown size={18} className="text-red-400" />}
+                        <span className={`text-xs font-bold uppercase ${stats?.role === 'motoboy' ? 'text-green-400' : 'text-red-400'}`}>
+                            Total
+                        </span>
                     </div>
-                    <span className={`text-sm font-bold uppercase tracking-wide ${stats?.role === 'motoboy' ? 'text-emerald-700' : 'text-red-700'}`}>
-                        {stats?.role === 'motoboy' ? 'Receita Total' : 'Despesa Total'}
-                    </span>
+                    <div className="text-2xl font-bold text-white">
+                        {stats?.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00'}
+                    </div>
                 </div>
-                <div className="text-4xl font-bold text-zinc-900">
-                    {stats?.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) || 'R$ 0,00'}
+
+                {/* Daily Average */}
+                <div className="p-4 rounded-xl bg-zinc-800 border border-zinc-700">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Target size={18} className="text-yellow-400" />
+                        <span className="text-xs font-bold uppercase text-yellow-400">Média/Dia</span>
+                    </div>
+                    <div className="text-2xl font-bold text-white">
+                        {dailyAverage.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
                 </div>
-                <p className="text-zinc-500 text-sm mt-1">
-                    Acumulado em {monthName}
-                </p>
+
+                {/* Best Day */}
+                <div className="p-4 rounded-xl bg-zinc-800 border border-zinc-700">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Zap size={18} className="text-orange-400" />
+                        <span className="text-xs font-bold uppercase text-orange-400">Melhor Dia</span>
+                    </div>
+                    <div className="text-2xl font-bold text-white">
+                        {bestDay.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
+                </div>
+
+                {/* Active Days */}
+                <div className="p-4 rounded-xl bg-zinc-800 border border-zinc-700">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Calendar size={18} className="text-blue-400" />
+                        <span className="text-xs font-bold uppercase text-blue-400">Dias Ativos</span>
+                    </div>
+                    <div className="text-2xl font-bold text-white">
+                        {activeDays} <span className="text-sm font-normal text-zinc-400">de {daysInMonth}</span>
+                    </div>
+                </div>
             </div>
 
             {/* Chart */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-zinc-200">
-                <h3 className="font-bold text-zinc-800 mb-6">Visão Diária</h3>
+            <div className="bg-zinc-800 p-6 rounded-2xl border border-zinc-700">
+                <h3 className="font-bold text-white mb-6 flex items-center gap-2">
+                    <TrendingUp size={18} className="text-green-400" />
+                    Visão Diária
+                </h3>
                 <div className="min-h-[300px]">
                     {stats && (
                         <DailyChart
                             data={stats.data}
                             totalDays={daysInMonth}
-                            color={stats.role === 'motoboy' ? '#10b981' : '#ef4444'}
+                            color={stats.role === 'motoboy' ? '#22c55e' : '#ef4444'}
                         />
                     )}
                 </div>
+            </div>
+
+            {/* Quick Summary */}
+            <div className="bg-zinc-800 p-4 rounded-xl border border-zinc-700">
+                <p className="text-sm text-zinc-400 text-center">
+                    {stats?.role === 'motoboy'
+                        ? `💰 Você ganhou ${stats?.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} em ${activeDays} dias de trabalho`
+                        : `📊 Despesas de ${monthName}: ${stats?.total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                    }
+                </p>
             </div>
         </div>
     );
