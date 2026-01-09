@@ -10,6 +10,7 @@ import { ShopkeeperView } from "@/components/dashboard/ShopkeeperView";
 import { MotoboyView } from "@/components/dashboard/MotoboyView";
 import { PendingConfirmations } from "@/components/dashboard/PendingConfirmations";
 import TrialBanner from "@/components/TrialBanner";
+import NotificationWrapper from "@/components/NotificationWrapper";
 
 // Data Fetching Helpers
 async function getMotoboysWithBalance() {
@@ -193,6 +194,12 @@ export default async function Dashboard() {
                 )}
 
             </main>
+
+            {/* Notification Manager */}
+            <NotificationWrapper
+                userId={user.id}
+                userRole={user.role as "motoboy" | "shopkeeper" | "admin"}
+            />
         </div >
     );
 }
