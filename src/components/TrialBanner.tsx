@@ -21,15 +21,13 @@ export default function TrialBanner({ trialEndsAt, isTrialUser }: TrialBannerPro
     // Não mostrar se o trial já acabou
     if (daysLeft <= 0) return null;
 
-    // Mostrar apenas se restam 7 dias ou menos
+    // Visual urgente se restam 7 dias ou menos
     const isUrgent = daysLeft <= 7;
-
-    if (!isUrgent) return null;
 
     return (
         <div className={`relative rounded-2xl p-4 mb-4 flex items-center justify-between ${daysLeft <= 3
-                ? 'bg-gradient-to-r from-red-600 to-orange-600'
-                : 'bg-gradient-to-r from-amber-500 to-orange-500'
+            ? 'bg-gradient-to-r from-red-600 to-orange-600'
+            : 'bg-gradient-to-r from-amber-500 to-orange-500'
             }`}>
             <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-xl">

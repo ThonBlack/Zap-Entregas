@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import MotoboySettingsForm from "@/components/MotoboySettingsForm";
+import AvatarForm from "@/components/AvatarForm";
 
 export default async function MotoboySettingsPage() {
     const cookieStore = await cookies();
@@ -32,7 +33,14 @@ export default async function MotoboySettingsPage() {
                 </div>
             </header>
 
-            <main className="max-w-2xl mx-auto p-6">
+            <main className="max-w-2xl mx-auto p-6 space-y-6">
+                <AvatarForm
+                    user={{
+                        id: user.id,
+                        name: user.name,
+                        avatarUrl: user.avatarUrl
+                    }}
+                />
                 <MotoboySettingsForm
                     userId={user.id}
                     currentGoal={user.dailyGoal || 10}
@@ -41,3 +49,4 @@ export default async function MotoboySettingsPage() {
         </div>
     );
 }
+

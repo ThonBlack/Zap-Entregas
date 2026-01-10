@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import SettingsForm from "@/components/SettingsForm";
+import AvatarForm from "@/components/AvatarForm";
 import { db } from "@/db";
-import { shopSettings } from "@/db/schema";
+import { shopSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -12,6 +13,12 @@ export default async function SettingsPage() {
     const userId = cookieStore.get("user_id")?.value;
 
     if (!userId) redirect("/login");
+
+    const user = await db.query.users.findFirst({
+        where: eq(users.id, Number(userId))
+    });
+
+    if (!user) redirect("/login");
 
     const currentSettings = await db.query.shopSettings.findFirst({
         where: eq(shopSettings.userId, Number(userId))
@@ -29,9 +36,17 @@ export default async function SettingsPage() {
                 </div>
             </header>
 
-            <main className="max-w-2xl mx-auto p-6">
+            <main className="max-w-2xl mx-auto p-6 space-y-6">
+                <AvatarForm
+                    user={{
+                        id: user.id,
+                        name: user.name,
+                        avatarUrl: user.avatarUrl
+                    }}
+                />
                 <SettingsForm initialData={currentSettings as any} />
             </main>
         </div>
     );
 }
+
