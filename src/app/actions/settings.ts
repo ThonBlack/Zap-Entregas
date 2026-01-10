@@ -128,3 +128,32 @@ export async function updateDailyGoalAction(goal: number) {
         return { error: "Erro ao salvar meta diária." };
     }
 }
+
+export async function generateApiKeyAction() {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+
+    if (!userId) redirect("/login");
+
+    try {
+        // Gerar uma API key única
+        const randomBytes = new Uint8Array(24);
+        crypto.getRandomValues(randomBytes);
+        const randomPart = Array.from(randomBytes)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+
+        const apiKey = `zap_${userId}_${randomPart}`;
+
+        await db.update(users).set({
+            apiKey
+        }).where(eq(users.id, Number(userId)));
+
+        revalidatePath("/settings");
+        return { success: true, apiKey };
+    } catch (e) {
+        console.error(e);
+        return { success: false, error: "Erro ao gerar API Key." };
+    }
+}
+

@@ -41,27 +41,35 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Buscar usuário pela API Key (armazenada no campo password temporariamente ou criar campo específico)
-        // Por enquanto, usamos o ID do usuário como API Key simples: "apikey_{userId}_{phone}"
-        const keyParts = apiKey.split("_");
-        if (keyParts.length < 3 || keyParts[0] !== "apikey") {
-            return NextResponse.json(
-                { success: false, error: "API Key inválida" },
-                { status: 401 }
-            );
-        }
+        // Buscar usuário pela API Key
+        let user;
 
-        const userId = parseInt(keyParts[1]);
-        const user = await db.query.users.findFirst({
-            where: and(
-                eq(users.id, userId),
-                eq(users.role, "shopkeeper")
-            )
-        });
+        // Novo formato: zap_{userId}_{hash} - busca direto no banco
+        if (apiKey.startsWith("zap_")) {
+            user = await db.query.users.findFirst({
+                where: and(
+                    eq(users.apiKey, apiKey),
+                    eq(users.role, "shopkeeper")
+                )
+            });
+        }
+        // Formato legado: apikey_{userId}_{phone}
+        else if (apiKey.startsWith("apikey_")) {
+            const keyParts = apiKey.split("_");
+            if (keyParts.length >= 3) {
+                const userId = parseInt(keyParts[1]);
+                user = await db.query.users.findFirst({
+                    where: and(
+                        eq(users.id, userId),
+                        eq(users.role, "shopkeeper")
+                    )
+                });
+            }
+        }
 
         if (!user) {
             return NextResponse.json(
-                { success: false, error: "Lojista não encontrado" },
+                { success: false, error: "API Key inválida ou lojista não encontrado" },
                 { status: 401 }
             );
         }

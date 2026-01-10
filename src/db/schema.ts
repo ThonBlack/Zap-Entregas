@@ -23,6 +23,7 @@ export const users = sqliteTable("users", {
     ratingDeliveryCount: integer("rating_delivery_count").default(0), // Quantidade de avaliações de entrega
     trialEndsAt: text("trial_ends_at"), // Data fim do trial (ISO string)
     isTrialUser: integer("is_trial_user", { mode: 'boolean' }).default(false), // Usuário de trial
+    apiKey: text("api_key"), // Chave de API para integração com PDV
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 

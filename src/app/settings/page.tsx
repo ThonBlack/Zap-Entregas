@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import SettingsForm from "@/components/SettingsForm";
 import AvatarForm from "@/components/AvatarForm";
+import ApiKeyForm from "@/components/ApiKeyForm";
 import { db } from "@/db";
 import { shopSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -45,6 +46,7 @@ export default async function SettingsPage() {
                     }}
                 />
                 <SettingsForm initialData={currentSettings as any} />
+                <ApiKeyForm userId={user.id} currentApiKey={user.apiKey || null} />
             </main>
         </div>
     );
