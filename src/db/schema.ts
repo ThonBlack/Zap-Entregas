@@ -17,6 +17,10 @@ export const users = sqliteTable("users", {
     currentLng: real("current_lng"),
     lastLocationUpdate: text("last_location_update"),
     dailyGoal: integer("daily_goal").default(10), // Meta diária de entregas do motoboy
+    rating: real("rating").default(0), // Média de avaliações gerais (0 = sem avaliação)
+    ratingCount: integer("rating_count").default(0), // Quantidade de avaliações gerais
+    ratingDelivery: real("rating_delivery").default(0), // Média de avaliações de entrega
+    ratingDeliveryCount: integer("rating_delivery_count").default(0), // Quantidade de avaliações de entrega
     trialEndsAt: text("trial_ends_at"), // Data fim do trial (ISO string)
     isTrialUser: integer("is_trial_user", { mode: 'boolean' }).default(false), // Usuário de trial
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
@@ -135,3 +139,28 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
         references: [plans.id],
     }),
 }));
+
+// Tabela de Avaliações
+export const reviews = sqliteTable("reviews", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    deliveryId: integer("delivery_id").references(() => deliveries.id).notNull(),
+    motoboyId: integer("motoboy_id").references(() => users.id).notNull(),
+    shopkeeperId: integer("shopkeeper_id").references(() => users.id),
+    customerName: text("customer_name"),
+    ratingGeneral: integer("rating_general").notNull(), // 1-5 estrelas - avaliação geral
+    ratingDelivery: integer("rating_delivery").notNull(), // 1-5 estrelas - avaliação da entrega
+    feedback: text("feedback"), // Comentário/sugestão do cliente
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const reviewsRelations = relations(reviews, ({ one }) => ({
+    delivery: one(deliveries, {
+        fields: [reviews.deliveryId],
+        references: [deliveries.id],
+    }),
+    motoboy: one(users, {
+        fields: [reviews.motoboyId],
+        references: [users.id],
+    }),
+}));
+

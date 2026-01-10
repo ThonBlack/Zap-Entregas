@@ -69,6 +69,23 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
         let avatarUrl = currentUser.avatarUrl;
         let lastUpdate = currentUser.lastAvatarUpdate;
 
+        // Verificar restrição de 30 dias para motoboys
+        if (currentUser.role === "motoboy" && file && file.size > 0 && file.name !== "undefined") {
+            if (lastUpdate) {
+                const lastUpdateDate = new Date(lastUpdate);
+                const now = new Date();
+                const diffDays = Math.floor((now.getTime() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24));
+
+                if (diffDays < 30) {
+                    const daysRemaining = 30 - diffDays;
+                    return {
+                        message: `Você só pode trocar a foto novamente em ${daysRemaining} dia${daysRemaining > 1 ? 's' : ''}.`,
+                        success: false
+                    };
+                }
+            }
+        }
+
         if (removeAvatar) {
             avatarUrl = null;
         } else if (file && file.size > 0 && file.name !== "undefined") {
@@ -83,6 +100,8 @@ export async function updateProfileAction(prevState: any, formData: FormData) {
         }).where(eq(users.id, Number(userId)));
 
         revalidatePath("/");
+        revalidatePath("/settings");
+        revalidatePath("/settings/motoboy");
         return { message: "Perfil atualizado com sucesso!", success: true };
     } catch (e) {
         console.error(e);

@@ -217,7 +217,15 @@ export async function completeDeliveryAction(id: number) {
             .where(eq(deliveries.id, id));
 
         revalidatePath("/");
-        return { success: true };
+
+        // Retornar dados para WhatsApp de avaliação
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
+        return {
+            success: true,
+            reviewUrl: `${baseUrl}/review/${id}`,
+            customerPhone: delivery.customerPhone,
+            customerName: delivery.customerName || "Cliente"
+        };
     } catch (e) {
         console.error(e);
         return { error: "Erro ao finalizar" };
