@@ -16,9 +16,15 @@ export function MotoboyView({ balance, pendingDeliveries, user }: MotoboyViewPro
     const deliveriesToday = pendingDeliveries.filter(d => d.status === 'delivered').length;
     const dailyGoal = user.dailyGoal || 10; // Usar meta do banco ou padrão 10
     const progress = Math.min((deliveriesToday / dailyGoal) * 100, 100);
-    const level = deliveriesToday >= 15 ? "Ouro" : deliveriesToday >= 10 ? "Prata" : "Bronze";
-    const levelEmoji = deliveriesToday >= 15 ? "🥇" : deliveriesToday >= 10 ? "🥈" : "🥉";
-    const rating = 4.9;
+
+    // Rating e Level baseado em avaliações do banco
+    const hasRating = user.ratingCount && user.ratingCount > 0;
+    const rating = hasRating ? (user.ratingDelivery || user.rating || 0).toFixed(1) : null;
+
+    // Nível baseado em avaliação média (padrão: Ouro se não tem avaliação)
+    const avgRating = user.ratingDelivery || user.rating || 0;
+    const level = !hasRating ? "Ouro" : avgRating >= 4.5 ? "Ouro" : avgRating >= 3.5 ? "Prata" : "Bronze";
+    const levelEmoji = level === "Ouro" ? "🥇" : level === "Prata" ? "🥈" : "🥉";
     const isFreeUser = user.plan === 'free' || !user.plan;
 
     return (
@@ -56,7 +62,7 @@ export function MotoboyView({ balance, pendingDeliveries, user }: MotoboyViewPro
                             </div>
                             <div className="flex items-center gap-3 text-sm text-white/90">
                                 <span className="flex items-center gap-1">
-                                    <Star size={14} fill="currentColor" /> {rating}
+                                    <Star size={14} fill="currentColor" /> {rating || 'Sem avaliação'}
                                 </span>
                                 <span className="flex items-center gap-1">
                                     <MapPin size={14} /> Online

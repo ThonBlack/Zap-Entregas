@@ -110,6 +110,11 @@ export default async function Dashboard() {
 
     if (!user) redirect("/login");
 
+    // Admin vai para o painel SaaS
+    if (user.role === 'admin') {
+        redirect("/admin/saas");
+    }
+
     // Data fetching vars
     let motoboys: Awaited<ReturnType<typeof getMotoboysWithBalance>> = [];
     let myBalance = 0;
@@ -153,8 +158,13 @@ export default async function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {isShopkeeperOrAdmin && (
+                    {user.role === 'shopkeeper' && (
                         <Link href="/settings" className="p-2 text-zinc-400 hover:text-green-400 transition-colors" title="Configurações da Loja">
+                            <Settings size={20} />
+                        </Link>
+                    )}
+                    {user.role === 'motoboy' && (
+                        <Link href="/settings/motoboy" className="p-2 text-zinc-400 hover:text-green-400 transition-colors" title="Minhas Configurações">
                             <Settings size={20} />
                         </Link>
                     )}
