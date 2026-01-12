@@ -1,162 +1,240 @@
 import { db } from "@/db";
 import { users, deliveries, transactions } from "@/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, User, Phone, Star, MapPin, DollarSign, Calendar, TrendingUp } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+    ArrowLeft, User, Phone, Calendar, CreditCard, Package,
+    DollarSign, Star, Clock, Settings, Ban, CheckCircle, Edit
+} from "lucide-react";
+import UserActionsForm from "./UserActionsForm";
 
-export default async function AdminUserDetailsPage({ params }: { params: { id: string } }) {
-    const { id } = await params; // Async params in Next 15+
+export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
     const cookieStore = await cookies();
     const currentUserId = cookieStore.get("user_id")?.value;
 
     if (!currentUserId) redirect("/login");
 
-    // Verify Admin Access
     const currentUser = await db.query.users.findFirst({
-        where: eq(users.id, Number(currentUserId)),
-    });
-    if (!currentUser || currentUser.role !== 'admin') redirect("/");
-
-    // Fetch Target User
-    const targetUser = await db.query.users.findFirst({
-        where: eq(users.id, Number(id)),
+        where: eq(users.id, Number(currentUserId))
     });
 
-    if (!targetUser) return <div>Usuário não encontrado.</div>;
+    if (currentUser?.role !== "admin") {
+        redirect("/");
+    }
 
-    // Fetch Related Data
-    const userDeliveries = await db.select().from(deliveries)
-        .where(eq(deliveries.shopkeeperId, targetUser.id)) // Assuming shopkeeper for now, need logic for motoboy
+    const user = await db.query.users.findFirst({
+        where: eq(users.id, Number(id))
+    });
+
+    if (!user) notFound();
+
+    // Buscar entregas do usuário
+    const userDeliveries = await db.select()
+        .from(deliveries)
+        .where(
+            user.role === 'shopkeeper'
+                ? eq(deliveries.shopkeeperId, user.id)
+                : eq(deliveries.motoboyId, user.id)
+        )
         .orderBy(desc(deliveries.createdAt))
-        .limit(20);
+        .limit(10);
 
-    // Stats Calculation
-    // Logic differs for Shopkeeper vs Motoboy
-    // For now, let's just count based on Shopkeeper ID matching user ID
-    // If motoboy, we would check who ACCEPTED the delivery (not implemented in schema yet fully? Or is it?)
-    // Checking schema... deliveries has 'shopkeeperId'. Does it have 'motoboyId'?
-    // Let's assume for this step we display what we have.
-
-    const totalDeliveriesCount = userDeliveries.length; // Placeholder for real count
-    const totalTransactions = await db.select({ count: sql<number>`count(*)` })
+    // Buscar transações do usuário
+    const userTransactions = await db.select()
         .from(transactions)
-        .where(eq(transactions.userId, targetUser.id))
-        .get();
+        .where(eq(transactions.userId, user.id))
+        .orderBy(desc(transactions.createdAt))
+        .limit(10);
+
+    // Estatísticas de entregas
+    const allUserDeliveries = await db.select()
+        .from(deliveries)
+        .where(
+            user.role === 'shopkeeper'
+                ? eq(deliveries.shopkeeperId, user.id)
+                : eq(deliveries.motoboyId, user.id)
+        );
+
+    const totalDeliveries = allUserDeliveries.length;
+    const completedDeliveries = allUserDeliveries.filter(d => d.status === 'delivered').length;
+    const canceledDeliveries = allUserDeliveries.filter(d => d.status === 'canceled').length;
 
     return (
-        <div className="min-h-screen bg-slate-50 p-6 space-y-8">
-            <header className="max-w-5xl mx-auto flex items-center gap-4">
-                <Link href="/admin" className="p-2 bg-white rounded-full shadow-sm hover:shadow-md transition-all text-slate-500">
-                    <ArrowLeft size={20} />
-                </Link>
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Detalhes do Membro</h1>
-                    <p className="text-sm text-slate-500">Visão Raio-X</p>
+        <div className="min-h-screen bg-zinc-900 pb-20">
+            {/* Header */}
+            <header className="bg-zinc-800 border-b border-zinc-700 px-6 py-4 sticky top-0 z-10">
+                <div className="max-w-4xl mx-auto flex items-center gap-4">
+                    <Link href="/admin/saas" className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-700 transition-colors">
+                        <ArrowLeft size={20} />
+                    </Link>
+                    <div>
+                        <h1 className="text-xl font-bold text-white">Detalhes do Usuário</h1>
+                        <p className="text-zinc-500 text-sm">#{user.id}</p>
+                    </div>
                 </div>
             </header>
 
-            <main className="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Profile Card */}
-                <div className="md:col-span-1 space-y-6">
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center">
-                        <div className="w-24 h-24 bg-slate-100 rounded-full mx-auto mb-4 flex items-center justify-center text-slate-300">
-                            <User size={48} />
+            <main className="max-w-4xl mx-auto p-6 space-y-6">
+                {/* Perfil */}
+                <Card className="p-6 bg-zinc-800 border-zinc-700">
+                    <div className="flex items-start gap-4">
+                        <div className="w-16 h-16 bg-zinc-700 rounded-2xl flex items-center justify-center">
+                            {user.avatarUrl ? (
+                                <img src={user.avatarUrl} alt={user.name} className="w-16 h-16 rounded-2xl object-cover" />
+                            ) : (
+                                <User className="text-zinc-400" size={32} />
+                            )}
                         </div>
-                        <h2 className="text-xl font-bold text-slate-900">{targetUser.name}</h2>
-                        <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-medium ${targetUser.role === 'shopkeeper' ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
-                            {targetUser.role.toUpperCase()}
-                        </span>
-
-                        <div className="mt-6 space-y-3 text-left">
-                            <div className="flex items-center gap-3 text-slate-600">
-                                <Phone size={18} className="text-slate-400" />
-                                <span className="text-sm">{targetUser.phone}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-slate-600">
-                                <Star size={18} className="text-slate-400" />
-                                <span className="text-sm">{targetUser.plan.toUpperCase()} Plan</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-slate-600">
-                                <Calendar size={18} className="text-slate-400" />
-                                <span className="text-sm">Entrou em: {new Date(targetUser.createdAt || Date.now()).toLocaleDateString()}</span>
+                        <div className="flex-1">
+                            <h2 className="text-xl font-bold text-white">{user.name}</h2>
+                            <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                <Badge className={
+                                    user.role === 'admin' ? 'bg-purple-600' :
+                                        user.role === 'shopkeeper' ? 'bg-amber-600' : 'bg-blue-600'
+                                }>
+                                    {user.role === 'shopkeeper' ? 'Lojista' : user.role === 'motoboy' ? 'Motoboy' : 'Admin'}
+                                </Badge>
+                                <Badge className={user.plan === 'free' ? 'bg-zinc-600' : 'bg-green-600'}>
+                                    {user.plan}
+                                </Badge>
+                                {user.isTrialUser && (
+                                    <Badge className="bg-amber-600">Trial</Badge>
+                                )}
+                                <Badge className={user.subscriptionStatus === 'active' ? 'bg-green-600/50' : 'bg-red-600/50'}>
+                                    {user.subscriptionStatus}
+                                </Badge>
                             </div>
                         </div>
                     </div>
 
-                    {/* Quick Stats */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                            <div className="text-xs text-slate-500 mb-1">Corridas</div>
-                            <div className="text-2xl font-bold text-slate-900">{totalDeliveriesCount}</div>
+                    <div className="grid md:grid-cols-2 gap-4 mt-6">
+                        <div className="flex items-center gap-3 text-zinc-400">
+                            <Phone size={18} />
+                            <span>{user.phone}</span>
                         </div>
-                        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                            <div className="text-xs text-slate-500 mb-1">Transações</div>
-                            <div className="text-2xl font-bold text-slate-900">{totalTransactions?.count || 0}</div>
+                        <div className="flex items-center gap-3 text-zinc-400">
+                            <Calendar size={18} />
+                            <span>Cadastro: {user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : '-'}</span>
                         </div>
+                        {user.trialEndsAt && (
+                            <div className="flex items-center gap-3 text-amber-400">
+                                <Clock size={18} />
+                                <span>Trial até: {new Date(user.trialEndsAt).toLocaleDateString('pt-BR')}</span>
+                            </div>
+                        )}
+                        {user.rating && user.rating > 0 && (
+                            <div className="flex items-center gap-3 text-yellow-400">
+                                <Star size={18} />
+                                <span>Avaliação: {user.rating.toFixed(1)} ({user.ratingCount} avaliações)</span>
+                            </div>
+                        )}
                     </div>
+                </Card>
+
+                {/* Ações de Gestão */}
+                <Card className="p-6 bg-zinc-800 border-zinc-700">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Settings size={20} className="text-green-400" />
+                        Ações de Gestão
+                    </h3>
+                    <UserActionsForm user={user} />
+                </Card>
+
+                {/* Estatísticas */}
+                <div className="grid md:grid-cols-3 gap-4">
+                    <Card className="p-4 bg-zinc-800 border-zinc-700">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-blue-600/20 rounded-lg flex items-center justify-center">
+                                <Package className="text-blue-400" size={20} />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-white">{totalDeliveries}</p>
+                                <p className="text-xs text-zinc-500">Total Entregas</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-4 bg-zinc-800 border-zinc-700">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-green-600/20 rounded-lg flex items-center justify-center">
+                                <CheckCircle className="text-green-400" size={20} />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-white">{completedDeliveries}</p>
+                                <p className="text-xs text-zinc-500">Concluídas</p>
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="p-4 bg-zinc-800 border-zinc-700">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-red-600/20 rounded-lg flex items-center justify-center">
+                                <Ban className="text-red-400" size={20} />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-white">{canceledDeliveries}</p>
+                                <p className="text-xs text-zinc-500">Canceladas</p>
+                            </div>
+                        </div>
+                    </Card>
                 </div>
 
-                {/* Main Content */}
-                <div className="md:col-span-2 space-y-6">
-                    {/* Performance Chart Placeholder */}
-                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                <TrendingUp size={20} className="text-blue-500" />
-                                Performance (Últimos 30 dias)
-                            </h3>
-                            <select className="bg-slate-50 border border-slate-200 text-xs rounded-lg px-2 py-1 outline-none">
-                                <option>Diário</option>
-                                <option>Semanal</option>
-                            </select>
+                {/* Últimas Entregas */}
+                <Card className="p-4 bg-zinc-800 border-zinc-700">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <Package size={20} className="text-purple-400" />
+                        Últimas Entregas
+                    </h3>
+                    {userDeliveries.length === 0 ? (
+                        <p className="text-zinc-500 text-center py-4">Nenhuma entrega encontrada</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {userDeliveries.map(d => (
+                                <div key={d.id} className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
+                                    <div>
+                                        <p className="text-white text-sm font-medium">{d.address}</p>
+                                        <p className="text-zinc-500 text-xs">{d.createdAt ? new Date(d.createdAt).toLocaleString('pt-BR') : '-'}</p>
+                                    </div>
+                                    <Badge className={
+                                        d.status === 'delivered' ? 'bg-green-600' :
+                                            d.status === 'canceled' ? 'bg-red-600' :
+                                                d.status === 'pending' ? 'bg-amber-600' : 'bg-blue-600'
+                                    }>
+                                        {d.status}
+                                    </Badge>
+                                </div>
+                            ))}
                         </div>
-                        <div className="h-48 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 text-sm">
-                            [Gráfico de Barras Aqui - Implementar com Recharts]
-                        </div>
-                    </div>
+                    )}
+                </Card>
 
-                    {/* History Table */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="p-6 border-b border-slate-100">
-                            <h3 className="font-bold text-slate-800">Histórico de Atividades</h3>
+                {/* Últimas Transações */}
+                <Card className="p-4 bg-zinc-800 border-zinc-700">
+                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <DollarSign size={20} className="text-green-400" />
+                        Últimas Transações
+                    </h3>
+                    {userTransactions.length === 0 ? (
+                        <p className="text-zinc-500 text-center py-4">Nenhuma transação encontrada</p>
+                    ) : (
+                        <div className="space-y-2">
+                            {userTransactions.map(t => (
+                                <div key={t.id} className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
+                                    <div>
+                                        <p className="text-white text-sm font-medium">{t.description || `Transação #${t.id}`}</p>
+                                        <p className="text-zinc-500 text-xs">{t.createdAt ? new Date(t.createdAt).toLocaleString('pt-BR') : '-'}</p>
+                                    </div>
+                                    <span className={`font-bold ${t.type === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
+                                        {t.type === 'credit' ? '+' : '-'}R$ {t.amount?.toFixed(2)}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
-                                    <tr>
-                                        <th className="px-6 py-3">Data</th>
-                                        <th className="px-6 py-3">Descrição</th>
-                                        <th className="px-6 py-3">Valor</th>
-                                        <th className="px-6 py-3">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50 text-sm text-slate-600">
-                                    {userDeliveries.map(d => (
-                                        <tr key={d.id}>
-                                            <td className="px-6 py-3">{new Date(d.createdAt || Date.now()).toLocaleDateString()}</td>
-                                            <td className="px-6 py-3 line-clamp-1">{d.address}</td>
-                                            <td className="px-6 py-3">R$ {d.value}</td>
-                                            <td className="px-6 py-3">
-                                                <span className={`px-2 py-0.5 rounded-full text-xs ${d.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                    {d.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {userDeliveries.length === 0 && (
-                                        <tr>
-                                            <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
-                                                Nenhuma atividade registrada.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+                    )}
+                </Card>
             </main>
         </div>
     );
