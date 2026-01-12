@@ -51,9 +51,14 @@ export default async function AdminSaaSPage() {
                         <h1 className="text-2xl font-bold text-zinc-900">Painel Admin SaaS</h1>
                         <p className="text-zinc-500 text-sm">Gestão de planos e assinantes</p>
                     </div>
-                    <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900">
-                        ← Voltar
-                    </Link>
+                    <div className="flex items-center gap-3">
+                        <Link href="/admin/master" className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-500 transition-colors">
+                            🎛️ Dashboard Mestre
+                        </Link>
+                        <Link href="/" className="text-sm text-zinc-600 hover:text-zinc-900">
+                            ← Voltar
+                        </Link>
+                    </div>
                 </div>
 
                 {/* Stats Grid */}

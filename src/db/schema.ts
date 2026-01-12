@@ -165,3 +165,55 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
     }),
 }));
 
+// =========================================
+// DASHBOARD MESTRE - Multi-Produto
+// =========================================
+
+export const masterProducts = sqliteTable("master_products", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(), // Nome do produto
+    type: text("type", {
+        enum: ["saas", "playstore", "ecommerce", "standalone", "desktop"]
+    }).notNull(),
+    description: text("description"),
+    packageName: text("package_name"), // Para apps (com.example.app)
+    webhookUrl: text("webhook_url"), // URL para notificações
+    apiKey: text("api_key").notNull().unique(), // Chave única do produto
+    isActive: integer("is_active", { mode: 'boolean' }).default(true),
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const masterEvents = sqliteTable("master_events", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    productId: integer("product_id").references(() => masterProducts.id).notNull(),
+    event: text("event", {
+        enum: ["signup", "login", "purchase", "cancel", "refund", "error", "custom"]
+    }).notNull(),
+    userId: text("user_id"), // ID do usuário no produto (pode ser string ou número)
+    amount: real("amount"), // Valor se for transação
+    currency: text("currency").default("BRL"),
+    metadata: text("metadata"), // JSON com dados extras
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const masterProductsRelations = relations(masterProducts, ({ many }) => ({
+    events: many(masterEvents),
+}));
+
+export const masterEventsRelations = relations(masterEvents, ({ one }) => ({
+    product: one(masterProducts, {
+        fields: [masterEvents.productId],
+        references: [masterProducts.id],
+    }),
+}));
+
+// Configurações de notificação do admin
+export const masterNotificationSettings = sqliteTable("master_notification_settings", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    eventType: text("event_type").notNull(), // signup, purchase, cancel, etc.
+    enablePush: integer("enable_push", { mode: 'boolean' }).default(true),
+    enableEmail: integer("enable_email", { mode: 'boolean' }).default(false),
+    enableWhatsapp: integer("enable_whatsapp", { mode: 'boolean' }).default(false),
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
