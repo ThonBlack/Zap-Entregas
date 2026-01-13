@@ -4,39 +4,42 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { MapPin, Loader2, Search, X } from "lucide-react";
 
 interface AddressAutocompleteProps {
-    value: string;
-    onChange: (address: string, lat?: number, lng?: number) => void;
+    name: string; // Nome do campo para form
+    value?: string;
+    onChange?: (address: string, lat?: number, lng?: number) => void;
     placeholder?: string;
     className?: string;
-    defaultCity?: string; // Cidade padrão para priorizar resultados
-    defaultState?: string; // Estado padrão
+    defaultCity?: string;
+    defaultState?: string;
+    required?: boolean;
 }
 
 interface Suggestion {
-    description: string;
+    display_name: string;
     place_id: string;
-    structured_formatting?: {
-        main_text: string;
-        secondary_text: string;
-    };
+    lat: string;
+    lon: string;
 }
 
-// Usar a API do Google Places diretamente
-const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+// Usa Nominatim (OpenStreetMap) - 100% GRATUITO
+// Com fallback para Google se API key estiver configurada
 
 export default function AddressAutocomplete({
-    value,
+    name,
+    value = "",
     onChange,
     placeholder = "Digite o endereço...",
     className = "",
     defaultCity = "Patos de Minas",
-    defaultState = "MG"
+    defaultState = "MG",
+    required = false
 }: AddressAutocompleteProps) {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
+    const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -50,15 +53,26 @@ export default function AddressAutocomplete({
         setIsLoading(true);
 
         try {
-            // Adicionar cidade e estado padrão para priorizar resultados locais
+            // Adicionar cidade e estado para priorizar resultados locais
             const searchQuery = `${query}, ${defaultCity}, ${defaultState}, Brasil`;
 
-            // Usar a API de geocoding do backend para evitar expor a chave
-            const res = await fetch(`/api/places/autocomplete?query=${encodeURIComponent(searchQuery)}`);
+            // Usar Nominatim (OpenStreetMap) - GRATUITO
+            const url = new URL("https://nominatim.openstreetmap.org/search");
+            url.searchParams.append("q", searchQuery);
+            url.searchParams.append("format", "json");
+            url.searchParams.append("addressdetails", "1");
+            url.searchParams.append("limit", "5");
+            url.searchParams.append("countrycodes", "br");
+
+            const res = await fetch(url.toString(), {
+                headers: {
+                    "User-Agent": "ZapEntregas/1.0"
+                }
+            });
             const data = await res.json();
 
-            if (data.predictions) {
-                setSuggestions(data.predictions);
+            if (Array.isArray(data)) {
+                setSuggestions(data);
                 setShowSuggestions(true);
             }
         } catch (error) {
@@ -76,7 +90,7 @@ export default function AddressAutocomplete({
 
         debounceRef.current = setTimeout(() => {
             fetchSuggestions(inputValue);
-        }, 300);
+        }, 400); // 400ms debounce para Nominatim (rate limit)
 
         return () => {
             if (debounceRef.current) {
@@ -86,28 +100,18 @@ export default function AddressAutocomplete({
     }, [inputValue, fetchSuggestions]);
 
     // Selecionar sugestão
-    const handleSelectSuggestion = async (suggestion: Suggestion) => {
-        setInputValue(suggestion.description);
+    const handleSelectSuggestion = (suggestion: Suggestion) => {
+        const address = suggestion.display_name;
+        const lat = parseFloat(suggestion.lat);
+        const lng = parseFloat(suggestion.lon);
+
+        setInputValue(address);
+        setCoords({ lat, lng });
         setShowSuggestions(false);
         setSuggestions([]);
 
-        // Buscar coordenadas do endereço selecionado
-        try {
-            const res = await fetch(`/api/places/details?place_id=${suggestion.place_id}`);
-            const data = await res.json();
-
-            if (data.result?.geometry?.location) {
-                onChange(
-                    suggestion.description,
-                    data.result.geometry.location.lat,
-                    data.result.geometry.location.lng
-                );
-            } else {
-                onChange(suggestion.description);
-            }
-        } catch (error) {
-            console.error("Erro ao buscar detalhes:", error);
-            onChange(suggestion.description);
+        if (onChange) {
+            onChange(address, lat, lng);
         }
     };
 
@@ -127,8 +131,8 @@ export default function AddressAutocomplete({
                 setSelectedIndex(prev => prev > 0 ? prev - 1 : 0);
                 break;
             case "Enter":
-                e.preventDefault();
                 if (selectedIndex >= 0) {
+                    e.preventDefault();
                     handleSelectSuggestion(suggestions[selectedIndex]);
                 }
                 break;
@@ -141,15 +145,33 @@ export default function AddressAutocomplete({
     // Limpar input
     const handleClear = () => {
         setInputValue("");
-        onChange("");
+        setCoords(null);
         setSuggestions([]);
+        if (onChange) onChange("");
         inputRef.current?.focus();
+    };
+
+    // Formatar endereço para exibição mais limpa
+    const formatAddress = (displayName: string) => {
+        // Remove Brasil e código postal do final
+        return displayName
+            .replace(/, Brasil$/, "")
+            .replace(/,\s*\d{5}-?\d{3}/, "");
     };
 
     return (
         <div className="relative">
+            {/* Input real escondido para o form (com coordenadas) */}
+            <input type="hidden" name={name} value={inputValue} />
+            {coords && (
+                <>
+                    <input type="hidden" name={`${name}_lat`} value={coords.lat} />
+                    <input type="hidden" name={`${name}_lng`} value={coords.lng} />
+                </>
+            )}
+
             <div className="relative">
-                <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 z-10" />
                 <input
                     ref={inputRef}
                     type="text"
@@ -157,6 +179,7 @@ export default function AddressAutocomplete({
                     onChange={(e) => {
                         setInputValue(e.target.value);
                         setSelectedIndex(-1);
+                        setCoords(null);
                     }}
                     onFocus={() => {
                         if (suggestions.length > 0) {
@@ -169,7 +192,8 @@ export default function AddressAutocomplete({
                     }}
                     onKeyDown={handleKeyDown}
                     placeholder={placeholder}
-                    className={`w-full pl-10 pr-10 py-3 bg-zinc-900 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-green-500 ${className}`}
+                    required={required}
+                    className={`w-full pl-10 pr-10 py-2.5 rounded-lg border border-zinc-600 bg-zinc-700 text-white placeholder-zinc-500 focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all ${className}`}
                 />
                 {isLoading ? (
                     <Loader2 size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 animate-spin" />
@@ -186,22 +210,19 @@ export default function AddressAutocomplete({
 
             {/* Sugestões */}
             {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl overflow-hidden">
+                <div className="absolute z-50 w-full mt-1 bg-zinc-800 border border-zinc-600 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto">
                     {suggestions.map((suggestion, index) => (
                         <button
                             key={suggestion.place_id}
                             type="button"
                             onClick={() => handleSelectSuggestion(suggestion)}
-                            className={`w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-zinc-700 transition-colors ${index === selectedIndex ? 'bg-zinc-700' : ''
+                            className={`w-full px-4 py-3 text-left flex items-start gap-3 hover:bg-zinc-700 transition-colors border-b border-zinc-700 last:border-b-0 ${index === selectedIndex ? 'bg-zinc-700' : ''
                                 }`}
                         >
-                            <Search size={16} className="text-zinc-500 mt-1 flex-shrink-0" />
-                            <div className="min-w-0">
-                                <p className="text-white text-sm font-medium truncate">
-                                    {suggestion.structured_formatting?.main_text || suggestion.description.split(',')[0]}
-                                </p>
-                                <p className="text-zinc-500 text-xs truncate">
-                                    {suggestion.structured_formatting?.secondary_text || suggestion.description}
+                            <Search size={16} className="text-green-400 mt-1 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                                <p className="text-white text-sm truncate">
+                                    {formatAddress(suggestion.display_name)}
                                 </p>
                             </div>
                         </button>
@@ -209,10 +230,10 @@ export default function AddressAutocomplete({
                 </div>
             )}
 
-            {/* Dica de cidade padrão */}
-            {!showSuggestions && !inputValue && (
-                <p className="text-xs text-zinc-600 mt-1">
-                    📍 Buscando em {defaultCity}, {defaultState}
+            {/* Indicador de coordenadas válidas */}
+            {coords && (
+                <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+                    ✓ Endereço validado
                 </p>
             )}
         </div>

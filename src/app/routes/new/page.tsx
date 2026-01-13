@@ -2,8 +2,9 @@
 
 import { useActionState, useState } from "react";
 import { createRouteAction } from "../../actions/route";
-import { Plus, Trash, MapPin, User, DollarSign, ArrowLeft, Loader2, Package } from "lucide-react";
+import { Plus, Trash, User, DollarSign, ArrowLeft, Loader2, Package } from "lucide-react";
 import Link from "next/link";
+import AddressAutocomplete from "@/components/AddressAutocomplete";
 
 const initialState = {
     message: "",
@@ -104,15 +105,11 @@ export default function NewRoutePage() {
 
                                     <div className="md:col-span-2 relative">
                                         <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Endereço Completo</label>
-                                        <div className="relative">
-                                            <MapPin size={18} className="absolute left-3 top-3 text-zinc-500" />
-                                            <input
-                                                name="address"
-                                                placeholder="Rua Exemplo, 123 - Bairro"
-                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-zinc-600 bg-zinc-700 text-white placeholder-zinc-500 focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
-                                                required
-                                            />
-                                        </div>
+                                        <AddressAutocomplete
+                                            name="address"
+                                            placeholder="Rua Exemplo, 123 - Bairro"
+                                            required
+                                        />
                                     </div>
                                 </div>
                             </div>
