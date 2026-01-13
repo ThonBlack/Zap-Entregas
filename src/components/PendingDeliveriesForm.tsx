@@ -164,8 +164,8 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
 
                         if (delivery.lat && delivery.lng && currentLocation) {
                             distance = calculateDistance(currentLocation.lat, currentLocation.lng, delivery.lat, delivery.lng);
-                            // Enable if within 100m (or slightly more to be safe, e.g., 150m due to GPS inaccuracy)
-                            canDeliver = distance <= 150;
+                            // Enable if within 200m (increased from 150m due to GPS inaccuracy issues)
+                            canDeliver = distance <= 200;
                         }
 
                         return (
@@ -229,7 +229,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                                             <span>Ordem: {delivery.stopOrder || '-'}</span>
                                             <span>Valor: R$ {delivery.value || 0}</span>
                                             {currentLocation && delivery.lat && (
-                                                <span className={distance > 150 ? "text-orange-400" : "text-green-400"}>
+                                                <span className={distance > 200 ? "text-orange-400" : "text-green-400"}>
                                                     Distância: {distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : Math.round(distance) + 'm'}
                                                 </span>
                                             )}

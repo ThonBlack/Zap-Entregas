@@ -21,12 +21,12 @@ export async function addDeliveryAction(formData: FormData) {
 
     if (!address) return { error: "Endereço obrigatório" };
 
-    // Prevent double submission (Idempotency Check - 60s)
+    // Prevent double submission (Idempotency Check - 5 minutes)
     const recent = await db.query.deliveries.findFirst({
         where: and(
             eq(deliveries.shopkeeperId, Number(userId)),
             eq(deliveries.address, address),
-            gt(deliveries.createdAt, new Date(Date.now() - 60000).toISOString())
+            gt(deliveries.createdAt, new Date(Date.now() - 300000).toISOString()) // 5 minutos
         )
     });
 
