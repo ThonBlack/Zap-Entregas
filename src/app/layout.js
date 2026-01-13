@@ -20,6 +20,7 @@ export const metadata = {
 };
 
 import InstallPrompt from "@/components/InstallPrompt";
+import LoggerInitializer from "@/components/LoggerInitializer";
 
 export default function RootLayout({ children }) {
   return (
@@ -27,6 +28,7 @@ export default function RootLayout({ children }) {
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <LoggerInitializer />
         <InstallPrompt />
         {children}
       </body>

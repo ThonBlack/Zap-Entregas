@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs/promises";
 import path from "node:path";
-import mime from "mime"; // You might need to install 'mime' or just guess basic types. 
-// Since we don't have 'mime' installed, let's do a simple lookup or install it. 
-// For MVP without external deps, simple switch.
 
 export async function GET(
     req: NextRequest,
@@ -25,7 +22,10 @@ export async function GET(
         return new NextResponse(fileBuffer, {
             headers: {
                 "Content-Type": contentType,
-                "Cache-Control": "public, max-age=31536000, immutable"
+                "Cache-Control": "public, max-age=31536000, immutable",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Cross-Origin-Resource-Policy": "cross-origin"
             }
         });
     } catch (e) {

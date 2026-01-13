@@ -217,3 +217,18 @@ export const masterNotificationSettings = sqliteTable("master_notification_setti
     enableWhatsapp: integer("enable_whatsapp", { mode: 'boolean' }).default(false),
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
+
+// Logs de eventos e erros para monitoramento em produção
+export const appLogs = sqliteTable("app_logs", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    level: text("level", { enum: ["info", "warn", "error", "debug"] }).default("info").notNull(),
+    event: text("event").notNull(), // Nome do evento (ex: "delivery_created", "login_error")
+    message: text("message"), // Descrição do evento/erro
+    userId: integer("user_id"), // ID do usuário relacionado (opcional)
+    page: text("page"), // Página onde ocorreu (ex: "/routes/new")
+    userAgent: text("user_agent"), // Browser/dispositivo
+    ip: text("ip"), // IP do usuário
+    metadata: text("metadata"), // JSON com dados extras
+    stack: text("stack"), // Stack trace se for erro
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
