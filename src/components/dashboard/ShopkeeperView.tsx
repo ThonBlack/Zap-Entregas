@@ -6,6 +6,7 @@ import ProfileForm from "@/components/ProfileForm";
 import AdBanner from "@/components/AdBanner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import Avatar from "@/components/Avatar";
 
 interface ShopkeeperViewProps {
     pendingDeliveries: any[];
@@ -28,13 +29,7 @@ export function ShopkeeperView({ pendingDeliveries, recentTransactions, user }: 
             <Card className="p-5 bg-green-600 border-green-500">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div className="flex items-center gap-4">
-                        {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={user.name} className="w-14 h-14 rounded-full object-cover border-2 border-white/40 shadow-md" />
-                        ) : (
-                            <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center text-white text-xl font-bold shadow-md border-2 border-white/20">
-                                {user.name.charAt(0)}
-                            </div>
-                        )}
+                        <Avatar src={user.avatarUrl} name={user.name} size="lg" />
                         <div>
                             <h1 className="text-xl font-bold text-white">
                                 Olá, {user.name.split(' ')[0]}! 👋
