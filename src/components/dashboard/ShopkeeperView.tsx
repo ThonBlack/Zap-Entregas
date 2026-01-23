@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Plus, Wallet, DollarSign, Package, Truck, CheckCircle, Clock, Settings, Star, Crown } from "lucide-react";
-import PendingDeliveriesForm from "@/components/PendingDeliveriesForm";
+import PendingDeliveriesForm from "@/components/deliveries/PendingDeliveriesForm";
 import { FinancialSummary } from "./FinancialSummary";
-import ProfileForm from "@/components/ProfileForm";
-import AdBanner from "@/components/AdBanner";
+import ProfileForm from "@/components/auth/ProfileForm";
+import AdBanner from "@/components/billing/AdBanner";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import Avatar from "@/components/Avatar";
+import Avatar from "@/components/auth/Avatar";
 
 interface ShopkeeperViewProps {
     pendingDeliveries: any[];

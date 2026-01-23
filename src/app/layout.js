@@ -15,12 +15,19 @@ export const metadata = {
   title: "Zap Entregas",
   description: "Gestão inteligente de entregas",
   manifest: "/manifest.json",
-  themeColor: "#16a34a",
-  viewport: "minimum-scale=1, initial-scale=1, width=device-width, shrink-to-fit=no, user-scalable=no, viewport-fit=cover",
 };
 
-import InstallPrompt from "@/components/InstallPrompt";
-import LoggerInitializer from "@/components/LoggerInitializer";
+export const viewport = {
+  themeColor: "#16a34a",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+};
+
+import InstallPrompt from "@/components/shared/InstallPrompt";
+import LoggerInitializer from "@/components/shared/LoggerInitializer";
 
 export default function RootLayout({ children }) {
   return (

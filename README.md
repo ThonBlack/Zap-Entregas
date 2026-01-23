@@ -19,158 +19,70 @@ Aplicação web (PWA) para **lojistas** gerenciarem entregas e **motoboys** rece
 | **Leaflet** | Mapas (react-leaflet) |
 | **Lucide React** | Ícones |
 | **PWA** | Instalável no celular |
+| **Docker** | Containerização e Deploy |
 
 ---
 
-## 🚀 Funcionalidades Implementadas
-
-### ✅ Autenticação
-- Login/Registro por telefone + senha
-- Roles: `shopkeeper`, `motoboy`, `admin`
-- 2FA opcional (TOTP)
-
-### ✅ Dashboard Lojista
-- Header com saudação + estatísticas do dia (Pendentes, Em Rota, Feitas)
-- Botão "Nova Entrega" destacado
-- Lista de entregas pendentes com ações
-- Gestão de motoboys
-- Resumo financeiro
-
-### ✅ Dashboard Motoboy (Gamificada)
-- Header com foto, nível (Bronze/Prata/Ouro), estrelas
-- Barra de progresso da meta diária
-- Cards de saldo e entregas do dia
-- Lista de próximas entregas
-- Mensagem de parabéns ao bater meta
-
-### ✅ Rastreio em Tempo Real
-- `LocationTracker.tsx` - Envia GPS a cada 10s
-- Mapa Leaflet mostrando posição do motoboy
-- Página `/tracking/[id]` pública para clientes
-
-### ✅ Otimização de Rotas
-- Integração com Google Directions API
-- Botão "Otimizar Rota" reorganiza entregas
-
-### ✅ Geofencing
-- Botão "Entregue" só libera a 150m do destino
-- Usa coordenadas GPS do motoboy
-
-### ✅ Integração WhatsApp
-- Botão abre WhatsApp com mensagem pré-definida
-- Inclui link de rastreio
-
-### ✅ PWA (App Instalável)
-- `manifest.json` com ícones
-- `InstallPrompt.tsx` - Notifica usuário para instalar
-- Funciona offline (service worker)
-
-### ✅ SaaS & Monetização
-- Tabelas `plans` e `subscriptions` no banco
-- 5 planos: Grátis, Motoboy Pro, Starter, Growth, Unlimited
-- Serviço `asaas.ts` preparado para integração de pagamentos
-- **Anúncios** para usuários do plano grátis (`AdBanner.tsx`)
-- Página `/upgrade` com landing page completa
-
-### ✅ Painel Admin
-- `/admin/saas` - Estatísticas, lista de planos e usuários
-- Acesso restrito a `role: admin`
-
----
-
-## 📁 Estrutura de Diretórios
+## 📁 Estrutura de Diretórios (Refatorado)
 
 ```
 src/
 ├── app/
-│   ├── actions/          # Server Actions (auth, logistics, motoboy, etc)
-│   ├── admin/saas/       # Painel admin
-│   ├── api/              # API routes
-│   ├── deliveries/       # Histórico de entregas
-│   ├── finance/          # Gestão financeira
-│   ├── login/            # Autenticação
-│   ├── motoboys/         # CRUD motoboys
-│   ├── routes/           # Nova entrega
-│   ├── settings/         # Configurações
-│   ├── tracking/         # Rastreio público
-│   ├── upgrade/          # Página de planos (Landing Page)
-│   └── page.tsx          # Home (dashboard condicional)
-├── components/
-│   ├── dashboard/        # Views específicas
-│   │   ├── ShopkeeperView.tsx
-│   │   ├── MotoboyView.tsx
-│   │   └── FinancialSummary.tsx
-│   ├── ui/               # Componentes base
-│   │   ├── button.tsx
-│   │   ├── card.tsx
-│   │   └── badge.tsx
-│   ├── AdBanner.tsx      # Anúncios
-│   ├── InstallPrompt.tsx # PWA
-│   ├── LocationTracker.tsx
-│   └── ...
+│   ├── actions/          # Server Actions
+│   ├── admin/            # Painel admin (SaaS, Master, Users)
+│   ├── ...               # Outras rotas (login, tracking, etc)
+├── components/           # Componentes organizados por feature
+│   ├── admin/            # Componentes de administração
+│   ├── auth/             # Componentes de autenticação
+│   ├── billing/          # Componentes de faturamento/planos
+│   ├── dashboard/        # Views principais do dashboard
+│   ├── deliveries/       # Componentes de entregas
+│   ├── map/              # Componentes de mapa e rastreio
+│   ├── shared/           # Componentes compartilhados (Logger, Notifications)
+│   └── ui/               # Componentes base (shadcn/ui)
 ├── db/
 │   ├── index.ts          # Conexão Drizzle
-│   └── schema.ts         # Tabelas (users, deliveries, plans, etc)
-├── lib/
-│   └── routeUtils.ts     # Geocoding e otimização
-└── services/
-    └── asaas.ts          # Integração pagamentos
+│   └── schema.ts         # Tabelas
+scripts/
+├── deploy/               # Scripts de deploy (deploy.sh)
+├── migrations/           # Scripts de migração legados
+└── utils/                # Scripts utilitários (create_admin, seed)
 ```
 
 ---
 
-## 🗄️ Banco de Dados (Schema)
-
-### Tabelas Principais:
-- `users` - Usuários (lojistas, motoboys, admins)
-- `deliveries` - Entregas
-- `transactions` - Pagamentos
-- `shopSettings` - Configurações do lojista
-- `plans` - Planos de assinatura
-- `subscriptions` - Assinaturas ativas
-
----
-
-## 🎨 Identidade Visual
-
-- **Cor principal:** Verde (#22c55e / green-500)
-- **Gradientes:** green-500 → emerald-600
-- **Logo:** Motoboy com raio (verde)
-
----
-
-## 📋 Próximos Passos (TODO)
-
-- [ ] Integrar pagamentos Asaas (webhooks)
-- [ ] Implementar travas de limites por plano
-- [ ] Push notifications para motoboys
-- [ ] Modo offline completo
-- [ ] Dashboard com gráficos de performance
-- [ ] Sistema de avaliação de motoboys
-
----
-
 ## 🚀 Como Rodar
+
+### Desenvolvimento Local
 
 ```bash
 # Instalar dependências
 npm install
 
 # Rodar em desenvolvimento
-npm run dev -- -p 4000
+npm run dev
 
-# Acessar
-http://localhost:4000
+# Helper Scripts
+npm run script:create-admin   # Criar admin
+npm run script:seed-plans     # Popular planos
 ```
 
+### Docker (Produção)
+
+```bash
+# Build e Start via Docker Compose
+docker compose up -d --build
+```
+
+O deploy para VPS pode ser feito utilizando o script `scripts/deploy/deploy.sh`.
+
 ---
 
-## 📞 Contexto para Continuar
+## 🗄️ Banco de Dados
 
-Se estiver continuando este projeto com um novo agente/sessão, informe:
-
-> "Estou continuando o Zap Entregas. É um app de entregas com Next.js, Drizzle ORM (SQLite), PWA. Já tem: dashboard gamificada para motoboy, rastreio GPS em tempo real, geofencing, integração WhatsApp, modelo SaaS com planos e página de upgrade. Quero implementar [próxima feature]."
+- **SQLite**: Local ou volume Docker (`/data/sqlite.db`).
+- **Migrações**: Gerenciadas via Drizzle ORM.
 
 ---
 
-*Última atualização: 08/01/2026*
+*Última atualização: 23/01/2026 - Refatoração Completa*

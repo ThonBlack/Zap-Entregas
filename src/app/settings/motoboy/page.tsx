@@ -5,8 +5,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
-import MotoboySettingsForm from "@/components/MotoboySettingsForm";
-import AvatarForm from "@/components/AvatarForm";
+import MotoboySettingsForm from "@/components/admin/MotoboySettingsForm";
+import AvatarForm from "@/components/auth/AvatarForm";
 
 export default async function MotoboySettingsPage() {
     const cookieStore = await cookies();

@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { DollarSign, History, Target, Flame, Star, Trophy, Zap, MapPin, Crown } from "lucide-react";
-import PendingDeliveriesForm from "@/components/PendingDeliveriesForm";
+import PendingDeliveriesForm from "@/components/deliveries/PendingDeliveriesForm";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import LocationTracker from "@/components/LocationTracker";
-import AdBanner from "@/components/AdBanner";
+import LocationTracker from "@/components/map/LocationTracker";
+import AdBanner from "@/components/billing/AdBanner";
 
 interface MotoboyViewProps {
     balance: number;

@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 
 const NotificationManager = dynamic(
-    () => import("@/components/NotificationManager"),
+    () => import("@/components/shared/NotificationManager"),
     { ssr: false }
 );
 

@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { Play, Plus, Trash2, Phone, MapPin } from "lucide-react";
 import { optimizeSelectedRouteAction } from "@/app/actions/logistics";
-import ConfirmationModal from "./ConfirmationModal";
-import RefreshButton from "./RefreshButton";
+import ConfirmationModal from "@/components/shared/ConfirmationModal";
+import RefreshButton from "@/components/shared/RefreshButton";
 
 interface Delivery {
     id: number;

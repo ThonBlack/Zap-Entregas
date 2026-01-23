@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 
 const TrackingMapClient = dynamic(
-    () => import("@/components/TrackingMap"),
+    () => import("@/components/map/TrackingMap"),
     {
         ssr: false,
         loading: () => <div className="h-[400px] w-full bg-zinc-100 rounded-xl animate-pulse mt-4"></div>

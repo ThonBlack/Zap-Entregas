@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "script:create-admin": "npx tsx scripts/utils/create_admin.ts",
+    "script:promote-admin": "npx tsx scripts/utils/promote_admin.ts",
+    "script:seed-plans": "npx tsx scripts/utils/seed_plans.ts"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",
@@ -26,6 +29,7 @@
     "react-dom": "19.2.3",
     "react-leaflet": "^5.0.0",
     "recharts": "^3.6.0",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

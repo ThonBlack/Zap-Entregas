@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import { createRouteAction } from "../../actions/route";
 import { Plus, Trash, User, DollarSign, ArrowLeft, Loader2, Package } from "lucide-react";
 import Link from "next/link";
-import AddressAutocomplete from "@/components/AddressAutocomplete";
+import AddressAutocomplete from "@/components/map/AddressAutocomplete";
 
 const initialState = {
     message: "",

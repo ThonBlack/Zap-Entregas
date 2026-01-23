@@ -9,8 +9,8 @@ import { LogOut, ShieldCheck, Settings } from "lucide-react";
 import { ShopkeeperView } from "@/components/dashboard/ShopkeeperView";
 import { MotoboyView } from "@/components/dashboard/MotoboyView";
 import { PendingConfirmations } from "@/components/dashboard/PendingConfirmations";
-import TrialBanner from "@/components/TrialBanner";
-import NotificationWrapper from "@/components/NotificationWrapper";
+import TrialBanner from "@/components/billing/TrialBanner";
+import NotificationWrapper from "@/components/shared/NotificationWrapper";
 
 // Data Fetching Helpers
 async function getMotoboysWithBalance() {

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
-import SettingsForm from "@/components/SettingsForm";
-import AvatarForm from "@/components/AvatarForm";
-import ApiKeyForm from "@/components/ApiKeyForm";
+import SettingsForm from "@/components/admin/SettingsForm";
+import AvatarForm from "@/components/auth/AvatarForm";
+import ApiKeyForm from "@/components/admin/ApiKeyForm";
 import { db } from "@/db";
 import { shopSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";

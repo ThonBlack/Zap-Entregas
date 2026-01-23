@@ -1,4 +1,4 @@
-import FinancialDashboard from "@/components/FinancialDashboard";
+import FinancialDashboard from "@/components/admin/FinancialDashboard";
 import Link from "next/link";
 import { ArrowLeft, DollarSign } from "lucide-react";
 

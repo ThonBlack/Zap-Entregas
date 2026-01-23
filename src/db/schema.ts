@@ -9,7 +9,7 @@ export const users = sqliteTable("users", {
     password: text("password"), // Opcional se for magic link, mas bom ter para auth simples
     avatarUrl: text("avatar_url"),
     lastAvatarUpdate: text("last_avatar_update"), // Data da última troca de foto
-    plan: text("plan", { enum: ["free", "pro", "enterprise"] }).default("free").notNull(),
+    plan: text("plan", { enum: ["free", "basic", "pro", "growth", "enterprise"] }).default("free").notNull(),
     subscriptionStatus: text("subscription_status", { enum: ["active", "inactive", "trial"] }).default("active").notNull(),
     twoFactorSecret: text("two_factor_secret"),
     twoFactorEnabled: integer("two_factor_enabled", { mode: 'boolean' }).default(false),

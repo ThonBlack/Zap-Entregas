@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { deliveries, reviews, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { notFound } from "next/navigation";
-import ReviewForm from "@/components/ReviewForm";
+import ReviewForm from "@/components/deliveries/ReviewForm";
 
 interface ReviewPageProps {
     params: Promise<{ id: string }>;

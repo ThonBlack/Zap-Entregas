@@ -81,7 +81,7 @@ export default async function MasterDashboardPage() {
             <header className="bg-gradient-to-r from-purple-900 to-indigo-900 border-b border-purple-700 px-6 py-4 sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/admin" className="p-2 text-purple-300 hover:text-white rounded-lg hover:bg-purple-800/50 transition-colors">
+                        <Link href="/admin/saas" className="p-2 text-purple-300 hover:text-white rounded-lg hover:bg-purple-800/50 transition-colors">
                             <ArrowLeft size={20} />
                         </Link>
                         <div className="flex items-center gap-3">

@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { getMotoboyLocationAction } from "@/app/actions/tracking";
-import TrackingMapWrapper from "@/components/TrackingMapWrapper";
+import TrackingMapWrapper from "@/components/map/TrackingMapWrapper";
 
 export default async function TrackingPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
