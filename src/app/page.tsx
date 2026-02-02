@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { users, transactions, deliveries } from "@/db/schema";
-import { eq, sql, desc, and } from "drizzle-orm";
+import { eq, sql, desc, and, or, gte, inArray } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LogOut, ShieldCheck, Settings } from "lucide-react";
@@ -119,6 +119,8 @@ export default async function Dashboard() {
     let motoboys: Awaited<ReturnType<typeof getMotoboysWithBalance>> = [];
     let myBalance = 0;
     let pendingDeliveries: any[] = [];
+    let myDeliveries: any[] = []; // Entregas atribuídas ao motoboy
+    let deliveriesTodayCount = 0; // Contador de entregas do dia
     let recentTransactions: Awaited<ReturnType<typeof getRecentTransactions>> = [];
     let pendingConfirmations: Awaited<ReturnType<typeof getPendingConfirmations>> = [];
 
@@ -127,23 +129,48 @@ export default async function Dashboard() {
 
     const isShopkeeperOrAdmin = user.role === 'shopkeeper' || user.role === 'admin';
 
-    if (isShopkeeperOrAdmin) {
-        // motoboys = await getMotoboysWithBalance(); // Unused in view currently, kept if needed later or remove? Removing for performance if unused.
-        // Actually, ShopkeeperView sends to /motoboys page, doesn't list them inline anymore (it never did in the original file I saw, despite fetching logic).
-        // I will keep the fetch commented out to match my finding that it was dead code, or just remove it.
+    // Data de hoje (meia-noite)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
+    if (isShopkeeperOrAdmin) {
         recentTransactions = await getRecentTransactions();
+        // Lojista vê todas as pendentes
         pendingDeliveries = await db.select()
             .from(deliveries)
             .where(eq(deliveries.status, 'pending'))
             .orderBy(deliveries.stopOrder, desc(deliveries.createdAt));
 
     } else {
+        // MOTOBOY
         myBalance = await getUserBalance(user.id);
+
+        // 1. Entregas disponíveis (pendentes sem motoboy) + atribuídas a ele
         pendingDeliveries = await db.select()
             .from(deliveries)
-            .where(eq(deliveries.status, 'pending'))
+            .where(
+                or(
+                    eq(deliveries.status, 'pending'), // Disponíveis para aceitar
+                    and(
+                        eq(deliveries.motoboyId, user.id),
+                        inArray(deliveries.status, ['assigned', 'picked_up']) // Minhas em andamento
+                    )
+                )
+            )
             .orderBy(deliveries.stopOrder);
+
+        // 2. Minhas entregas em andamento (para seção separada)
+        myDeliveries = pendingDeliveries.filter(d => d.motoboyId === user.id);
+
+        // 3. Contador de entregas finalizadas HOJE
+        const todayDelivered = await db.select({ count: sql<number>`count(*)` })
+            .from(deliveries)
+            .where(and(
+                eq(deliveries.motoboyId, user.id),
+                eq(deliveries.status, 'delivered'),
+                gte(deliveries.deliveredAt, today.toISOString())
+            ));
+        deliveriesTodayCount = todayDelivered[0]?.count || 0;
     }
 
     return (
@@ -199,6 +226,8 @@ export default async function Dashboard() {
                     <MotoboyView
                         balance={myBalance}
                         pendingDeliveries={pendingDeliveries}
+                        myDeliveries={myDeliveries}
+                        deliveriesToday={deliveriesTodayCount}
                         user={user}
                     />
                 )}

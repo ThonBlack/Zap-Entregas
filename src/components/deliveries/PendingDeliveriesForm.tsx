@@ -15,10 +15,14 @@ interface Delivery {
     stopOrder: number | null;
     lat: number | null;
     lng: number | null;
+    status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'canceled';
+    motoboyId: number | null;
 }
 
 interface PendingDeliveriesFormProps {
     deliveries: Delivery[];
+    isMotoboy?: boolean;
+    currentUserId?: number;
 }
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -36,9 +40,10 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     return R * c;
 }
 
-export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesFormProps) {
+export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, currentUserId }: PendingDeliveriesFormProps) {
     const [selected, setSelected] = useState<number[]>([]);
     const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
+    const [loadingAction, setLoadingAction] = useState<number | null>(null);
 
     useEffect(() => {
         if (!("geolocation" in navigator)) return;
@@ -71,8 +76,44 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
         description: string;
         action: () => Promise<void>;
         requireWord?: string;
-        variant: "danger" | "warning";
-    }>({ isOpen: false, title: "", description: "", action: async () => { }, variant: "danger" });
+        variant: "danger" | "warning" | "info";
+    }>({ isOpen: false, title: "", description: "", action: async () => { }, variant: "warning" });
+
+    // Handler para ACEITAR entrega
+    const handleAcceptClick = async (id: number) => {
+        setLoadingAction(id);
+        try {
+            const m = await import("@/app/actions/logistics");
+            const res = await m.acceptDeliveryAction(id);
+            if (res?.error) {
+                alert(res.error);
+            } else {
+                window.location.reload();
+            }
+        } catch (e) {
+            alert("Erro ao aceitar entrega.");
+        } finally {
+            setLoadingAction(null);
+        }
+    };
+
+    // Handler para PEGAR entrega (saiu para entregar)
+    const handlePickupClick = async (id: number) => {
+        setLoadingAction(id);
+        try {
+            const m = await import("@/app/actions/logistics");
+            const res = await m.pickupDeliveryAction(id);
+            if (res?.error) {
+                alert(res.error);
+            } else {
+                window.location.reload();
+            }
+        } catch (e) {
+            alert("Erro ao marcar coleta.");
+        } finally {
+            setLoadingAction(null);
+        }
+    };
 
     // Actions wrapped with client-side modal
     const handleDeleteClick = (id: number) => {
@@ -89,13 +130,7 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                     if (res?.error) {
                         alert(res.error);
                     } else {
-                        // Success
-                        // Force a router refresh to ensure UI sync
-                        // (Though revalidatePath should handle it, this is a fallback)
-                        import("next/navigation").then(({ useRouter }) => {
-                            // Can't use hook in callback easily, but we can assume revalidate works or reload
-                            window.location.reload();
-                        });
+                        window.location.reload();
                     }
                 } catch (e) {
                     alert("Erro ao conectar com servidor.");
@@ -171,7 +206,20 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                         return (
                             <div key={delivery.id} className={`group relative block bg-zinc-800 p-4 rounded-xl shadow-sm border transition-all ${selected.includes(delivery.id) ? 'border-green-500 ring-1 ring-green-500 bg-zinc-700' : 'border-zinc-700'}`}>
                                 {/* Actions Overlay */}
-                                <div className="absolute top-2 right-2 flex gap-2">
+                                <div className="absolute top-2 right-2 flex gap-2 flex-wrap justify-end">
+                                    {/* Status Badge */}
+                                    {delivery.status !== 'pending' && (
+                                        <span className={`px-2 py-1 text-xs font-bold rounded ${delivery.status === 'assigned' ? 'bg-yellow-500 text-black' :
+                                                delivery.status === 'picked_up' ? 'bg-blue-500 text-white' :
+                                                    'bg-zinc-600 text-white'
+                                            }`}>
+                                            {delivery.status === 'assigned' ? '📦 Aceita' :
+                                                delivery.status === 'picked_up' ? '🏍️ Em Rota' :
+                                                    delivery.status}
+                                        </span>
+                                    )}
+
+                                    {/* WhatsApp Button - sempre visível se tiver telefone */}
                                     {delivery.customerPhone && (
                                         <a
                                             href={`https://wa.me/55${delivery.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️\nAcompanhe em tempo real: https://zapentregas.duckdns.org/tracking/${delivery.id}`)}`}
@@ -185,29 +233,61 @@ export default function PendingDeliveriesForm({ deliveries }: PendingDeliveriesF
                                         </a>
                                     )}
 
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.preventDefault(); handleCompleteClick(delivery.id); }}
-                                        disabled={!canDeliver}
-                                        className={`p-1 px-2 text-xs font-bold rounded flex items-center gap-1 shadow-sm transition-colors
-                                        ${canDeliver
-                                                ? 'bg-green-600 text-white hover:bg-green-500'
-                                                : 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
-                                            }`}
-                                        title={!canDeliver ? `Você está a ${Math.round(distance)}m do local. Aproxime-se para finalizar.` : "Marcar como Entregue"}
-                                    >
-                                        <CheckCircleIcon canDeliver={canDeliver} />
-                                        <span>Entregue</span>
-                                    </button>
+                                    {/* BOTÃO: ACEITAR - só aparece se pending e é motoboy */}
+                                    {isMotoboy && delivery.status === 'pending' && !delivery.motoboyId && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); handleAcceptClick(delivery.id); }}
+                                            disabled={loadingAction === delivery.id}
+                                            className="p-1 px-2 text-xs font-bold rounded flex items-center gap-1 shadow-sm bg-yellow-500 text-black hover:bg-yellow-400 disabled:opacity-50"
+                                            title="Aceitar esta entrega"
+                                        >
+                                            {loadingAction === delivery.id ? '...' : '🙋 Aceitar'}
+                                        </button>
+                                    )}
 
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.preventDefault(); handleDeleteClick(delivery.id); }}
-                                        className="p-1 bg-red-600 text-white rounded hover:bg-red-500"
-                                        title="Excluir"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
+                                    {/* BOTÃO: PEGUEI - só aparece se assigned e é o motoboy atribuído */}
+                                    {isMotoboy && delivery.status === 'assigned' && delivery.motoboyId === currentUserId && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); handlePickupClick(delivery.id); }}
+                                            disabled={loadingAction === delivery.id}
+                                            className="p-1 px-2 text-xs font-bold rounded flex items-center gap-1 shadow-sm bg-blue-500 text-white hover:bg-blue-400 disabled:opacity-50"
+                                            title="Marcar que pegou o pedido"
+                                        >
+                                            {loadingAction === delivery.id ? '...' : '📦 Peguei'}
+                                        </button>
+                                    )}
+
+                                    {/* BOTÃO: ENTREGUE - só aparece se picked_up ou (não é motoboy e qualquer status) */}
+                                    {(isMotoboy && delivery.status === 'picked_up' && delivery.motoboyId === currentUserId) || (!isMotoboy) ? (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); handleCompleteClick(delivery.id); }}
+                                            disabled={!canDeliver || loadingAction === delivery.id}
+                                            className={`p-1 px-2 text-xs font-bold rounded flex items-center gap-1 shadow-sm transition-colors
+                                            ${canDeliver
+                                                    ? 'bg-green-600 text-white hover:bg-green-500'
+                                                    : 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
+                                                }`}
+                                            title={!canDeliver ? `Você está a ${Math.round(distance)}m do local. Aproxime-se para finalizar.` : "Marcar como Entregue"}
+                                        >
+                                            <CheckCircleIcon canDeliver={canDeliver} />
+                                            <span>Entregue</span>
+                                        </button>
+                                    ) : null}
+
+                                    {/* BOTÃO: EXCLUIR - só para lojista/admin */}
+                                    {!isMotoboy && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.preventDefault(); handleDeleteClick(delivery.id); }}
+                                            className="p-1 bg-red-600 text-white rounded hover:bg-red-500"
+                                            title="Excluir"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    )}
                                 </div>
 
                                 <label className="flex items-start gap-4 cursor-pointer mt-8 md:mt-0">

@@ -155,70 +155,161 @@ export async function deleteDeliveryAction(id: number) {
     }
 }
 
-// 4. Complete Delivery (with privacy implications handled in History view)
+// 4. Accept Delivery - Motoboy accepts a pending delivery
+export async function acceptDeliveryAction(id: number) {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+    if (!userId) return { error: "Não autenticado" };
+
+    try {
+        // Verificar se a entrega ainda está disponível
+        const delivery = await db.query.deliveries.findFirst({
+            where: and(
+                eq(deliveries.id, id),
+                eq(deliveries.status, 'pending')
+            )
+        });
+
+        if (!delivery) {
+            return { error: "Entrega não disponível ou já foi aceita." };
+        }
+
+        // Verificar se já tem motoboy atribuído
+        if (delivery.motoboyId) {
+            return { error: "Esta entrega já foi aceita por outro motoboy." };
+        }
+
+        // Atribuir ao motoboy
+        await db.update(deliveries)
+            .set({
+                motoboyId: Number(userId),
+                status: 'assigned',
+                acceptedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            })
+            .where(and(
+                eq(deliveries.id, id),
+                eq(deliveries.status, 'pending') // Double-check para evitar race condition
+            ));
+
+        revalidatePath("/");
+        return { success: true };
+    } catch (e) {
+        console.error("[ACCEPT ERROR]", e);
+        return { error: "Erro ao aceitar entrega." };
+    }
+}
+
+// 5. Pickup Delivery - Motoboy picked up the order from shop
+export async function pickupDeliveryAction(id: number) {
+    const cookieStore = await cookies();
+    const userId = cookieStore.get("user_id")?.value;
+    if (!userId) return { error: "Não autenticado" };
+
+    try {
+        // Verificar se a entrega existe e pertence a este motoboy
+        const delivery = await db.query.deliveries.findFirst({
+            where: and(
+                eq(deliveries.id, id),
+                eq(deliveries.motoboyId, Number(userId)),
+                eq(deliveries.status, 'assigned')
+            )
+        });
+
+        if (!delivery) {
+            return { error: "Entrega não encontrada ou não atribuída a você." };
+        }
+
+        await db.update(deliveries)
+            .set({
+                status: 'picked_up',
+                pickedUpAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            })
+            .where(eq(deliveries.id, id));
+
+        revalidatePath("/");
+        return { success: true };
+    } catch (e) {
+        console.error("[PICKUP ERROR]", e);
+        return { error: "Erro ao marcar coleta." };
+    }
+}
+
+// 6. Complete Delivery (with race condition protection)
 export async function completeDeliveryAction(id: number) {
     const cookieStore = await cookies();
     const userId = cookieStore.get("user_id")?.value;
     if (!userId) return { error: "Não autenticado" };
 
     try {
-        // 1. Get Shop Settings for calculation
-        // We need to know WHO is the shopkeeper for this delivery to get their settings
+        // Verificar se a entrega existe e está em status válido para completar
         const delivery = await db.query.deliveries.findFirst({
-            where: eq(deliveries.id, id),
+            where: and(
+                eq(deliveries.id, id),
+                inArray(deliveries.status, ['assigned', 'picked_up', 'pending'])
+            ),
             with: {
                 shopkeeper: true
             }
         });
 
-        if (!delivery) return { error: "Entrega não encontrada." };
+        if (!delivery) {
+            return { error: "Entrega não encontrada ou já foi finalizada." };
+        }
+
+        // Se já foi entregue, retornar sucesso sem duplicar
+        if (delivery.status === 'delivered') {
+            return { success: true, alreadyDelivered: true };
+        }
 
         const shopId = delivery.shopkeeperId;
+        let fee = 0;
+
+        // Calcular taxa se houver configuração do lojista
         if (shopId) {
             const settings = await db.query.shopSettings.findFirst({
                 where: eq(shopSettings.userId, shopId)
             });
 
             if (settings) {
-                let fee = 0;
-                // Simple MVP Logic: Fixed Value Only for now (as requested)
-                // Expanded logic:
                 if (settings.remunerationModel === 'fixed' || settings.remunerationModel === 'hybrid') {
-                    fee += (settings.fixedValue || 0);
-                }
-
-                // If distance calculation is needed, we would need distance between points.
-                // For now, MVP assumes Fixed.
-
-                if (fee > 0) {
-                    // Create Transaction: Credit to Motoboy
-                    await db.insert(transactions).values({
-                        userId: Number(userId), // Motoboy receives
-                        amount: fee,
-                        type: 'credit',
-                        description: `Corrida #${id} - ${delivery.customerName || 'Cliente'}`,
-                        relatedDeliveryId: id,
-                        creatorId: shopId, // Shopkeeper "pays" (conceptually)
-                        status: 'confirmed'
-                    });
-
-                    // Update delivery fee for record
-                    await db.update(deliveries).set({ fee }).where(eq(deliveries.id, id));
+                    fee = settings.fixedValue || 0;
                 }
             }
         }
 
+        // Verificar se já existe transação para esta entrega (evitar duplicata)
+        const existingTransaction = await db.query.transactions.findFirst({
+            where: eq(transactions.relatedDeliveryId, id)
+        });
+
+        // Criar transação apenas se não existir e tiver fee
+        if (!existingTransaction && fee > 0) {
+            await db.insert(transactions).values({
+                userId: Number(userId),
+                amount: fee,
+                type: 'credit',
+                description: `Corrida #${id} - ${delivery.customerName || 'Cliente'}`,
+                relatedDeliveryId: id,
+                creatorId: shopId,
+                status: 'confirmed'
+            });
+        }
+
+        // Atualizar entrega
         await db.update(deliveries)
             .set({
                 status: 'delivered',
+                fee,
                 motoboyId: Number(userId),
+                deliveredAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             })
             .where(eq(deliveries.id, id));
 
         revalidatePath("/");
 
-        // Retornar dados para WhatsApp de avaliação
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
         return {
             success: true,
@@ -227,7 +318,8 @@ export async function completeDeliveryAction(id: number) {
             customerName: delivery.customerName || "Cliente"
         };
     } catch (e) {
-        console.error(e);
+        console.error("[COMPLETE ERROR]", e);
         return { error: "Erro ao finalizar" };
     }
 }
+

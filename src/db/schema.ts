@@ -41,6 +41,9 @@ export const deliveries = sqliteTable("deliveries", {
     fee: real("fee").default(0), // Taxa de entrega (ganho do motoboy ou custo do lojista)
     observation: text("observation"),
     stopOrder: integer("stop_order"), // Ordem da entrega na rota (1, 2, 3...)
+    acceptedAt: text("accepted_at"), // Quando motoboy aceitou
+    pickedUpAt: text("picked_up_at"), // Quando saiu da loja
+    deliveredAt: text("delivered_at"), // Quando entregou
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });

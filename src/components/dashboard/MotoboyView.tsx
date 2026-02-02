@@ -9,11 +9,12 @@ import AdBanner from "@/components/billing/AdBanner";
 interface MotoboyViewProps {
     balance: number;
     pendingDeliveries: any[];
+    myDeliveries: any[];
+    deliveriesToday: number;
     user: any;
 }
 
-export function MotoboyView({ balance, pendingDeliveries, user }: MotoboyViewProps) {
-    const deliveriesToday = pendingDeliveries.filter(d => d.status === 'delivered').length;
+export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveriesToday, user }: MotoboyViewProps) {
     const dailyGoal = user.dailyGoal || 10; // Usar meta do banco ou padrão 10
     const progress = Math.min((deliveriesToday / dailyGoal) * 100, 100);
 
@@ -171,7 +172,11 @@ export function MotoboyView({ balance, pendingDeliveries, user }: MotoboyViewPro
 
             {/* Pending Deliveries */}
             <section>
-                <PendingDeliveriesForm deliveries={pendingDeliveries} />
+                <PendingDeliveriesForm
+                    deliveries={pendingDeliveries}
+                    isMotoboy={true}
+                    currentUserId={user.id}
+                />
             </section>
 
             {/* Motivational Footer */}
