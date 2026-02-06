@@ -5,6 +5,7 @@ import { users } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { hashPassword } from "../../lib/password";
 
 const TRIAL_DAYS = 30;
 const MAX_TRIAL_USERS = 100;
@@ -12,6 +13,7 @@ const MAX_TRIAL_USERS = 100;
 export async function registerAction(prevState: any, formData: FormData) {
     const name = formData.get("name") as string;
     const phone = formData.get("phone") as string;
+    const email = formData.get("email") as string | null;
     const password = formData.get("password") as string;
     const role = formData.get("role") as "shopkeeper" | "motoboy";
 
@@ -35,13 +37,17 @@ export async function registerAction(prevState: any, formData: FormData) {
         ? new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
         : null;
 
+    // Hash da senha antes de salvar
+    const hashedPassword = await hashPassword(password);
+
     // Create user with trial if applicable
     const newUser = await db.insert(users).values({
         name,
         phone,
-        password, // In a real app, hash this!
+        email: email || null, // Email opcional para recuperação de senha
+        password: hashedPassword,
         role,
-        plan: givesTrial ? "enterprise" : "free", // Unlimited plan during trial
+        plan: givesTrial ? "enterprise" : "free",
         subscriptionStatus: givesTrial ? "trial" : "active",
         isTrialUser: givesTrial,
         trialEndsAt,

@@ -5,6 +5,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { hashPassword } from "@/lib/password";
 
 async function checkAdmin() {
     const cookieStore = await cookies();
@@ -47,17 +48,47 @@ export async function updateUserStatusAction(targetUserId: number, newStatus: st
 export async function deleteUserAction(targetUserId: number) {
     if (!(await checkAdmin())) return { error: "Não autorizado" };
 
-    // This is dangerous cascading delete, simpler logic for now: just mark inactive?
-    // User requested "delete" for deliveries, maybe for users too?
-    // Let's actually delete for "cleanup" but warn about constraints.
-    // For now, let's keep it safe: just clean access.
-    // If strict delete is needed, we need to handle FKs.
-    // Let's stick to status inactive for now as "soft delete"
-
+    // Soft delete: marca como inativo
     await db.update(users)
-        .set({ subscriptionStatus: 'inactive' })
+        .set({ subscriptionStatus: 'inactive', isActive: false })
         .where(eq(users.id, targetUserId));
 
     revalidatePath("/admin");
     return { success: true };
+}
+
+/**
+ * Reset manual de senha por admin (emergência)
+ */
+export async function adminResetUserPasswordAction(targetUserId: number, newPassword: string) {
+    if (!(await checkAdmin())) return { error: "Não autorizado" };
+
+    if (!newPassword || newPassword.length < 4) {
+        return { error: "Senha deve ter pelo menos 4 caracteres" };
+    }
+
+    const hashedPassword = await hashPassword(newPassword);
+
+    await db.update(users)
+        .set({ password: hashedPassword })
+        .where(eq(users.id, targetUserId));
+
+    console.log(`[Admin] Senha resetada para usuário ID ${targetUserId}`);
+    revalidatePath("/admin");
+    return { success: true, message: "Senha alterada com sucesso" };
+}
+
+/**
+ * Ativar/desativar usuário (bloqueia login)
+ */
+export async function adminToggleUserActiveAction(targetUserId: number, active: boolean) {
+    if (!(await checkAdmin())) return { error: "Não autorizado" };
+
+    await db.update(users)
+        .set({ isActive: active })
+        .where(eq(users.id, targetUserId));
+
+    console.log(`[Admin] Usuário ID ${targetUserId} ${active ? 'ativado' : 'desativado'}`);
+    revalidatePath("/admin");
+    return { success: true, message: active ? "Usuário ativado" : "Usuário desativado" };
 }

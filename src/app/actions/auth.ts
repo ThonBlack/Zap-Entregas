@@ -6,21 +6,41 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { verifyPassword, hashPassword, isPasswordHashed } from "../../lib/password";
 
 export async function loginAction(prevState: any, formData: FormData) {
     const phone = formData.get("phone") as string;
     const password = formData.get("password") as string;
 
     if (!phone || !password) {
-        // In a real app we would return state to show error
         return { error: "Preencha todos os campos" };
     }
 
-    // Simple query
+    // Busca usuário
     const user = await db.select().from(users).where(eq(users.phone, phone)).get();
 
-    if (!user || user.password !== password) {
+    if (!user || !user.password) {
         return { error: "Credenciais inválidas" };
+    }
+
+    // Verifica se usuário está ativo
+    if (user.isActive === false) {
+        return { error: "Conta desativada. Entre em contato com o suporte." };
+    }
+
+    // Verifica senha (suporta bcrypt e texto plano para migração gradual)
+    const passwordValid = await verifyPassword(password, user.password);
+    if (!passwordValid) {
+        return { error: "Credenciais inválidas" };
+    }
+
+    // Migração automática: se senha é texto plano, atualiza para hash
+    if (!isPasswordHashed(user.password)) {
+        const hashedPassword = await hashPassword(password);
+        await db.update(users)
+            .set({ password: hashedPassword })
+            .where(eq(users.id, user.id));
+        console.log(`[Auth] Senha do usuário ID ${user.id} migrada para bcrypt`);
     }
 
     // Check 2FA

@@ -5,12 +5,14 @@ export const users = sqliteTable("users", {
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
     phone: text("phone").notNull().unique(), // Login principal via telefone
+    email: text("email").unique(), // Email opcional para recuperação de senha
     role: text("role", { enum: ["admin", "shopkeeper", "motoboy"] }).default("motoboy").notNull(),
     password: text("password"), // Opcional se for magic link, mas bom ter para auth simples
     avatarUrl: text("avatar_url"),
     lastAvatarUpdate: text("last_avatar_update"), // Data da última troca de foto
     plan: text("plan", { enum: ["free", "basic", "pro", "growth", "enterprise"] }).default("free").notNull(),
     subscriptionStatus: text("subscription_status", { enum: ["active", "inactive", "trial"] }).default("active").notNull(),
+    isActive: integer("is_active", { mode: 'boolean' }).default(true), // Para ativar/desativar usuário
     twoFactorSecret: text("two_factor_secret"),
     twoFactorEnabled: integer("two_factor_enabled", { mode: 'boolean' }).default(false),
     currentLat: real("current_lat"),
@@ -235,3 +237,20 @@ export const appLogs = sqliteTable("app_logs", {
     stack: text("stack"), // Stack trace se for erro
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
+
+// Tokens de recuperação de senha
+export const passwordResets = sqliteTable("password_resets", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => users.id).notNull(),
+    token: text("token").notNull().unique(),
+    expiresAt: text("expires_at").notNull(), // ISO string - expira em 15 minutos
+    usedAt: text("used_at"), // Quando foi usado (null = não usado)
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const passwordResetsRelations = relations(passwordResets, ({ one }) => ({
+    user: one(users, {
+        fields: [passwordResets.userId],
+        references: [users.id],
+    }),
+}));
