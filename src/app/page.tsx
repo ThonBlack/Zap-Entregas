@@ -110,6 +110,25 @@ export default async function Dashboard() {
 
     if (!user) redirect("/login");
 
+    // AUTO-DOWNGRADE: Se trial expirou, rebaixa para free
+    if (user.isTrialUser && user.trialEndsAt) {
+        const trialEnd = new Date(user.trialEndsAt);
+        if (trialEnd < new Date()) {
+            await db.update(users)
+                .set({
+                    plan: "free",
+                    isTrialUser: false,
+                    subscriptionStatus: "active"
+                })
+                .where(eq(users.id, user.id));
+
+            // Atualiza o objeto local
+            user.plan = "free";
+            user.isTrialUser = false;
+            user.subscriptionStatus = "active";
+        }
+    }
+
     // Admin vai para o painel Admin
     if (user.role === 'admin') {
         redirect("/admin");

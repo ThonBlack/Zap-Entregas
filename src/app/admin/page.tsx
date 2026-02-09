@@ -72,6 +72,7 @@ export default async function AdminDashboardPage() {
     const freeUsers = allUsers.filter(u => u.plan === "free").length;
     const proUsers = allUsers.filter(u => u.plan === "pro").length;
     const enterpriseUsers = allUsers.filter(u => u.plan === "enterprise").length;
+    const trialUsers = allUsers.filter(u => u.isTrialUser).length;
 
     // Novos usuários
     const newUsers24h = allUsers.filter(u => u.createdAt && new Date(u.createdAt) > dayAgo).length;
@@ -89,17 +90,19 @@ export default async function AdminDashboardPage() {
     // MÉTRICAS FINANCEIRAS
     // =====================
 
-    // MRR (Monthly Recurring Revenue)
-    const mrr = allUsers.reduce((sum, u) => sum + (PLAN_PRICES[u.plan] || 0), 0);
+    // MRR (Monthly Recurring Revenue) - APENAS usuários pagantes (excluir trial e inativos)
+    const mrr = allUsers
+        .filter(u => !u.isTrialUser && u.subscriptionStatus === "active" && u.plan !== "free")
+        .reduce((sum, u) => sum + (PLAN_PRICES[u.plan] || 0), 0);
 
     // ARR (Annual Recurring Revenue)
     const arr = mrr * 12;
 
-    // Ticket médio (usuários pagantes)
-    const payingUsers = proUsers + enterpriseUsers;
+    // Ticket médio (usuários pagantes reais - sem trial)
+    const payingUsers = allUsers.filter(u => !u.isTrialUser && u.subscriptionStatus === "active" && u.plan !== "free").length;
     const avgTicket = payingUsers > 0 ? mrr / payingUsers : 0;
 
-    // Taxa de conversão (free -> pago)
+    // Taxa de conversão (free -> pago, excluindo trial)
     const conversionRate = totalUsers > 0 ? ((payingUsers / totalUsers) * 100).toFixed(1) : 0;
 
     // =====================
