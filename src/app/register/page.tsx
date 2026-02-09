@@ -27,8 +27,8 @@ export default function RegisterPage() {
                             type="button"
                             onClick={() => setRole("shopkeeper")}
                             className={`p-3 rounded-md text-sm font-medium transition-all ${role === "shopkeeper"
-                                    ? "bg-green-600 text-white shadow-lg"
-                                    : "text-zinc-400 hover:text-white hover:bg-zinc-600"
+                                ? "bg-green-600 text-white shadow-lg"
+                                : "text-zinc-400 hover:text-white hover:bg-zinc-600"
                                 }`}
                         >
                             Sou Lojista
@@ -37,8 +37,8 @@ export default function RegisterPage() {
                             type="button"
                             onClick={() => setRole("motoboy")}
                             className={`p-3 rounded-md text-sm font-medium transition-all ${role === "motoboy"
-                                    ? "bg-green-600 text-white shadow-lg"
-                                    : "text-zinc-400 hover:text-white hover:bg-zinc-600"
+                                ? "bg-green-600 text-white shadow-lg"
+                                : "text-zinc-400 hover:text-white hover:bg-zinc-600"
                                 }`}
                         >
                             Sou Motoboy
@@ -65,6 +65,18 @@ export default function RegisterPage() {
                                 type="text"
                                 required
                                 placeholder="21999999999"
+                                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
+                            />
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-300 mb-1">
+                                Email <span className="text-zinc-500 font-normal">(para recuperação de senha)</span>
+                            </label>
+                            <input
+                                name="email"
+                                type="email"
+                                placeholder="seu@email.com"
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
                             />
                         </div>
