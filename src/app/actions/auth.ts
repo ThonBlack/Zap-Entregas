@@ -46,8 +46,11 @@ export async function loginAction(prevState: any, formData: FormData) {
     // Check 2FA
     if (user.twoFactorEnabled && user.twoFactorSecret) {
         // Set temporary 2FA cookie
+        const isProduction = process.env.NODE_ENV === 'production';
         (await cookies()).set("2fa_pending_userId", user.id.toString(), {
             httpOnly: true,
+            secure: isProduction,
+            sameSite: 'lax',
             path: "/",
             maxAge: 60 * 5 // 5 minutes to verify
         });
@@ -55,8 +58,11 @@ export async function loginAction(prevState: any, formData: FormData) {
     }
 
     // Set cookie
+    const isProduction = process.env.NODE_ENV === 'production';
     (await cookies()).set("user_id", user.id.toString(), {
         httpOnly: true,
+        secure: isProduction,
+        sameSite: 'lax',
         path: "/",
         maxAge: 60 * 60 * 24 * 7 // 1 week
     });
@@ -85,9 +91,12 @@ export async function verifyTwoFactorAction(token: string) {
     }
 
     // Success: Set real session
+    const isProduction = process.env.NODE_ENV === 'production';
     cookieStore.delete("2fa_pending_userId");
     cookieStore.set("user_id", user.id.toString(), {
         httpOnly: true,
+        secure: isProduction,
+        sameSite: 'lax',
         path: "/",
         maxAge: 60 * 60 * 24 * 7
     });

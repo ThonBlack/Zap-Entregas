@@ -110,9 +110,9 @@ export default async function Dashboard() {
 
     if (!user) redirect("/login");
 
-    // Admin vai para o painel SaaS
+    // Admin vai para o painel Admin
     if (user.role === 'admin') {
-        redirect("/admin/saas");
+        redirect("/admin");
     }
 
     // Data fetching vars

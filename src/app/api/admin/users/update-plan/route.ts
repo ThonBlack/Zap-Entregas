@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ success: false, error: "userId e plan são obrigatórios" }, { status: 400 });
         }
 
-        if (!['free', 'pro', 'enterprise'].includes(plan)) {
+        if (!['free', 'basic', 'pro', 'growth', 'enterprise'].includes(plan)) {
             return NextResponse.json({ success: false, error: "Plano inválido" }, { status: 400 });
         }
 

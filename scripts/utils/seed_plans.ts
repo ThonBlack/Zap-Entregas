@@ -1,6 +1,6 @@
 
-import { db } from "./src/db";
-import { plans } from "./src/db/schema";
+import { db } from "../../src/db";
+import { plans } from "../../src/db/schema";
 
 async function seed() {
     console.log("Seeding Plans...");

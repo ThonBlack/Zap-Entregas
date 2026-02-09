@@ -53,7 +53,9 @@ export async function requestPasswordResetAction(identifier: string) {
 
     // Log de sucesso
     console.log(`[Password Reset] Token gerado para usuário ID ${user.id}, email: ${user.email}`);
-    console.log(`[Password Reset] URL (debug): ${resetUrl}`);
+    if (process.env.NODE_ENV !== 'production') {
+        console.log(`[Password Reset] URL (debug): ${resetUrl}`);
+    }
 
     return {
         success: true,
@@ -69,8 +71,15 @@ export async function resetPasswordAction(token: string, newPassword: string) {
         return { error: "Token e nova senha são obrigatórios." };
     }
 
-    if (newPassword.length < 4) {
-        return { error: "A senha deve ter pelo menos 4 caracteres." };
+    if (newPassword.length < 8) {
+        return { error: "A senha deve ter pelo menos 8 caracteres." };
+    }
+
+    // Validar complexidade: letras e números
+    const hasLetter = /[a-zA-Z]/.test(newPassword);
+    const hasNumber = /[0-9]/.test(newPassword);
+    if (!hasLetter || !hasNumber) {
+        return { error: "A senha deve conter letras e números." };
     }
 
     // Busca token válido (não usado)

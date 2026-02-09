@@ -44,8 +44,13 @@ export async function addDeliveryAction(formData: FormData) {
         console.error("Geocode form failed", e);
     }
 
-    // TODO: Add plan limits verification when needed
-    // For MVP, allow all deliveries
+    // BLOQUEIO HARD: Verificar limite de entregas do plano
+    const { canCreateDelivery } = await import("@/lib/planLimits");
+    const limitCheck = await canCreateDelivery(Number(userId));
+
+    if (!limitCheck.allowed) {
+        return { error: limitCheck.reason || "Limite de entregas atingido." };
+    }
 
     await db.insert(deliveries).values({
         shopkeeperId: Number(userId),

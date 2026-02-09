@@ -69,7 +69,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             {/* Header */}
             <header className="bg-zinc-800 border-b border-zinc-700 px-6 py-4 sticky top-0 z-10">
                 <div className="max-w-4xl mx-auto flex items-center gap-4">
-                    <Link href="/admin/saas" className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-700 transition-colors">
+                    <Link href="/admin" className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-700 transition-colors">
                         <ArrowLeft size={20} />
                     </Link>
                     <div>

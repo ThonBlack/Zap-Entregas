@@ -84,9 +84,11 @@ export default function UserActionsForm({ user }: UserActionsFormProps) {
                     onChange={(e) => setSelectedPlan(e.target.value)}
                     className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm"
                 >
-                    <option value="free">Free</option>
-                    <option value="pro">Pro</option>
-                    <option value="enterprise">Enterprise</option>
+                    <option value="free">Free (30 entregas)</option>
+                    <option value="basic">Basic (100 entregas)</option>
+                    <option value="pro">Pro (500 entregas)</option>
+                    <option value="growth">Growth (1000 entregas)</option>
+                    <option value="enterprise">Enterprise (Ilimitado)</option>
                 </select>
                 <button
                     onClick={handleChangePlan}

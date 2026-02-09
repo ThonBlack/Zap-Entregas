@@ -58,8 +58,11 @@ export async function registerAction(prevState: any, formData: FormData) {
     }
 
     // Auto-login after registration
+    const isProduction = process.env.NODE_ENV === 'production';
     (await cookies()).set("user_id", newUser.id.toString(), {
         httpOnly: true,
+        secure: isProduction,
+        sameSite: 'lax',
         path: "/",
         maxAge: 60 * 60 * 24 * 7 // 1 week
     });
