@@ -84,7 +84,7 @@ export default async function UpgradePage() {
                         <Link href="/" className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:shadow-xl hover:scale-105 transition-all shadow-lg">
                             Começar Grátis Agora 🎉
                         </Link>
-                        <a href="https://wa.me/5521979584070?text=Olá! Quero saber mais sobre o Zap Entregas" className="bg-zinc-800 border-2 border-green-500 text-green-400 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-zinc-700 transition-all flex items-center justify-center gap-2">
+                        <a href="https://wa.me/5534996802886?text=Olá! Quero saber mais sobre o Zap Entregas" className="bg-zinc-800 border-2 border-green-500 text-green-400 px-8 py-4 rounded-2xl font-bold text-lg hover:bg-zinc-700 transition-all flex items-center justify-center gap-2">
                             <MessageCircle size={20} />
                             Falar com a Gente
                         </a>
@@ -235,7 +235,7 @@ export default async function UpgradePage() {
                                         </div>
                                     ) : (
                                         <a
-                                            href={`https://wa.me/5521979584070?text=Olá! Quero assinar o plano ${plan.name} do Zap Entregas!`}
+                                            href={`https://wa.me/5534996802886?text=Olá! Quero assinar o plano ${plan.name} do Zap Entregas!`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className={`w-full py-4 rounded-2xl font-bold text-base transition-all block text-center ${isPopular
