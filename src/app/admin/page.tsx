@@ -132,10 +132,10 @@ export default async function AdminDashboardPage() {
                             <Bike size={16} className="text-blue-400" />
                             Visão Motoboy
                         </Link>
-                        <a href="#usuarios" className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">
+                        <Link href="/admin/users" className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">
                             <Users size={16} className="text-emerald-400" />
                             Usuários
-                        </a>
+                        </Link>
                         <Link href="/admin/plans" className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">
                             <CreditCard size={16} className="text-green-400" />
                             Planos
