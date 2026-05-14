@@ -5,12 +5,11 @@ import { eq } from "drizzle-orm";
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import { updateMotoboyAction } from "@/app/actions/motoboy";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { getSessionUserId } from "@/lib/session";
 
 export default async function EditMotoboyPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     const motoboy = await db.query.users.findFirst({

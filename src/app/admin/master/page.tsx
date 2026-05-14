@@ -1,8 +1,8 @@
 import { db } from "@/db";
 import { masterProducts, masterEvents, users } from "@/db/schema";
 import { eq, desc, gte, count } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -29,17 +29,15 @@ const productTypeLabels: Record<string, string> = {
 };
 
 export default async function MasterDashboardPage() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     const currentUser = await db.query.users.findFirst({
-        where: eq(users.id, Number(userId))
+        where: eq(users.id, userId)
     });
 
     if (currentUser?.role !== "admin") {
-        redirect("/");
+        redirect("/app");
     }
 
     // Buscar produtos

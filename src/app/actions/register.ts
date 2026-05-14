@@ -3,9 +3,9 @@
 import { db } from "../../db";
 import { users } from "../../db/schema";
 import { eq, sql } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { hashPassword } from "../../lib/password";
+import { setSessionCookie } from "../../lib/session";
 
 const TRIAL_DAYS = 30;
 const MAX_TRIAL_USERS = 100;
@@ -19,6 +19,14 @@ export async function registerAction(prevState: any, formData: FormData) {
 
     if (!name || !phone || !password || !role) {
         return { message: "Preencha todos os campos obrigatórios." };
+    }
+
+    if (password.length < 8) {
+        return { message: "A senha deve ter pelo menos 8 caracteres." };
+    }
+
+    if (role !== "shopkeeper" && role !== "motoboy") {
+        return { message: "Tipo de conta inválido." };
     }
 
     // Check if user already exists
@@ -58,18 +66,11 @@ export async function registerAction(prevState: any, formData: FormData) {
     }
 
     // Auto-login after registration
-    const isProduction = process.env.NODE_ENV === 'production';
-    (await cookies()).set("user_id", newUser.id.toString(), {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: 'lax',
-        path: "/",
-        maxAge: 60 * 60 * 24 * 7 // 1 week
-    });
+    await setSessionCookie(newUser.id);
 
     if (role === 'shopkeeper') {
         redirect("/settings");
     } else {
-        redirect("/");
+        redirect("/app");
     }
 }

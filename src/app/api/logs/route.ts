@@ -1,78 +1,71 @@
 import { db } from "@/db";
 import { appLogs } from "@/db/schema";
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import { desc, eq, gte } from "drizzle-orm";
+import { desc } from "drizzle-orm";
+import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
 
-// POST: Registrar novo log (usado pelo client)
+const VALID_LEVELS = ["info", "warn", "error", "debug"] as const;
+type LogLevel = typeof VALID_LEVELS[number];
+
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json();
-        const { level, event, message, page, metadata, stack } = body;
+        const auth = await getAuthUser();
+        if ("error" in auth) {
+            return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+        }
 
-        if (!event) {
+        const body = await request.json();
+        const { level, event, message, page, metadata, stack } = body || {};
+
+        if (!event || typeof event !== "string") {
             return NextResponse.json({ error: "event é obrigatório" }, { status: 400 });
         }
 
-        // Tentar pegar userId do cookie
-        const cookieStore = await cookies();
-        const userId = cookieStore.get("user_id")?.value;
+        const safeLevel: LogLevel =
+            typeof level === "string" && (VALID_LEVELS as readonly string[]).includes(level)
+                ? (level as LogLevel)
+                : "info";
 
-        // Informações do request
-        const userAgent = request.headers.get("user-agent") || "";
-        const ip = request.headers.get("x-forwarded-for") ||
+        const userAgent = (request.headers.get("user-agent") || "").slice(0, 500);
+        const ip = (request.headers.get("x-forwarded-for") ||
             request.headers.get("x-real-ip") ||
-            "unknown";
+            "unknown").slice(0, 100);
 
         await db.insert(appLogs).values({
-            level: level || "info",
-            event,
-            message,
-            userId: userId ? Number(userId) : null,
-            page,
+            level: safeLevel,
+            event: event.slice(0, 200),
+            message: typeof message === "string" ? message.slice(0, 2000) : null,
+            userId: auth.user.id,
+            page: typeof page === "string" ? page.slice(0, 200) : null,
             userAgent,
             ip,
-            metadata: metadata ? JSON.stringify(metadata) : null,
-            stack
+            metadata: metadata ? JSON.stringify(metadata).slice(0, 4000) : null,
+            stack: typeof stack === "string" ? stack.slice(0, 4000) : null,
         });
 
         return NextResponse.json({ success: true });
-
     } catch (error: any) {
         console.error("Erro ao salvar log:", error);
         return NextResponse.json({ error: "Erro interno" }, { status: 500 });
     }
 }
 
-// GET: Listar logs (apenas admin)
 export async function GET(request: NextRequest) {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-
-    if (!userId) {
-        return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+    const auth = await getAuthUserWithRole("admin");
+    if ("error" in auth) {
+        return NextResponse.json({ error: auth.error }, { status: 403 });
     }
 
-    // Verificar se é admin (simplificado - em produção verificar no DB)
     const { searchParams } = new URL(request.url);
-    const level = searchParams.get("level");
-    const limit = Number(searchParams.get("limit") || 100);
-    const since = searchParams.get("since"); // ISO string
+    const limit = Math.min(Number(searchParams.get("limit") || 100), 500);
 
     try {
-        let query = db.select().from(appLogs);
-
-        // Ordenar por mais recente
         const logs = await db.select()
             .from(appLogs)
             .orderBy(desc(appLogs.createdAt))
             .limit(limit);
 
-        return NextResponse.json({
-            logs,
-            total: logs.length
-        });
-
+        return NextResponse.json({ logs, total: logs.length });
     } catch (error: any) {
         console.error("Erro ao buscar logs:", error);
         return NextResponse.json({ error: "Erro interno" }, { status: 500 });

@@ -1,40 +1,32 @@
 import { db } from "@/db";
-import { deliveries, users } from "@/db/schema";
-import { eq, and, gt, or } from "drizzle-orm";
+import { deliveries } from "@/db/schema";
+import { eq, and, gt } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/session";
 
 export async function GET(request: NextRequest) {
+    const auth = await getAuthUser();
+    if ("error" in auth) {
+        return NextResponse.json({ notifications: [] }, { status: 401 });
+    }
+    const user = auth.user;
+
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
     const lastCheck = searchParams.get("lastCheck");
-
-    if (!userId) {
-        return NextResponse.json({ notifications: [] });
-    }
-
-    const user = await db.query.users.findFirst({
-        where: eq(users.id, Number(userId))
-    });
-
-    if (!user) {
-        return NextResponse.json({ notifications: [] });
-    }
 
     const notifications: { title: string; body: string; icon?: string }[] = [];
     const lastCheckTime = lastCheck ? new Date(Number(lastCheck)) : new Date(Date.now() - 30000);
 
     if (user.role === "motoboy") {
-        // Check for new pending deliveries (criadas recentemente)
         const newDeliveries = await db.query.deliveries.findMany({
             where: and(
                 eq(deliveries.status, "pending"),
                 gt(deliveries.createdAt, lastCheckTime.toISOString())
             ),
             with: { shopkeeper: true },
-            limit: 10
+            limit: 10,
         });
 
-        // Notificação individual para cada nova entrega
         for (const delivery of newDeliveries) {
             const shopName = delivery.shopkeeper?.name || "Loja";
             const value = delivery.value ? `R$ ${delivery.value.toFixed(2)}` : "";
@@ -46,7 +38,6 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // Se houver muitas entregas novas, consolidar em uma notificação
         if (newDeliveries.length >= 3) {
             notifications.unshift({
                 title: "🔥 Várias Corridas Disponíveis!",
@@ -54,15 +45,12 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // Também checar total de entregas pendentes para lembrete
         const allPending = await db.query.deliveries.findMany({
             where: eq(deliveries.status, "pending"),
-            limit: 20
+            limit: 20,
         });
 
-        // Se tiver entregas pendentes mas nenhuma nova, ainda assim notificar
         if (newDeliveries.length === 0 && allPending.length > 0) {
-            // Notificar apenas a cada 5 minutos sobre entregas existentes
             const fiveMinutesAgo = new Date(Date.now() - 300000);
             if (lastCheckTime < fiveMinutesAgo) {
                 notifications.push({
@@ -72,7 +60,6 @@ export async function GET(request: NextRequest) {
             }
         }
     } else if (user.role === "shopkeeper" || user.role === "admin") {
-        // Check for delivered orders
         const deliveredOrders = await db.query.deliveries.findMany({
             where: and(
                 eq(deliveries.shopkeeperId, user.id),
@@ -80,7 +67,7 @@ export async function GET(request: NextRequest) {
                 gt(deliveries.updatedAt, lastCheckTime.toISOString())
             ),
             with: { motoboy: true },
-            limit: 5
+            limit: 5,
         });
 
         for (const order of deliveredOrders) {
@@ -90,7 +77,6 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // Check for accepted orders (assigned status)
         const acceptedOrders = await db.query.deliveries.findMany({
             where: and(
                 eq(deliveries.shopkeeperId, user.id),
@@ -98,7 +84,7 @@ export async function GET(request: NextRequest) {
                 gt(deliveries.updatedAt, lastCheckTime.toISOString())
             ),
             with: { motoboy: true },
-            limit: 5
+            limit: 5,
         });
 
         for (const order of acceptedOrders) {
@@ -108,7 +94,6 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        // Check for orders picked up (in route)
         const pickedUpOrders = await db.query.deliveries.findMany({
             where: and(
                 eq(deliveries.shopkeeperId, user.id),
@@ -116,7 +101,7 @@ export async function GET(request: NextRequest) {
                 gt(deliveries.updatedAt, lastCheckTime.toISOString())
             ),
             with: { motoboy: true },
-            limit: 5
+            limit: 5,
         });
 
         for (const order of pickedUpOrders) {

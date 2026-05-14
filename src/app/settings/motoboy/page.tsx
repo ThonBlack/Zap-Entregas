@@ -1,25 +1,23 @@
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import MotoboySettingsForm from "@/components/admin/MotoboySettingsForm";
 import AvatarForm from "@/components/auth/AvatarForm";
 
 export default async function MotoboySettingsPage() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     const user = await db.query.users.findFirst({
-        where: eq(users.id, Number(userId))
+        where: eq(users.id, userId)
     });
 
     if (!user) redirect("/login");
-    if (user.role !== 'motoboy') redirect("/");
+    if (user.role !== 'motoboy') redirect("/app");
 
     return (
         <div className="min-h-screen bg-zinc-900 pb-20 md:pb-8">

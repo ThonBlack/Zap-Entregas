@@ -3,15 +3,21 @@ import { masterProducts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
-// Chave admin para registrar produtos (definir em .env)
-const ADMIN_KEY = process.env.MASTER_ADMIN_KEY || "admin_master_secret_key";
+function requireMasterAdminKey(provided: string | null): boolean {
+    const expected = process.env.MASTER_ADMIN_KEY;
+    if (!expected || expected.length < 16) {
+        console.error("[MASTER] MASTER_ADMIN_KEY ausente ou fraca — rejeitando requisição.");
+        return false;
+    }
+    if (!provided) return false;
+    if (provided.length !== expected.length) return false;
+    return Buffer.from(provided).equals(Buffer.from(expected));
+}
 
 // POST: Registrar novo produto
 export async function POST(request: NextRequest) {
     try {
-        const adminKey = request.headers.get("X-ADMIN-KEY");
-
-        if (adminKey !== ADMIN_KEY) {
+        if (!requireMasterAdminKey(request.headers.get("X-ADMIN-KEY"))) {
             return NextResponse.json(
                 { success: false, error: "Chave admin inválida" },
                 { status: 401 }
@@ -68,9 +74,7 @@ export async function POST(request: NextRequest) {
 // GET: Listar todos os produtos
 export async function GET(request: NextRequest) {
     try {
-        const adminKey = request.headers.get("X-ADMIN-KEY");
-
-        if (adminKey !== ADMIN_KEY) {
+        if (!requireMasterAdminKey(request.headers.get("X-ADMIN-KEY"))) {
             return NextResponse.json(
                 { success: false, error: "Chave admin inválida" },
                 { status: 401 }

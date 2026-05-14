@@ -1,17 +1,15 @@
 import { db } from "@/db";
 import { plans } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check, Sparkles, Zap, Crown, Rocket, Shield, Clock, Users, Star, TrendingUp, MessageCircle, ChevronRight, PartyPopper, Package, MapPin } from "lucide-react";
 
 export default async function UpgradePage() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     const allPlans = await db.select().from(plans).where(eq(plans.isActive, true)).orderBy(plans.price);

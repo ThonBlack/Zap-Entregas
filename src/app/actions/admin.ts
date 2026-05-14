@@ -3,31 +3,21 @@
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { hashPassword } from "@/lib/password";
-
-async function checkAdmin() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-    if (!userId) return false;
-
-    const user = await db.query.users.findFirst({
-        where: eq(users.id, Number(userId)),
-    });
-
-    return user?.role === 'admin';
-}
+import { getAuthUserWithRole } from "@/lib/session";
 
 export async function updateUserPlanAction(targetUserId: number, newPlan: string) {
-    if (!(await checkAdmin())) return { error: "Não autorizado" };
+    const auth = await getAuthUserWithRole("admin");
+    if ("error" in auth) return auth;
 
-    if (!['free', 'pro', 'enterprise'].includes(newPlan)) {
+    const validPlans = ["free", "basic", "pro", "growth", "enterprise"] as const;
+    if (!validPlans.includes(newPlan as any)) {
         return { error: "Plano inválido" };
     }
 
     await db.update(users)
-        .set({ plan: newPlan as "free" | "pro" | "enterprise" })
+        .set({ plan: newPlan as typeof validPlans[number] })
         .where(eq(users.id, targetUserId));
 
     revalidatePath("/admin");
@@ -35,7 +25,12 @@ export async function updateUserPlanAction(targetUserId: number, newPlan: string
 }
 
 export async function updateUserStatusAction(targetUserId: number, newStatus: string) {
-    if (!(await checkAdmin())) return { error: "Não autorizado" };
+    const auth = await getAuthUserWithRole("admin");
+    if ("error" in auth) return auth;
+
+    if (!["active", "inactive", "trial"].includes(newStatus)) {
+        return { error: "Status inválido" };
+    }
 
     await db.update(users)
         .set({ subscriptionStatus: newStatus as "active" | "inactive" | "trial" })
@@ -46,25 +41,23 @@ export async function updateUserStatusAction(targetUserId: number, newStatus: st
 }
 
 export async function deleteUserAction(targetUserId: number) {
-    if (!(await checkAdmin())) return { error: "Não autorizado" };
+    const auth = await getAuthUserWithRole("admin");
+    if ("error" in auth) return auth;
 
-    // Soft delete: marca como inativo
     await db.update(users)
-        .set({ subscriptionStatus: 'inactive', isActive: false })
+        .set({ subscriptionStatus: "inactive", isActive: false })
         .where(eq(users.id, targetUserId));
 
     revalidatePath("/admin");
     return { success: true };
 }
 
-/**
- * Reset manual de senha por admin (emergência)
- */
 export async function adminResetUserPasswordAction(targetUserId: number, newPassword: string) {
-    if (!(await checkAdmin())) return { error: "Não autorizado" };
+    const auth = await getAuthUserWithRole("admin");
+    if ("error" in auth) return auth;
 
-    if (!newPassword || newPassword.length < 4) {
-        return { error: "Senha deve ter pelo menos 4 caracteres" };
+    if (!newPassword || newPassword.length < 8) {
+        return { error: "Senha deve ter pelo menos 8 caracteres" };
     }
 
     const hashedPassword = await hashPassword(newPassword);
@@ -73,22 +66,18 @@ export async function adminResetUserPasswordAction(targetUserId: number, newPass
         .set({ password: hashedPassword })
         .where(eq(users.id, targetUserId));
 
-    console.log(`[Admin] Senha resetada para usuário ID ${targetUserId}`);
     revalidatePath("/admin");
     return { success: true, message: "Senha alterada com sucesso" };
 }
 
-/**
- * Ativar/desativar usuário (bloqueia login)
- */
 export async function adminToggleUserActiveAction(targetUserId: number, active: boolean) {
-    if (!(await checkAdmin())) return { error: "Não autorizado" };
+    const auth = await getAuthUserWithRole("admin");
+    if ("error" in auth) return auth;
 
     await db.update(users)
         .set({ isActive: active })
         .where(eq(users.id, targetUserId));
 
-    console.log(`[Admin] Usuário ID ${targetUserId} ${active ? 'ativado' : 'desativado'}`);
     revalidatePath("/admin");
     return { success: true, message: active ? "Usuário ativado" : "Usuário desativado" };
 }

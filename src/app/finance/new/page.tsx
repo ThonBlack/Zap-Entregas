@@ -5,11 +5,10 @@ import { eq } from "drizzle-orm";
 import { ArrowLeft, CheckCircle, DollarSign } from "lucide-react";
 import { createTransactionAction } from "@/app/actions/finance";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { getSessionUserId } from "@/lib/session";
 
 export default async function NewTransactionPage() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     // Fetch motoboys for dropdown

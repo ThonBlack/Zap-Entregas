@@ -1,8 +1,8 @@
 import { db } from "@/db";
 import { users, deliveries, transactions } from "@/db/schema";
 import { eq, desc, count } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
+import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,17 +14,15 @@ import UserActionsForm from "./UserActionsForm";
 
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const cookieStore = await cookies();
-    const currentUserId = cookieStore.get("user_id")?.value;
-
+    const currentUserId = await getSessionUserId();
     if (!currentUserId) redirect("/login");
 
     const currentUser = await db.query.users.findFirst({
-        where: eq(users.id, Number(currentUserId))
+        where: eq(users.id, currentUserId)
     });
 
     if (currentUser?.role !== "admin") {
-        redirect("/");
+        redirect("/app");
     }
 
     const user = await db.query.users.findFirst({

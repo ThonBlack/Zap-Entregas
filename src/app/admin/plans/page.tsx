@@ -1,8 +1,8 @@
 import { db } from "@/db";
 import { plans, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,17 +10,15 @@ import { ArrowLeft, Edit2, Save, X, Check, Power } from "lucide-react";
 import { updatePlanAction, togglePlanStatusAction } from "@/app/actions/admin-plans";
 
 export default async function PlansPage() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     const currentUser = await db.query.users.findFirst({
-        where: eq(users.id, Number(userId))
+        where: eq(users.id, userId)
     });
 
     if (currentUser?.role !== "admin") {
-        redirect("/");
+        redirect("/app");
     }
 
     const allPlans = await db.select().from(plans).orderBy(plans.price);

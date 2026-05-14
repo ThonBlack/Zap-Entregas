@@ -3,7 +3,16 @@ import { masterProducts, masterEvents } from "@/db/schema";
 import { eq, desc, and, gte, sql, count, sum } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
-const ADMIN_KEY = process.env.MASTER_ADMIN_KEY || "admin_master_secret_key";
+function requireMasterAdminKey(provided: string | null): boolean {
+    const expected = process.env.MASTER_ADMIN_KEY;
+    if (!expected || expected.length < 16) {
+        console.error("[MASTER] MASTER_ADMIN_KEY ausente ou fraca — rejeitando requisição.");
+        return false;
+    }
+    if (!provided) return false;
+    if (provided.length !== expected.length) return false;
+    return Buffer.from(provided).equals(Buffer.from(expected));
+}
 
 // GET: Estatísticas consolidadas de todos os produtos
 export async function GET(request: NextRequest) {
@@ -24,7 +33,7 @@ export async function GET(request: NextRequest) {
                 return NextResponse.json({ success: false, error: "Produto não encontrado" }, { status: 401 });
             }
             productFilter = product.id;
-        } else if (adminKey !== ADMIN_KEY) {
+        } else if (!requireMasterAdminKey(adminKey)) {
             return NextResponse.json({ success: false, error: "Chave inválida" }, { status: 401 });
         }
 

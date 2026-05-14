@@ -1,0 +1,34 @@
+node_modules
+.next
+.git
+.gitignore
+.github
+.vscode
+.idea
+.agent
+.claude
+
+# Local DB / uploads
+sqlite.db
+sqlite.db-journal
+uploads
+data
+
+# Build artifacts / logs
+build_error.log
+build_log.txt
+lint_log.txt
+tsconfig.tsbuildinfo
+*.log
+
+# Helpers / docs not needed in image
+ENVIAR_ALTERACOES.bat
+RECEBER_ALTERACOES.bat
+promote_admin.sql
+README.md
+RELATORIO_STATUS.md
+docs
+
+# Env
+.env
+.env.*

@@ -1,47 +1,67 @@
 "use server";
 
 import { db } from "@/db";
-import { users, shopSettings, subscriptions } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { saveFile } from "@/lib/upload";
 import { revalidatePath } from "next/cache";
+import { hashPassword } from "@/lib/password";
+import { getAuthUserWithRole } from "@/lib/session";
+
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+function pickFile(formData: FormData): File | null {
+    const file = formData.get("avatar") as File | null;
+    if (!file || typeof file === "string") return null;
+    if (file.size === 0 || file.name === "undefined") return null;
+    return file;
+}
+
+async function validateAvatarOrError(file: File): Promise<string | null> {
+    if (file.size > MAX_AVATAR_BYTES) return "Imagem maior que 5MB.";
+    if (!ALLOWED_MIME.has(file.type)) return "Formato de imagem inválido. Use JPG, PNG ou WebP.";
+    return null;
+}
 
 export async function createMotoboyAction(formData: FormData) {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-    if (!userId) return { error: "Não autenticado" };
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+    if ("error" in auth) return auth;
 
-    const name = formData.get("name") as string;
-    const phone = formData.get("phone") as string;
-    const password = formData.get("password") as string || "123456";
-
-    // Handle File
-    const file = formData.get("avatar") as File;
-    let avatarUrl = null;
-
-    if (file && file.size > 0 && file.name !== "undefined") {
-        avatarUrl = await saveFile(file);
-    }
+    const name = (formData.get("name") as string)?.trim();
+    const phone = (formData.get("phone") as string)?.trim();
+    const password = (formData.get("password") as string) || "";
 
     if (!name || !phone) {
         return { error: "Nome e Telefone são obrigatórios" };
     }
+    if (password && password.length < 8) {
+        return { error: "Senha deve ter ao menos 8 caracteres." };
+    }
 
-    // TODO: Add plan limits verification when subscription relations are properly set up
-    // For now, motoboys are global/freelancers, so no limit on creation
+    const file = pickFile(formData);
+    let avatarUrl: string | null = null;
+
+    if (file) {
+        const err = await validateAvatarOrError(file);
+        if (err) return { error: err };
+        avatarUrl = await saveFile(file);
+    }
+
+    const finalPassword = password || crypto.randomUUID().slice(0, 12);
+    const hashedPassword = await hashPassword(finalPassword);
 
     try {
         await db.insert(users).values({
             name,
             phone,
-            password,
+            password: hashedPassword,
             avatarUrl,
             lastAvatarUpdate: avatarUrl ? new Date().toISOString() : null,
             role: "motoboy",
         });
-    } catch (e) {
+    } catch {
         return { error: "Erro ao criar motoboy. Telefone já cadastrado?" };
     }
 
@@ -49,32 +69,39 @@ export async function createMotoboyAction(formData: FormData) {
 }
 
 export async function updateMotoboyAction(formData: FormData) {
-    const id = formData.get("id") as string;
-    const name = formData.get("name") as string;
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+    if ("error" in auth) return auth;
 
-    const file = formData.get("avatar") as File;
+    const id = Number(formData.get("id"));
+    const name = (formData.get("name") as string)?.trim();
 
-    if (!id || !name) return { error: "Dados inválidos" };
+    if (!Number.isInteger(id) || id <= 0 || !name) return { error: "Dados inválidos" };
 
-    // Check 30 days rule if avatar is changing
-    const currentUser = await db.query.users.findFirst({
-        where: eq(users.id, Number(id)),
-        columns: { avatarUrl: true, lastAvatarUpdate: true }
+    const target = await db.query.users.findFirst({
+        where: eq(users.id, id),
+        columns: { id: true, role: true, avatarUrl: true, lastAvatarUpdate: true },
     });
 
-    let newAvatarUrl = currentUser?.avatarUrl;
-    let newLastUpdate = currentUser?.lastAvatarUpdate;
+    if (!target || target.role !== "motoboy") {
+        return { error: "Motoboy não encontrado" };
+    }
 
-    if (file && file.size > 0 && file.name !== "undefined") {
-        // User uploaded a new file
-        if (currentUser?.lastAvatarUpdate) {
-            const lastUpdate = new Date(currentUser.lastAvatarUpdate);
-            const now = new Date();
-            const diffTime = Math.abs(now.getTime() - lastUpdate.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    let newAvatarUrl = target.avatarUrl;
+    let newLastUpdate = target.lastAvatarUpdate;
 
+    const file = pickFile(formData);
+    if (file) {
+        const err = await validateAvatarOrError(file);
+        if (err) return { error: err };
+
+        if (target.lastAvatarUpdate) {
+            const diffDays = Math.ceil(
+                (Date.now() - new Date(target.lastAvatarUpdate).getTime()) / (1000 * 60 * 60 * 24)
+            );
             if (diffDays < 30) {
-                return { error: `A foto só pode ser alterada a cada 30 dias. Espere mais ${30 - diffDays} dias.` };
+                return {
+                    error: `A foto só pode ser alterada a cada 30 dias. Espere mais ${30 - diffDays} dias.`,
+                };
             }
         }
 
@@ -84,21 +111,29 @@ export async function updateMotoboyAction(formData: FormData) {
 
     await db.update(users)
         .set({ name, avatarUrl: newAvatarUrl, lastAvatarUpdate: newLastUpdate })
-        .where(eq(users.id, Number(id)));
+        .where(eq(users.id, id));
 
     redirect("/motoboys");
 }
 
 export async function deleteMotoboyAction(formData: FormData) {
-    const id = formData.get("id") as string;
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+    if ("error" in auth) return auth;
 
-    if (!userId || !id) return { error: "Operação inválida" };
+    const id = Number(formData.get("id"));
+    if (!Number.isInteger(id) || id <= 0) return { error: "Operação inválida" };
+
+    const target = await db.query.users.findFirst({
+        where: eq(users.id, id),
+        columns: { id: true, role: true },
+    });
+    if (!target || target.role !== "motoboy") {
+        return { error: "Motoboy não encontrado" };
+    }
 
     try {
-        await db.delete(users).where(eq(users.id, Number(id)));
-    } catch (e) {
+        await db.delete(users).where(eq(users.id, id));
+    } catch {
         return { error: "Erro ao excluir. O motoboy pode ter entregas vinculadas." };
     }
 

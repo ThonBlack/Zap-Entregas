@@ -42,3 +42,17 @@ yarn-error.log*
 sqlite.db
 sqlite.db-journal
 
+# build artifacts/logs
+tsconfig.tsbuildinfo
+build_error.log
+build_log.txt
+lint_log.txt
+
+# uploads (persistent volume)
+uploads/
+
+# misc dev helpers
+ENVIAR_ALTERACOES.bat
+RECEBER_ALTERACOES.bat
+promote_admin.sql
+

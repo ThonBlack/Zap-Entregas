@@ -6,23 +6,21 @@ import ApiKeyForm from "@/components/admin/ApiKeyForm";
 import { db } from "@/db";
 import { shopSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSessionUserId } from "@/lib/session";
 
 export default async function SettingsPage() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     const user = await db.query.users.findFirst({
-        where: eq(users.id, Number(userId))
+        where: eq(users.id, userId)
     });
 
     if (!user) redirect("/login");
 
     const currentSettings = await db.query.shopSettings.findFirst({
-        where: eq(shopSettings.userId, Number(userId))
+        where: eq(shopSettings.userId, userId)
     });
 
     return (

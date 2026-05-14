@@ -5,11 +5,10 @@ import { eq, desc } from "drizzle-orm";
 import { ArrowLeft, Plus, Edit2, User, Trash2, Users } from "lucide-react";
 import { createMotoboyAction, updateMotoboyAction, deleteMotoboyAction } from "@/app/actions/motoboy";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { getSessionUserId } from "@/lib/session";
 
 export default async function MotoboysPage() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     const motoboys = await db.select().from(users).where(eq(users.role, 'motoboy')).orderBy(desc(users.createdAt));

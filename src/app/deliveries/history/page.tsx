@@ -1,19 +1,17 @@
 import { db } from "@/db";
 import { deliveries, users } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { ArrowLeft, Calendar, MapPin, DollarSign, ShieldCheck } from "lucide-react";
 
 export default async function HistoryPage() {
-    const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
-
+    const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
     const user = await db.query.users.findFirst({
-        where: eq(users.id, Number(userId)),
+        where: eq(users.id, userId),
     });
 
     if (!user) redirect("/login");
