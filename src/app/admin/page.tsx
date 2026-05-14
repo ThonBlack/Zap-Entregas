@@ -12,6 +12,7 @@ import {
     Bike, Calendar, Bell, Filter, ChevronRight, Eye,
     Store, LogOut
 } from "lucide-react";
+import InviteLinksCard from "./InviteLinksCard";
 
 // Preços dos planos (para cálculo de MRR)
 const PLAN_PRICES: Record<string, number> = {
@@ -329,6 +330,11 @@ export default async function AdminDashboardPage() {
                         ))}
                     </div>
                 </Card>
+
+                {/* ===================== */}
+                {/* LINKS DE CONVITE */}
+                {/* ===================== */}
+                <InviteLinksCard />
 
                 {/* ===================== */}
                 {/* USUÁRIOS */}

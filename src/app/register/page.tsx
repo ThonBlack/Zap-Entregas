@@ -2,15 +2,23 @@
 
 import { registerAction } from "../actions/register";
 import Link from "next/link";
-import { useState, useActionState } from "react";
+import { useState, useActionState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 const initialState = {
     message: "",
 };
 
-export default function RegisterPage() {
-    const [role, setRole] = useState<"shopkeeper" | "motoboy">("shopkeeper");
+function RegisterInner() {
+    const sp = useSearchParams();
+    const initialRole = sp?.get("role") === "motoboy" ? "motoboy" : "shopkeeper";
+    const [role, setRole] = useState<"shopkeeper" | "motoboy">(initialRole);
     const [state, formAction, isPending] = useActionState(registerAction, initialState);
+
+    useEffect(() => {
+        const r = sp?.get("role");
+        if (r === "motoboy" || r === "shopkeeper") setRole(r);
+    }, [sp]);
 
     return (
         <div className="min-h-screen bg-zinc-900 flex items-center justify-center p-4">
@@ -116,5 +124,13 @@ export default function RegisterPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function RegisterPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen bg-zinc-900" />}>
+            <RegisterInner />
+        </Suspense>
     );
 }
