@@ -88,6 +88,11 @@ export const shopSettings = sqliteTable("shop_settings", {
     showCustomerPhone: integer("show_customer_phone", { mode: 'boolean' }).default(true),
     showOrderValue: integer("show_order_value", { mode: 'boolean' }).default(false),
     showObservation: integer("show_observation", { mode: 'boolean' }).default(true),
+    // Localização da loja — usado pra dar bias no geocoder
+    defaultCity: text("default_city"),
+    defaultState: text("default_state"),
+    shopLat: real("shop_lat"),
+    shopLng: real("shop_lng"),
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
 

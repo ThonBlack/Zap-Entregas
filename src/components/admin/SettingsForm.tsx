@@ -2,7 +2,7 @@
 
 import { updateSettingsAction } from "@/app/actions/settings";
 import { useActionState, useState } from "react";
-import { CheckCircle, Save, HelpCircle, DollarSign, Eye, EyeOff } from "lucide-react";
+import { CheckCircle, Save, HelpCircle, DollarSign, Eye, EyeOff, MapPin, Crosshair, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +22,10 @@ interface SettingsFormProps {
         showCustomerPhone?: boolean | null;
         showOrderValue?: boolean | null;
         showObservation?: boolean | null;
+        defaultCity?: string | null;
+        defaultState?: string | null;
+        shopLat?: number | null;
+        shopLng?: number | null;
     } | null;
 }
 
@@ -42,6 +46,36 @@ const PAYMENT_MODELS = [
 export default function SettingsForm({ initialData }: SettingsFormProps) {
     const [state, formAction, isPending] = useActionState(updateSettingsAction, initialState);
     const [model, setModel] = useState(initialData?.remunerationModel || "fixed");
+
+    const [shopLat, setShopLat] = useState<string>(
+        initialData?.shopLat != null ? String(initialData.shopLat) : ""
+    );
+    const [shopLng, setShopLng] = useState<string>(
+        initialData?.shopLng != null ? String(initialData.shopLng) : ""
+    );
+    const [locating, setLocating] = useState(false);
+    const [locateError, setLocateError] = useState<string | null>(null);
+
+    const captureLocation = () => {
+        setLocateError(null);
+        if (!("geolocation" in navigator)) {
+            setLocateError("Navegador não suporta geolocalização.");
+            return;
+        }
+        setLocating(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                setShopLat(pos.coords.latitude.toFixed(6));
+                setShopLng(pos.coords.longitude.toFixed(6));
+                setLocating(false);
+            },
+            (err) => {
+                setLocateError(err.message || "Falha ao obter localização.");
+                setLocating(false);
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
 
     return (
         <form action={formAction} className="space-y-8">
@@ -175,6 +209,109 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                         </div>
                         <p className="text-xs text-zinc-500 mt-1">Valor mínimo que o motoboy recebe no dia, independente das entregas.</p>
                     </div>
+                </div>
+            </div>
+
+            {/* Localização da Loja */}
+            <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 bg-amber-600 rounded-lg">
+                        <MapPin size={20} className="text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-white">Localização da Loja</h2>
+                        <p className="text-sm text-zinc-400">
+                            Quando um endereço chegar sem cidade/UF (ex.: "Rua dos Bobos, 123"), o sistema completa automaticamente com sua cidade pra evitar geocodificar em estado errado.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-4 mb-4">
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-1">
+                            Cidade padrão
+                        </label>
+                        <input
+                            name="defaultCity"
+                            type="text"
+                            defaultValue={initialData?.defaultCity ?? ""}
+                            placeholder="Uberaba"
+                            className="w-full px-3 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:ring-2 focus:ring-amber-500 outline-none"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-1">
+                            UF
+                        </label>
+                        <input
+                            name="defaultState"
+                            type="text"
+                            maxLength={2}
+                            defaultValue={initialData?.defaultState ?? ""}
+                            placeholder="MG"
+                            className="w-full px-3 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 uppercase focus:ring-2 focus:ring-amber-500 outline-none"
+                        />
+                    </div>
+                </div>
+
+                <div className="bg-zinc-900/50 border border-zinc-700 rounded-lg p-4">
+                    <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                        <div>
+                            <p className="text-sm font-medium text-zinc-300">Coordenada da loja (opcional)</p>
+                            <p className="text-xs text-zinc-500">
+                                Limita a busca de endereços a ~60km da sua loja — evita resultado em outro estado.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={captureLocation}
+                            disabled={locating}
+                            className="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
+                        >
+                            {locating ? <Loader2 size={14} className="animate-spin" /> : <Crosshair size={14} />}
+                            {locating ? "Localizando..." : "Capturar minha localização"}
+                        </button>
+                    </div>
+
+                    {locateError && (
+                        <p className="text-xs text-red-400 mb-2">⚠️ {locateError}</p>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1">Latitude</label>
+                            <input
+                                name="shopLat"
+                                type="text"
+                                value={shopLat}
+                                onChange={(e) => setShopLat(e.target.value)}
+                                placeholder="-19.7472"
+                                className="w-full px-3 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white text-sm font-mono focus:ring-2 focus:ring-amber-500 outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-zinc-400 mb-1">Longitude</label>
+                            <input
+                                name="shopLng"
+                                type="text"
+                                value={shopLng}
+                                onChange={(e) => setShopLng(e.target.value)}
+                                placeholder="-47.9381"
+                                className="w-full px-3 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white text-sm font-mono focus:ring-2 focus:ring-amber-500 outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    {shopLat && shopLng && (
+                        <a
+                            href={`https://www.openstreetmap.org/?mlat=${shopLat}&mlon=${shopLng}#map=16/${shopLat}/${shopLng}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 mt-3 text-xs text-amber-400 hover:text-amber-300"
+                        >
+                            <MapPin size={12} /> Ver no mapa
+                        </a>
+                    )}
                 </div>
             </div>
 

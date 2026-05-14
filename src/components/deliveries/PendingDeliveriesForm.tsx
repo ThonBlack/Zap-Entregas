@@ -18,6 +18,7 @@ interface Delivery {
     lng: number | null;
     status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'canceled';
     motoboyId: number | null;
+    isSuspectAddress?: boolean;
 }
 
 interface PendingDeliveriesFormProps {
@@ -306,6 +307,11 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                             <span className="text-zinc-400 text-xs font-mono mr-12 md:mr-32">#{delivery.id}</span>
                                         </div>
                                         <p className="text-zinc-300 text-sm mb-1">{delivery.address}</p>
+                                        {delivery.isSuspectAddress && (
+                                            <p className="text-xs text-amber-300 bg-amber-900/30 border border-amber-700/40 rounded px-2 py-1 mb-1 inline-flex items-center gap-1" title="Endereço caiu a mais de 100km da sua loja — pode estar geocodificado errado">
+                                                ⚠️ Endereço fora do raio da loja — verifique
+                                            </p>
+                                        )}
                                         {delivery.observation && (
                                             <p className="text-zinc-400 text-xs italic mb-1 border-l-2 border-zinc-600 pl-2">
                                                 📝 {delivery.observation}

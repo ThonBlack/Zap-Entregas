@@ -32,6 +32,16 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
     const showOrderValue = formData.get("showOrderValue") === "on";
     const showObservation = formData.get("showObservation") === "on";
 
+    const defaultCity = ((formData.get("defaultCity") as string) || "").trim() || null;
+    const defaultStateRaw = ((formData.get("defaultState") as string) || "").trim().toUpperCase();
+    const defaultState = /^[A-Z]{2}$/.test(defaultStateRaw) ? defaultStateRaw : null;
+    const shopLatRaw = (formData.get("shopLat") as string) || "";
+    const shopLngRaw = (formData.get("shopLng") as string) || "";
+    const parsedLat = parseFloat(shopLatRaw);
+    const parsedLng = parseFloat(shopLngRaw);
+    const shopLat = Number.isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90 ? parsedLat : null;
+    const shopLng = Number.isFinite(parsedLng) && parsedLng >= -180 && parsedLng <= 180 ? parsedLng : null;
+
     try {
         const existingSettings = await db.select().from(shopSettings).where(eq(shopSettings.userId, userId)).get();
 
@@ -46,6 +56,10 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 showCustomerPhone,
                 showOrderValue,
                 showObservation,
+                defaultCity,
+                defaultState,
+                shopLat,
+                shopLng,
                 updatedAt: new Date().toISOString(),
             }).where(eq(shopSettings.userId, userId));
         } else {
@@ -60,6 +74,10 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 showCustomerPhone,
                 showOrderValue,
                 showObservation,
+                defaultCity,
+                defaultState,
+                shopLat,
+                shopLng,
             });
         }
 

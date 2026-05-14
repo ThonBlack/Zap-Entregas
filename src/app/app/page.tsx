@@ -5,6 +5,7 @@ import { eq, sql, desc, and, or, gte, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getSessionUserId, clearSessionCookie } from "@/lib/session";
 import { LogOut, ShieldCheck, Settings, Store, Bike, Crown } from "lucide-react";
+import { isAddressSuspicious } from "@/lib/routeUtils";
 
 type VisibilityFlags = {
     showCustomerName: boolean;
@@ -164,6 +165,24 @@ export default async function Dashboard({
             .from(deliveries)
             .where(pendingWhere)
             .orderBy(deliveries.stopOrder, desc(deliveries.createdAt));
+
+        // Marcar endereços suspeitos (fora do raio da loja)
+        const shopIds = Array.from(new Set(pendingDeliveries.map(d => d.shopkeeperId).filter((x): x is number => x != null)));
+        if (shopIds.length) {
+            const cfg = await db.select({
+                userId: shopSettings.userId,
+                shopLat: shopSettings.shopLat,
+                shopLng: shopSettings.shopLng,
+            }).from(shopSettings).where(inArray(shopSettings.userId, shopIds));
+            const byShop = new Map(cfg.map(c => [c.userId, c]));
+            pendingDeliveries = pendingDeliveries.map(d => {
+                const c = d.shopkeeperId != null ? byShop.get(d.shopkeeperId) : null;
+                const suspect = c
+                    ? isAddressSuspicious(d.lat ?? 0, d.lng ?? 0, c.shopLat, c.shopLng, 100)
+                    : false;
+                return { ...d, isSuspectAddress: suspect };
+            });
+        }
     } else {
         myBalance = await getUserBalance(user.id);
 

@@ -4,8 +4,21 @@ import { db } from "@/db";
 import { deliveries, transactions, shopSettings } from "@/db/schema";
 import { eq, inArray, and, gt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { geocodeAddress, optimizeRoute } from "@/lib/routeUtils";
+import { geocodeAddress, optimizeRoute, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
+
+async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
+    const s = await db.query.shopSettings.findFirst({
+        where: eq(shopSettings.userId, shopkeeperId),
+        columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
+    });
+    return {
+        defaultCity: s?.defaultCity ?? null,
+        defaultState: s?.defaultState ?? null,
+        shopLat: s?.shopLat ?? null,
+        shopLng: s?.shopLng ?? null,
+    };
+}
 
 export async function addDeliveryAction(formData: FormData) {
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
@@ -29,9 +42,10 @@ export async function addDeliveryAction(formData: FormData) {
 
     if (recent) return { error: "Entrega já adicionada recentemente." };
 
+    const geoOpts = await loadGeocodeOpts(me.id);
     let lat = 0, lng = 0;
     try {
-        const coords = await geocodeAddress(address);
+        const coords = await geocodeAddress(address, geoOpts);
         if (coords) { lat = coords.lat; lng = coords.lng; }
     } catch (e) {
         console.error("Geocode form failed", e);
@@ -82,12 +96,24 @@ export async function optimizeSelectedRouteAction(selectedIds: number[]) {
 
     if (!visible.length) return { error: "Nenhuma entrega autorizada para você." };
 
+    // Cachear opts por shopkeeperId pra não buscar shopSettings várias vezes
+    const optsCache = new Map<number, GeocodeOpts>();
+    async function optsFor(shopId: number | null): Promise<GeocodeOpts | undefined> {
+        if (shopId == null) return undefined;
+        const cached = optsCache.get(shopId);
+        if (cached) return cached;
+        const fresh = await loadGeocodeOpts(shopId);
+        optsCache.set(shopId, fresh);
+        return fresh;
+    }
+
     const points = await Promise.all(visible.map(async (d, index) => {
         let lat = d.lat || 0;
         let lng = d.lng || 0;
 
         if (lat === 0 || lng === 0) {
-            const coords = await geocodeAddress(d.address);
+            const opts = await optsFor(d.shopkeeperId);
+            const coords = await geocodeAddress(d.address, opts);
             if (coords) {
                 lat = coords.lat;
                 lng = coords.lng;

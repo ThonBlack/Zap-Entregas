@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { deliveries } from "@/db/schema";
+import { deliveries, shopSettings } from "@/db/schema";
 import { and, eq, gt } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
@@ -33,8 +33,19 @@ export async function createRouteAction(prevState: any, formData: FormData) {
         return { error: "Rota já criada recentemente. Aguarde um momento." };
     }
 
+    const shopCfg = await db.query.shopSettings.findFirst({
+        where: eq(shopSettings.userId, me.id),
+        columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
+    });
+    const geoOpts = {
+        defaultCity: shopCfg?.defaultCity ?? null,
+        defaultState: shopCfg?.defaultState ?? null,
+        shopLat: shopCfg?.shopLat ?? null,
+        shopLng: shopCfg?.shopLng ?? null,
+    };
+
     const points = await Promise.all(addresses.map(async (addr, index) => {
-        const coords = await geocodeAddress(addr as string);
+        const coords = await geocodeAddress(addr as string, geoOpts);
         return {
             index,
             address: addr as string,
