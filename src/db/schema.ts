@@ -77,12 +77,17 @@ export const financialRecords = sqliteTable("financial_records", {
 
 export const shopSettings = sqliteTable("shop_settings", {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: integer("user_id").references(() => users.id).notNull().unique(), // Configuração única por lojista
+    userId: integer("user_id").references(() => users.id).notNull().unique(),
     remunerationModel: text("remuneration_model", { enum: ["fixed", "distance", "daily", "hybrid"] }).default("fixed").notNull(),
-    fixedValue: real("fixed_value").default(0), // Valor fixo por entrega
-    valuePerKm: real("value_per_km").default(0), // Valor por KM
-    dailyvalue: real("daily_value").default(0), // Valor da diária
-    guaranteedMinimum: real("guaranteed_minimum").default(0), // Mínimo garantido (opcional)
+    fixedValue: real("fixed_value").default(0),
+    valuePerKm: real("value_per_km").default(0),
+    dailyvalue: real("daily_value").default(0),
+    guaranteedMinimum: real("guaranteed_minimum").default(0),
+    // Privacidade — o que o motoboy enxerga sobre cada entrega
+    showCustomerName: integer("show_customer_name", { mode: 'boolean' }).default(true),
+    showCustomerPhone: integer("show_customer_phone", { mode: 'boolean' }).default(true),
+    showOrderValue: integer("show_order_value", { mode: 'boolean' }).default(false),
+    showObservation: integer("show_observation", { mode: 'boolean' }).default(true),
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
 

@@ -1,10 +1,43 @@
 import Link from "next/link";
 import { db } from "@/db";
-import { users, transactions, deliveries } from "@/db/schema";
+import { users, transactions, deliveries, shopSettings } from "@/db/schema";
 import { eq, sql, desc, and, or, gte, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getSessionUserId, clearSessionCookie } from "@/lib/session";
 import { LogOut, ShieldCheck, Settings, Store, Bike, Crown } from "lucide-react";
+
+type VisibilityFlags = {
+    showCustomerName: boolean;
+    showCustomerPhone: boolean;
+    showOrderValue: boolean;
+    showObservation: boolean;
+};
+
+const DEFAULT_VISIBILITY: VisibilityFlags = {
+    showCustomerName: true,
+    showCustomerPhone: true,
+    showOrderValue: false,
+    showObservation: true,
+};
+
+function applyVisibility<T extends {
+    shopkeeperId: number | null;
+    customerName: string | null;
+    customerPhone: string | null;
+    value: number | null;
+    observation: string | null;
+}>(deliveries: T[], visibilityByShop: Map<number, VisibilityFlags>): T[] {
+    return deliveries.map((d) => {
+        const v = (d.shopkeeperId != null && visibilityByShop.get(d.shopkeeperId)) || DEFAULT_VISIBILITY;
+        return {
+            ...d,
+            customerName: v.showCustomerName ? d.customerName : null,
+            customerPhone: v.showCustomerPhone ? d.customerPhone : null,
+            value: v.showOrderValue ? d.value : null,
+            observation: v.showObservation ? d.observation : null,
+        };
+    });
+}
 
 import { ShopkeeperView } from "@/components/dashboard/ShopkeeperView";
 import { MotoboyView } from "@/components/dashboard/MotoboyView";
@@ -147,6 +180,27 @@ export default async function Dashboard({
             )
             .orderBy(deliveries.stopOrder);
 
+        // Aplicar config de visibilidade do lojista (NO SERVIDOR — cliente nunca recebe campo oculto)
+        const shopIds = Array.from(new Set(pendingDeliveries.map(d => d.shopkeeperId).filter((x): x is number => x != null)));
+        const visibilityByShop = new Map<number, VisibilityFlags>();
+        if (shopIds.length) {
+            const settings = await db.select({
+                userId: shopSettings.userId,
+                showCustomerName: shopSettings.showCustomerName,
+                showCustomerPhone: shopSettings.showCustomerPhone,
+                showOrderValue: shopSettings.showOrderValue,
+                showObservation: shopSettings.showObservation,
+            }).from(shopSettings).where(inArray(shopSettings.userId, shopIds));
+            for (const s of settings) {
+                visibilityByShop.set(s.userId, {
+                    showCustomerName: s.showCustomerName ?? true,
+                    showCustomerPhone: s.showCustomerPhone ?? true,
+                    showOrderValue: s.showOrderValue ?? false,
+                    showObservation: s.showObservation ?? true,
+                });
+            }
+        }
+        pendingDeliveries = applyVisibility(pendingDeliveries, visibilityByShop);
         myDeliveries = pendingDeliveries.filter(d => d.motoboyId === user.id);
 
         const todayDelivered = await db.select({ count: sql<number>`count(*)` })

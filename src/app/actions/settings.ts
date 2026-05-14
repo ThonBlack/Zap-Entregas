@@ -27,6 +27,11 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
     const dailyValue = parseFloat((formData.get("dailyValue") as string || "0").replace(",", "."));
     const guaranteedMinimum = parseFloat((formData.get("guaranteedMinimum") as string || "0").replace(",", "."));
 
+    const showCustomerName = formData.get("showCustomerName") === "on";
+    const showCustomerPhone = formData.get("showCustomerPhone") === "on";
+    const showOrderValue = formData.get("showOrderValue") === "on";
+    const showObservation = formData.get("showObservation") === "on";
+
     try {
         const existingSettings = await db.select().from(shopSettings).where(eq(shopSettings.userId, userId)).get();
 
@@ -37,6 +42,10 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 valuePerKm,
                 dailyvalue: dailyValue,
                 guaranteedMinimum,
+                showCustomerName,
+                showCustomerPhone,
+                showOrderValue,
+                showObservation,
                 updatedAt: new Date().toISOString(),
             }).where(eq(shopSettings.userId, userId));
         } else {
@@ -47,6 +56,10 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 valuePerKm,
                 dailyvalue: dailyValue,
                 guaranteedMinimum,
+                showCustomerName,
+                showCustomerPhone,
+                showOrderValue,
+                showObservation,
             });
         }
 

@@ -2,7 +2,7 @@
 
 import { updateSettingsAction } from "@/app/actions/settings";
 import { useActionState, useState } from "react";
-import { CheckCircle, Save, HelpCircle, DollarSign } from "lucide-react";
+import { CheckCircle, Save, HelpCircle, DollarSign, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,8 +18,19 @@ interface SettingsFormProps {
         valuePerKm: number;
         dailyvalue: number;
         guaranteedMinimum: number;
+        showCustomerName?: boolean | null;
+        showCustomerPhone?: boolean | null;
+        showOrderValue?: boolean | null;
+        showObservation?: boolean | null;
     } | null;
 }
+
+const PRIVACY_FIELDS = [
+    { key: "showCustomerName", label: "Nome do cliente", desc: "Aparece como cabeçalho de cada entrega.", default: true },
+    { key: "showCustomerPhone", label: "Telefone / WhatsApp do cliente", desc: "Habilita o botão de mensagem direta no WhatsApp.", default: true },
+    { key: "showOrderValue", label: "Valor do pedido", desc: "Preço dos produtos (não é a taxa do motoboy).", default: false },
+    { key: "showObservation", label: "Observação do pedido", desc: "Instruções extras (ex.: \"tocar interfone 10\").", default: true },
+] as const;
 
 const PAYMENT_MODELS = [
     { id: "fixed", label: "Taxa Fixa", description: "Valor único por entrega realizada." },
@@ -165,6 +176,45 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                         <p className="text-xs text-zinc-500 mt-1">Valor mínimo que o motoboy recebe no dia, independente das entregas.</p>
                     </div>
                 </div>
+            </div>
+
+            {/* Privacidade do Motoboy */}
+            <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 bg-blue-600 rounded-lg">
+                        <Eye size={20} className="text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-white">Privacidade — o que o motoboy enxerga</h2>
+                        <p className="text-sm text-zinc-400">Endereço e taxa do motoboy são sempre visíveis. Os demais campos você escolhe.</p>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    {PRIVACY_FIELDS.map((f) => {
+                        const checked = (initialData as any)?.[f.key] ?? f.default;
+                        return (
+                            <label
+                                key={f.key}
+                                className="flex items-start gap-3 p-3 rounded-lg bg-zinc-900/40 hover:bg-zinc-900/70 border border-zinc-700 cursor-pointer transition-colors"
+                            >
+                                <input
+                                    type="checkbox"
+                                    name={f.key}
+                                    defaultChecked={!!checked}
+                                    className="mt-1 w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-blue-500 focus:ring-blue-500"
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-white text-sm font-medium">{f.label}</div>
+                                    <div className="text-zinc-500 text-xs">{f.desc}</div>
+                                </div>
+                            </label>
+                        );
+                    })}
+                </div>
+                <p className="text-xs text-zinc-500 mt-3 flex items-center gap-1">
+                    <EyeOff size={12} /> Campos desmarcados ficam ocultos para o motoboy mesmo se a sua API/PDV enviar o dado.
+                </p>
             </div>
 
             {state?.message && (

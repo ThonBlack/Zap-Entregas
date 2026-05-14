@@ -12,6 +12,7 @@ interface Delivery {
     customerName: string | null;
     customerPhone: string | null;
     value: number | null;
+    observation: string | null;
     stopOrder: number | null;
     lat: number | null;
     lng: number | null;
@@ -305,9 +306,16 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                             <span className="text-zinc-400 text-xs font-mono mr-12 md:mr-32">#{delivery.id}</span>
                                         </div>
                                         <p className="text-zinc-300 text-sm mb-1">{delivery.address}</p>
-                                        <div className="flex items-center gap-4 text-xs text-zinc-400">
+                                        {delivery.observation && (
+                                            <p className="text-zinc-400 text-xs italic mb-1 border-l-2 border-zinc-600 pl-2">
+                                                📝 {delivery.observation}
+                                            </p>
+                                        )}
+                                        <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap">
                                             <span>Ordem: {delivery.stopOrder || '-'}</span>
-                                            <span>Valor: R$ {delivery.value || 0}</span>
+                                            {delivery.value != null && delivery.value > 0 && (
+                                                <span>Valor: R$ {delivery.value.toFixed(2).replace('.', ',')}</span>
+                                            )}
                                             {currentLocation && delivery.lat && (
                                                 <span className={distance > 200 ? "text-orange-400" : "text-green-400"}>
                                                     Distância: {distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : Math.round(distance) + 'm'}
