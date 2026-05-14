@@ -4,7 +4,7 @@ import { users, transactions, deliveries } from "@/db/schema";
 import { eq, sql, desc, and, or, gte, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getSessionUserId, clearSessionCookie } from "@/lib/session";
-import { LogOut, ShieldCheck, Settings } from "lucide-react";
+import { LogOut, ShieldCheck, Settings, Store, Bike, Crown } from "lucide-react";
 
 import { ShopkeeperView } from "@/components/dashboard/ShopkeeperView";
 import { MotoboyView } from "@/components/dashboard/MotoboyView";
@@ -73,7 +73,11 @@ async function getRecentTransactions() {
     return result as { id: number; amount: number; type: "credit" | "debit"; description: string; createdAt: string; userName: string; status: string }[];
 }
 
-export default async function Dashboard() {
+export default async function Dashboard({
+    searchParams,
+}: {
+    searchParams: Promise<{ as?: string }>;
+}) {
     const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
@@ -100,9 +104,9 @@ export default async function Dashboard() {
         }
     }
 
-    if (user.role === "admin") {
-        redirect("/admin");
-    }
+    // Admin pode escolher ver como lojista (padrão) ou motoboy via ?as=motoboy
+    const asView = (await searchParams).as;
+    const isAdminViewingAsMotoboy = user.role === "admin" && asView === "motoboy";
 
     let myBalance = 0;
     let pendingDeliveries: any[] = [];
@@ -111,7 +115,9 @@ export default async function Dashboard() {
     let recentTransactions: Awaited<ReturnType<typeof getRecentTransactions>> = [];
 
     const pendingConfirmations = await getPendingConfirmations(user.id);
-    const isShopkeeperOrAdmin = user.role === "shopkeeper" || (user.role as string) === "admin";
+    const isShopkeeperOrAdmin =
+        !isAdminViewingAsMotoboy &&
+        (user.role === "shopkeeper" || (user.role as string) === "admin");
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -155,21 +161,48 @@ export default async function Dashboard() {
 
     return (
         <div className="min-h-screen bg-zinc-900 pb-20 md:pb-8">
+            {user.role === "admin" && (
+                <div className="bg-gradient-to-r from-purple-900/80 to-purple-800/80 border-b border-purple-700 px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-purple-100">
+                        <Crown size={16} className="text-yellow-300" />
+                        <span>Modo admin — vendo como <strong>{isAdminViewingAsMotoboy ? "Motoboy" : "Lojista"}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Link
+                            href="/app"
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${!isAdminViewingAsMotoboy ? "bg-amber-600/40 text-amber-100" : "bg-zinc-800/40 text-purple-200 hover:bg-zinc-800/70"}`}
+                        >
+                            <Store size={14} />
+                            Lojista
+                        </Link>
+                        <Link
+                            href="/app?as=motoboy"
+                            className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${isAdminViewingAsMotoboy ? "bg-blue-600/40 text-blue-100" : "bg-zinc-800/40 text-purple-200 hover:bg-zinc-800/70"}`}
+                        >
+                            <Bike size={14} />
+                            Motoboy
+                        </Link>
+                        <Link href="/admin" className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-zinc-800/40 text-purple-200 hover:bg-zinc-800/70 transition-colors">
+                            ← Painel Admin
+                        </Link>
+                    </div>
+                </div>
+            )}
             <header className="bg-zinc-800 border-b border-zinc-700 sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-md">
                 <div>
                     <h1 className="text-xl font-bold text-white truncate">Olá, {user.name}</h1>
                     <p className="text-xs text-zinc-400 uppercase tracking-wider font-medium">
-                        {user.role === "shopkeeper" ? "Lojista" : (user.role as string) === "admin" ? "Administrador" : "Motoboy"}
+                        {user.role === "shopkeeper" ? "Lojista" : (user.role as string) === "admin" ? (isAdminViewingAsMotoboy ? "Administrador (vista Motoboy)" : "Administrador (vista Lojista)") : "Motoboy"}
                     </p>
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {user.role === "shopkeeper" && (
+                    {(user.role === "shopkeeper" || (user.role === "admin" && !isAdminViewingAsMotoboy)) && (
                         <Link href="/settings" className="p-2 text-zinc-400 hover:text-green-400 transition-colors" title="Configurações da Loja">
                             <Settings size={20} />
                         </Link>
                     )}
-                    {user.role === "motoboy" && (
+                    {(user.role === "motoboy" || (user.role === "admin" && isAdminViewingAsMotoboy)) && (
                         <Link href="/settings/motoboy" className="p-2 text-zinc-400 hover:text-green-400 transition-colors" title="Minhas Configurações">
                             <Settings size={20} />
                         </Link>

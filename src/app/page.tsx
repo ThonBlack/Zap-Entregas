@@ -139,8 +139,8 @@ const LANDING_CSS = `
   .step-card p { font-size: 0.88rem; color: var(--text-2); line-height: 1.7; }
 
   .pricing { background: var(--bg-2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
-  .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; max-width: 960px; margin: 0 auto; }
-  .plan-card { padding: 36px 28px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); transition: all var(--transition); display: flex; flex-direction: column; }
+  .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; max-width: 1100px; margin: 0 auto; }
+  .plan-card { padding: 32px 24px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); transition: all var(--transition); display: flex; flex-direction: column; }
   .plan-card.featured { border-color: var(--green); position: relative; box-shadow: 0 0 40px rgba(34,197,94,0.08); }
   .plan-card.featured::before { content: 'Mais Popular'; position: absolute; top: -12px; left: 50%; transform: translateX(-50%); font-size: 0.7rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #fff; background: var(--gradient); padding: 4px 16px; border-radius: 100px; }
   .plan-name { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
@@ -388,39 +388,64 @@ export default async function LandingPage() {
                             <div className="plan-card reveal">
                                 <div className="plan-name">Grátis</div>
                                 <div className="plan-price">R$ 0 <span>/mês</span></div>
-                                <div className="plan-desc">Para quem está começando</div>
+                                <div className="plan-desc">Para começar</div>
                                 <ul className="plan-features">
-                                    <li>Entregas ilimitadas</li>
+                                    <li>Até 30 entregas/mês</li>
+                                    <li>1 motoboy</li>
                                     <li>Dashboard básico</li>
-                                    <li>Gestão de motoboys</li>
                                     <li>App instalável (PWA)</li>
                                 </ul>
                                 <a href="/register" className="plan-btn outline">Começar grátis</a>
                             </div>
+                            <div className="plan-card reveal">
+                                <div className="plan-name">Basic</div>
+                                <div className="plan-price">R$ 19<span>,90/mês</span></div>
+                                <div className="plan-desc">Operação pequena</div>
+                                <ul className="plan-features">
+                                    <li>Até 150 entregas/mês</li>
+                                    <li>3 motoboys</li>
+                                    <li>Dashboard financeiro</li>
+                                    <li>Suporte por email</li>
+                                </ul>
+                                <a href="/register" className="plan-btn outline">Assinar Basic</a>
+                            </div>
                             <div className="plan-card featured reveal">
                                 <div className="plan-name">Pro</div>
-                                <div className="plan-price">R$ 49 <span>/mês</span></div>
-                                <div className="plan-desc">Para operações em crescimento</div>
+                                <div className="plan-price">R$ 49<span>,90/mês</span></div>
+                                <div className="plan-desc">Para crescer</div>
                                 <ul className="plan-features">
-                                    <li>Tudo do plano Grátis</li>
-                                    <li>Rastreamento GPS em tempo real</li>
-                                    <li>Dashboard financeiro completo</li>
-                                    <li>Relatórios e métricas avançadas</li>
+                                    <li>Até 500 entregas/mês</li>
+                                    <li>10 motoboys</li>
+                                    <li>Rastreamento GPS</li>
                                     <li>Otimização de rotas</li>
+                                    <li>Relatórios avançados</li>
                                     <li>Suporte prioritário</li>
                                 </ul>
                                 <a href="/register" className="plan-btn primary">Começar agora</a>
                             </div>
                             <div className="plan-card reveal">
+                                <div className="plan-name">Growth</div>
+                                <div className="plan-price">R$ 79<span>,90/mês</span></div>
+                                <div className="plan-desc">Operação madura</div>
+                                <ul className="plan-features">
+                                    <li>Até 1.500 entregas/mês</li>
+                                    <li>25 motoboys</li>
+                                    <li>Tudo do plano Pro</li>
+                                    <li>API de integração PDV</li>
+                                    <li>Multi-unidades</li>
+                                </ul>
+                                <a href="/register" className="plan-btn outline">Assinar Growth</a>
+                            </div>
+                            <div className="plan-card reveal">
                                 <div className="plan-name">Enterprise</div>
                                 <div className="plan-price">Sob consulta</div>
-                                <div className="plan-desc">Para operações de grande porte</div>
+                                <div className="plan-desc">Grande porte</div>
                                 <ul className="plan-features">
-                                    <li>Tudo do plano Pro</li>
-                                    <li>Múltiplas unidades</li>
-                                    <li>API de integração</li>
-                                    <li>Gerente de conta dedicado</li>
+                                    <li>Entregas ilimitadas</li>
+                                    <li>Motoboys ilimitados</li>
                                     <li>SLA personalizado</li>
+                                    <li>Gerente de conta dedicado</li>
+                                    <li>Onboarding assistido</li>
                                 </ul>
                                 <a href="/register" className="plan-btn outline">Fale conosco</a>
                             </div>

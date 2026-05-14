@@ -17,7 +17,7 @@ export default async function MotoboySettingsPage() {
     });
 
     if (!user) redirect("/login");
-    if (user.role !== 'motoboy') redirect("/app");
+    if (user.role !== 'motoboy' && user.role !== 'admin') redirect("/app");
 
     return (
         <div className="min-h-screen bg-zinc-900 pb-20 md:pb-8">

@@ -2,14 +2,15 @@ import { db } from "@/db";
 import { users, plans, deliveries, transactions } from "@/db/schema";
 import { desc, eq, gte, and, count, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/session";
+import { getSessionUserId, clearSessionCookie } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
     Users, CreditCard, TrendingUp, Settings, DollarSign,
     Package, AlertTriangle, Clock, UserPlus, ArrowUpRight,
-    Bike, Calendar, Bell, Filter, ChevronRight, Eye
+    Bike, Calendar, Bell, Filter, ChevronRight, Eye,
+    Store, LogOut
 } from "lucide-react";
 
 // Preços dos planos (para cálculo de MRR)
@@ -117,18 +118,38 @@ export default async function AdminDashboardPage() {
         <div className="min-h-screen bg-zinc-900 pb-20">
             {/* Header */}
             <header className="bg-gradient-to-r from-green-900 to-emerald-900 border-b border-green-700 px-6 py-4 sticky top-0 z-10">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold text-white">Painel Admin</h1>
                         <p className="text-green-300 text-sm">Gestão completa da plataforma</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Link href="/admin/master" className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-500 transition-colors">
-                            🎛️ Dashboard Mestre
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Link href="/app" className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">
+                            <Store size={16} className="text-amber-400" />
+                            Visão Lojista
                         </Link>
-                        <Link href="/" className="px-4 py-2 bg-zinc-700 text-white rounded-lg text-sm hover:bg-zinc-600 transition-colors">
-                            ← Voltar
+                        <Link href="/app?as=motoboy" className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">
+                            <Bike size={16} className="text-blue-400" />
+                            Visão Motoboy
                         </Link>
+                        <a href="#usuarios" className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">
+                            <Users size={16} className="text-emerald-400" />
+                            Usuários
+                        </a>
+                        <Link href="/admin/plans" className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg text-sm font-medium transition-colors">
+                            <CreditCard size={16} className="text-green-400" />
+                            Planos
+                        </Link>
+                        <form action={async () => {
+                            "use server";
+                            await clearSessionCookie();
+                            redirect("/");
+                        }}>
+                            <button type="submit" className="flex items-center gap-2 px-3 py-2 bg-red-900/60 hover:bg-red-900 border border-red-800 text-red-100 rounded-lg text-sm font-medium transition-colors">
+                                <LogOut size={16} />
+                                Sair
+                            </button>
+                        </form>
                     </div>
                 </div>
             </header>
@@ -312,11 +333,11 @@ export default async function AdminDashboardPage() {
                 {/* ===================== */}
                 {/* USUÁRIOS */}
                 {/* ===================== */}
-                <Card className="p-4 bg-zinc-800 border-zinc-700">
+                <Card id="usuarios" className="p-4 bg-zinc-800 border-zinc-700 scroll-mt-24">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-bold text-white flex items-center gap-2">
                             <Users size={20} className="text-blue-400" />
-                            Usuários Recentes
+                            Gerenciar Usuários
                         </h2>
                         <div className="flex items-center gap-2">
                             <Badge className="bg-zinc-700 text-zinc-300">{freeUsers} free</Badge>
