@@ -83,6 +83,13 @@ export default async function AdminUsersListPage({
                             {total} cadastrados • {counts.shopkeeper} lojistas • {counts.motoboy} motoboys • {counts.trial} em trial • {counts.inactive} inativos
                         </p>
                     </div>
+                    <Link
+                        href="/admin/users/new"
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                        <UserPlus size={16} />
+                        Criar Usuário
+                    </Link>
                 </div>
             </header>
 

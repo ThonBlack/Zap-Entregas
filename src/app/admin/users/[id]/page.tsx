@@ -11,6 +11,7 @@ import {
     DollarSign, Star, Clock, Settings, Ban, CheckCircle, Edit
 } from "lucide-react";
 import UserActionsForm from "./UserActionsForm";
+import AdminApiKeyCard from "./AdminApiKeyCard";
 
 export default async function AdminUserDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -142,6 +143,11 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                     </h3>
                     <UserActionsForm user={user} />
                 </Card>
+
+                {/* API Key (só para shopkeeper) */}
+                {user.role === "shopkeeper" && (
+                    <AdminApiKeyCard userId={user.id} userName={user.name} currentApiKey={user.apiKey ?? null} />
+                )}
 
                 {/* Estatísticas */}
                 <div className="grid md:grid-cols-3 gap-4">
