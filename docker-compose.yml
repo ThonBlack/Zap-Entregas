@@ -12,9 +12,14 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/sqlite.db
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASS=${SMTP_PASS}
-      - SMTP_FROM=${SMTP_FROM}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - MASTER_ADMIN_KEY=${MASTER_ADMIN_KEY}
+      - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
       - APP_URL=${APP_URL}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://zapentregas.duckdns.org}
