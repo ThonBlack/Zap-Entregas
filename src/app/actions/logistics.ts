@@ -6,6 +6,7 @@ import { eq, inArray, and, gt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { geocodeAddress, optimizeRoute, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
+import { newTrackingToken } from "@/lib/trackingToken";
 
 async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
     const s = await db.query.shopSettings.findFirst({
@@ -68,6 +69,7 @@ export async function addDeliveryAction(formData: FormData) {
         lng,
         status: "pending",
         stopOrder: 999,
+        publicToken: newTrackingToken(),
     });
 
     revalidatePath("/app");
@@ -245,18 +247,28 @@ export async function pickupDeliveryAction(id: number) {
 }
 
 export async function completeDeliveryAction(id: number) {
-    const auth = await getAuthUserWithRole(["motoboy", "admin"]);
+    const auth = await getAuthUserWithRole(["motoboy", "shopkeeper", "admin"]);
     if ("error" in auth) return auth;
     const me = auth.user;
 
     if (!Number.isInteger(id) || id <= 0) return { error: "ID inválido" };
 
     try {
+        // Motoboy: só entregas atribuídas a ele. Lojista: só entregas da loja dele
+        // (inclusive pending, caso ele mesmo tenha entregue). Admin: qualquer uma.
+        const ownership =
+            me.role === "motoboy" ? eq(deliveries.motoboyId, me.id) :
+            me.role === "shopkeeper" ? eq(deliveries.shopkeeperId, me.id) :
+            undefined;
+        const openStatuses: ("pending" | "assigned" | "picked_up")[] = me.role === "motoboy"
+            ? ["assigned", "picked_up"]
+            : ["pending", "assigned", "picked_up"];
+
         const delivery = await db.query.deliveries.findFirst({
             where: and(
                 eq(deliveries.id, id),
-                eq(deliveries.motoboyId, me.id),
-                inArray(deliveries.status, ["assigned", "picked_up"])
+                ownership,
+                inArray(deliveries.status, openStatuses)
             ),
             with: { shopkeeper: true },
         });
@@ -265,12 +277,12 @@ export async function completeDeliveryAction(id: number) {
             const alreadyDelivered = await db.query.deliveries.findFirst({
                 where: and(
                     eq(deliveries.id, id),
-                    eq(deliveries.motoboyId, me.id),
+                    ownership,
                     eq(deliveries.status, "delivered")
                 ),
             });
             if (alreadyDelivered) return { success: true, alreadyDelivered: true };
-            return { error: "Entrega não atribuída a você ou em status inválido." };
+            return { error: "Entrega não encontrada, sem permissão ou em status inválido." };
         }
 
         const shopId = delivery.shopkeeperId;
@@ -292,9 +304,10 @@ export async function completeDeliveryAction(id: number) {
             where: eq(transactions.relatedDeliveryId, id),
         });
 
-        if (!existingTransaction && fee > 0) {
+        // Crédito vai pro motoboy da entrega (não pra quem clicou) e só se houver um.
+        if (!existingTransaction && fee > 0 && delivery.motoboyId) {
             await db.insert(transactions).values({
-                userId: me.id,
+                userId: delivery.motoboyId,
                 amount: fee,
                 type: "credit",
                 description: `Corrida #${id} - ${delivery.customerName || "Cliente"}`,

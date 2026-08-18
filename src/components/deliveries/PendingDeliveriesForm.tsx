@@ -13,6 +13,7 @@ interface Delivery {
     customerPhone: string | null;
     value: number | null;
     observation: string | null;
+    publicToken: string | null;
     stopOrder: number | null;
     lat: number | null;
     lng: number | null;
@@ -87,7 +88,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
         try {
             const m = await import("@/app/actions/logistics");
             const res = await m.acceptDeliveryAction(id);
-            if (res?.error) {
+            if (res && "error" in res && res.error) {
                 alert(res.error);
             } else {
                 window.location.reload();
@@ -105,7 +106,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
         try {
             const m = await import("@/app/actions/logistics");
             const res = await m.pickupDeliveryAction(id);
-            if (res?.error) {
+            if (res && "error" in res && res.error) {
                 alert(res.error);
             } else {
                 window.location.reload();
@@ -129,7 +130,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                 try {
                     const m = await import("@/app/actions/logistics");
                     const res = await m.deleteDeliveryAction(id);
-                    if (res?.error) {
+                    if (res && "error" in res && res.error) {
                         alert(res.error);
                     } else {
                         window.location.reload();
@@ -149,8 +150,12 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
             variant: "warning",
             action: async () => {
                 const m = await import("@/app/actions/logistics");
-                await m.completeDeliveryAction(id);
-                window.location.reload();
+                const res = await m.completeDeliveryAction(id);
+                if (res && "error" in res && res.error) {
+                    alert(res.error);
+                } else {
+                    window.location.reload();
+                }
             }
         });
     };
@@ -179,7 +184,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                 // Call server action to optimize and get URL
                                 const result = await optimizeSelectedRouteAction(selected);
 
-                                if (result.success && result.url) {
+                                if (result && "url" in result && result.success && result.url) {
                                     window.open(result.url, '_blank');
                                 } else {
                                     alert("Erro ao gerar rota ou rota vazia.");
@@ -199,7 +204,8 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                         let distance = 0;
                         let canDeliver = true; // Default to true if no geofencing data
 
-                        if (delivery.lat && delivery.lng && currentLocation) {
+                        // Cerca de 200m só vale pro motoboy; lojista finaliza de onde estiver
+                        if (isMotoboy && delivery.lat && delivery.lng && currentLocation) {
                             distance = calculateDistance(currentLocation.lat, currentLocation.lng, delivery.lat, delivery.lng);
                             // Enable if within 200m (increased from 150m due to GPS inaccuracy issues)
                             canDeliver = distance <= 200;
@@ -224,7 +230,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                     {/* WhatsApp Button - sempre visível se tiver telefone */}
                                     {delivery.customerPhone && (
                                         <a
-                                            href={`https://wa.me/55${delivery.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️\nAcompanhe em tempo real: https://zapentregas.duckdns.org/tracking/${delivery.id}`)}`}
+                                            href={`https://wa.me/55${delivery.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️${delivery.publicToken ? `\nAcompanhe em tempo real: ${typeof window !== 'undefined' ? window.location.origin : ''}/tracking/${delivery.publicToken}` : ''}`)}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="p-1 px-2 bg-green-500 text-white text-xs font-bold rounded flex items-center gap-1 hover:bg-green-400 shadow-sm"
@@ -322,7 +328,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                             {delivery.value != null && delivery.value > 0 && (
                                                 <span>Valor: R$ {delivery.value.toFixed(2).replace('.', ',')}</span>
                                             )}
-                                            {currentLocation && delivery.lat && (
+                                            {isMotoboy && currentLocation && delivery.lat && (
                                                 <span className={distance > 200 ? "text-orange-400" : "text-green-400"}>
                                                     Distância: {distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : Math.round(distance) + 'm'}
                                                 </span>

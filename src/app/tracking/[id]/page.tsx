@@ -10,9 +10,12 @@ import TrackingMapWrapper from "@/components/map/TrackingMapWrapper";
 export default async function TrackingPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
 
-    // Fetch delivery
+    // O parâmetro é o token público aleatório — nunca buscar pelo ID sequencial,
+    // senão qualquer um enumera entregas alheias trocando o número da URL.
+    if (!id || id.length < 8) notFound();
+
     const delivery = await db.query.deliveries.findFirst({
-        where: eq(deliveries.id, Number(id)),
+        where: eq(deliveries.publicToken, id),
         with: {
             motoboy: true,
             shopkeeper: true

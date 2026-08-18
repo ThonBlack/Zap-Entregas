@@ -22,7 +22,7 @@ export default function NotificationManager({ userId, userRole }: NotificationMa
         }
 
         // Create audio element for notification sound
-        audioRef.current = new Audio("/notification.mp3");
+        audioRef.current = new Audio("/notification.wav");
         audioRef.current.volume = 0.5;
     }, []);
 

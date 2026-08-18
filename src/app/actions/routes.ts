@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 
 import { geocodeAddress, optimizeRoute } from "@/lib/routeUtils";
 import { getAuthUserWithRole } from "@/lib/session";
+import { newTrackingToken } from "@/lib/trackingToken";
 
 export async function createRouteAction(prevState: any, formData: FormData) {
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
@@ -72,6 +73,7 @@ export async function createRouteAction(prevState: any, formData: FormData) {
             stopOrder: i + 1,
             lat: p.lat,
             lng: p.lng,
+            publicToken: newTrackingToken(),
         };
     });
 
@@ -88,6 +90,7 @@ export async function createRouteAction(prevState: any, formData: FormData) {
             stopOrder: optimizedPath.length + i + 1,
             lat: 0,
             lng: 0,
+            publicToken: newTrackingToken(),
         });
     });
 
