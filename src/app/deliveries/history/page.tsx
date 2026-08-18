@@ -111,6 +111,19 @@ export default async function HistoryPage() {
                                         {item.address}
                                     </span>
                                 </div>
+                                {item.receiptStatus && (
+                                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                                        <span className={`px-2 py-1 font-bold rounded-full ${item.receiptStatus === 'nao_recebido' ? 'bg-red-900/50 text-red-300 border border-red-700' : 'bg-zinc-700 text-zinc-200 border border-zinc-600'}`}>
+                                            {item.receiptStatus === 'recebido' && `💵 Recebido: R$ ${(item.receivedAmount ?? 0).toFixed(2).replace('.', ',')} (${item.receivedMethod})`}
+                                            {item.receiptStatus === 'valor_diferente' && `✏️ Recebido (outro valor): R$ ${(item.receivedAmount ?? 0).toFixed(2).replace('.', ',')} (${item.receivedMethod})`}
+                                            {item.receiptStatus === 'nao_recebido' && '🚫 Não recebido'}
+                                            {item.receiptStatus === 'nada_a_receber' && '💳 Já estava pago'}
+                                        </span>
+                                        {item.receiptNote && (
+                                            <span className="text-zinc-400 italic">📝 {item.receiptNote}</span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex flex-col items-end justify-center min-w-[100px] border-t md:border-t-0 md:border-l border-zinc-700 pt-4 md:pt-0 md:pl-6 mt-2 md:mt-0">

@@ -246,12 +246,44 @@ export async function pickupDeliveryAction(id: number) {
     }
 }
 
-export async function completeDeliveryAction(id: number) {
+export interface DeliveryReceipt {
+    status: "recebido" | "valor_diferente" | "nao_recebido" | "nada_a_receber";
+    amount?: number; // quanto recebeu (recebido/valor_diferente)
+    method?: "dinheiro" | "pix" | "cartao";
+    note?: string;
+}
+
+const RECEIPT_STATUSES = ["recebido", "valor_diferente", "nao_recebido", "nada_a_receber"] as const;
+const RECEIPT_METHODS = ["dinheiro", "pix", "cartao"] as const;
+
+export async function completeDeliveryAction(id: number, receipt?: DeliveryReceipt) {
     const auth = await getAuthUserWithRole(["motoboy", "shopkeeper", "admin"]);
     if ("error" in auth) return auth;
     const me = auth.user;
 
     if (!Number.isInteger(id) || id <= 0) return { error: "ID inválido" };
+
+    // Validar recebimento (opcional — entrega pode ser finalizada sem informar)
+    let receivedAmount: number | null = null;
+    let receivedMethod: (typeof RECEIPT_METHODS)[number] | null = null;
+    let receiptNote: string | null = null;
+    let receiptStatus: (typeof RECEIPT_STATUSES)[number] | null = null;
+    if (receipt) {
+        if (!RECEIPT_STATUSES.includes(receipt.status)) return { error: "Status de recebimento inválido." };
+        receiptStatus = receipt.status;
+        receiptNote = typeof receipt.note === "string" && receipt.note.trim() ? receipt.note.trim().slice(0, 500) : null;
+        if (receipt.status === "recebido" || receipt.status === "valor_diferente") {
+            const amt = Number(receipt.amount);
+            if (!Number.isFinite(amt) || amt < 0 || amt > 100000) return { error: "Valor recebido inválido." };
+            receivedAmount = Math.round(amt * 100) / 100;
+            if (!receipt.method || !RECEIPT_METHODS.includes(receipt.method)) {
+                return { error: "Informe como recebeu (dinheiro, PIX ou cartão)." };
+            }
+            receivedMethod = receipt.method;
+        } else {
+            receivedAmount = 0;
+        }
+    }
 
     try {
         // Motoboy: só entregas atribuídas a ele. Lojista: só entregas da loja dele
@@ -300,12 +332,15 @@ export async function completeDeliveryAction(id: number) {
             }
         }
 
-        const existingTransaction = await db.query.transactions.findFirst({
+        const existingByType = await db.query.transactions.findMany({
             where: eq(transactions.relatedDeliveryId, id),
+            columns: { type: true },
         });
+        const hasCredit = existingByType.some(t => t.type === "credit");
+        const hasDebit = existingByType.some(t => t.type === "debit");
 
         // Crédito vai pro motoboy da entrega (não pra quem clicou) e só se houver um.
-        if (!existingTransaction && fee > 0 && delivery.motoboyId) {
+        if (!hasCredit && fee > 0 && delivery.motoboyId) {
             await db.insert(transactions).values({
                 userId: delivery.motoboyId,
                 amount: fee,
@@ -317,10 +352,28 @@ export async function completeDeliveryAction(id: number) {
             });
         }
 
+        // Dinheiro recebido fica com o motoboy → débito na carteira dele (abate o que a loja lhe deve).
+        // PIX/cartão vão direto pra loja, não geram débito.
+        if (!hasDebit && receivedMethod === "dinheiro" && receivedAmount && receivedAmount > 0 && delivery.motoboyId) {
+            await db.insert(transactions).values({
+                userId: delivery.motoboyId,
+                amount: receivedAmount,
+                type: "debit",
+                description: `Recebido do cliente em dinheiro - Corrida #${id}`,
+                relatedDeliveryId: id,
+                creatorId: shopId,
+                status: "confirmed",
+            });
+        }
+
         await db.update(deliveries)
             .set({
                 status: "delivered",
                 fee,
+                receiptStatus,
+                receivedAmount,
+                receivedMethod,
+                receiptNote,
                 deliveredAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             })

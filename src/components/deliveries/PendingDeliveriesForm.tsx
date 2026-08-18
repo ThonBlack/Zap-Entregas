@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Play, Plus, Trash2, Phone, MapPin } from "lucide-react";
-import { optimizeSelectedRouteAction } from "@/app/actions/logistics";
+import { optimizeSelectedRouteAction, type DeliveryReceipt } from "@/app/actions/logistics";
 import ConfirmationModal from "@/components/shared/ConfirmationModal";
+import CompleteDeliveryModal from "@/components/deliveries/CompleteDeliveryModal";
 import RefreshButton from "@/components/shared/RefreshButton";
 
 interface Delivery {
@@ -142,22 +143,27 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
         });
     };
 
-    const handleCompleteClick = (id: number) => {
-        setModalConfig({
-            isOpen: true,
-            title: "Finalizar Entrega",
-            description: "ATENÇÃO: Ao confirmar a entrega, os dados sensíveis do cliente (endereço, telefone) ficarão ocultos para proteção de privacidade (LGPD). Confirma a entrega?",
-            variant: "warning",
-            action: async () => {
-                const m = await import("@/app/actions/logistics");
-                const res = await m.completeDeliveryAction(id);
-                if (res && "error" in res && res.error) {
-                    alert(res.error);
-                } else {
-                    window.location.reload();
-                }
+    const [completingId, setCompletingId] = useState<number | null>(null);
+    const [completing, setCompleting] = useState(false);
+
+    const handleCompleteClick = (id: number) => setCompletingId(id);
+
+    const handleCompleteConfirm = async (receipt: DeliveryReceipt) => {
+        if (completingId == null) return;
+        setCompleting(true);
+        try {
+            const m = await import("@/app/actions/logistics");
+            const res = await m.completeDeliveryAction(completingId, receipt);
+            if (res && "error" in res && res.error) {
+                alert(res.error);
+            } else {
+                window.location.reload();
             }
-        });
+        } catch (e) {
+            alert("Erro ao finalizar entrega.");
+        } finally {
+            setCompleting(false);
+        }
     };
 
     return (
@@ -172,6 +178,16 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                 variant={modalConfig.variant}
                 confirmText="Confirmar"
             />
+            {completingId != null && (
+                <CompleteDeliveryModal
+                    key={completingId}
+                    isOpen
+                    onClose={() => setCompletingId(null)}
+                    onConfirm={handleCompleteConfirm}
+                    orderValue={deliveries.find(d => d.id === completingId)?.value ?? null}
+                    loading={completing}
+                />
+            )}
             <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="font-bold text-white">Entregas Pendentes ({deliveries.length})</h3>

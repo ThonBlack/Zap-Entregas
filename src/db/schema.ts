@@ -47,6 +47,11 @@ export const deliveries = sqliteTable("deliveries", {
     acceptedAt: text("accepted_at"), // Quando motoboy aceitou
     pickedUpAt: text("picked_up_at"), // Quando saiu da loja
     deliveredAt: text("delivered_at"), // Quando entregou
+    // Recebimento na entrega (preenchido ao finalizar — base da conciliação com o lojista)
+    receiptStatus: text("receipt_status", { enum: ["recebido", "valor_diferente", "nao_recebido", "nada_a_receber"] }),
+    receivedAmount: real("received_amount"), // Quanto o motoboy de fato recebeu do cliente
+    receivedMethod: text("received_method", { enum: ["dinheiro", "pix", "cartao"] }),
+    receiptNote: text("receipt_note"), // Observação do motoboy na entrega
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
