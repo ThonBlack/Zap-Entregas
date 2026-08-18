@@ -56,6 +56,18 @@ export const deliveries = sqliteTable("deliveries", {
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
+// Web Push: cada linha é um navegador/celular inscrito de um usuário.
+// endpoint é único por navegador; 404/410 no envio = inscrição morta, apagar.
+export const pushSubscriptions = sqliteTable("push_subscriptions", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => users.id).notNull(),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const transactions = sqliteTable("transactions", {
     id: integer("id").primaryKey({ autoIncrement: true }),
     userId: integer("user_id").references(() => users.id).notNull(), // Quem sofreu a alteração de saldo

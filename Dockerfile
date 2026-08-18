@@ -9,6 +9,10 @@ RUN npm ci
 # Copy source
 COPY . .
 
+# NEXT_PUBLIC_* é embutido no bundle NO BUILD — precisa chegar como build-arg
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
 # Build Next.js app
 RUN npm run build
 

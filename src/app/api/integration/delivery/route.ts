@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { geocodeAddress } from "@/lib/routeUtils";
 import { newTrackingToken } from "@/lib/trackingToken";
+import { pushToMotoboys } from "@/lib/push";
 
 /**
  * API de Integração para PDV
@@ -74,6 +75,14 @@ export async function POST(request: NextRequest) {
             status: "pending",
             publicToken: newTrackingToken(),
         }).returning().get();
+
+        // Agora a frase "os motoboys serão notificados" é verdade: Web Push
+        pushToMotoboys({
+            title: "🏍️ Nova Corrida Disponível!",
+            body: address,
+            url: "/app",
+            tag: "nova-corrida",
+        }).catch(() => { });
 
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
 

@@ -8,6 +8,12 @@ interface NotificationManagerProps {
     userRole: "motoboy" | "shopkeeper" | "admin";
 }
 
+function urlBase64ToUint8Array(base64: string): Uint8Array {
+    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+    const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
 export default function NotificationManager({ userId, userRole }: NotificationManagerProps) {
     const [permission, setPermission] = useState<NotificationPermission>("default");
     const [isEnabled, setIsEnabled] = useState(false);
@@ -25,6 +31,39 @@ export default function NotificationManager({ userId, userRole }: NotificationMa
         audioRef.current = new Audio("/notification.wav");
         audioRef.current.volume = 0.5;
     }, []);
+
+    // Web Push: com permissão dada, registra o service worker e inscreve este
+    // aparelho — é o que faz a notificação chegar COM O APP FECHADO. O polling
+    // abaixo continua como fallback pra aba aberta.
+    useEffect(() => {
+        if (!isEnabled) return;
+        (async () => {
+            try {
+                if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+                const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+                if (!vapidKey) return;
+                const reg = await navigator.serviceWorker.register("/sw.js");
+                await navigator.serviceWorker.ready;
+                let sub = await reg.pushManager.getSubscription();
+                if (!sub) {
+                    sub = await reg.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
+                    });
+                }
+                const json = sub.toJSON();
+                if (json.endpoint && json.keys?.p256dh && json.keys?.auth) {
+                    const m = await import("@/app/actions/push");
+                    await m.savePushSubscriptionAction(
+                        { endpoint: json.endpoint, keys: { p256dh: json.keys.p256dh, auth: json.keys.auth } },
+                        navigator.userAgent
+                    );
+                }
+            } catch (e) {
+                console.error("Falha ao inscrever no push:", e);
+            }
+        })();
+    }, [isEnabled]);
 
     useEffect(() => {
         if (!isEnabled) return;

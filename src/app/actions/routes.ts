@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { geocodeAddress, optimizeRoute } from "@/lib/routeUtils";
 import { getAuthUserWithRole } from "@/lib/session";
 import { newTrackingToken } from "@/lib/trackingToken";
+import { pushToMotoboys } from "@/lib/push";
 
 export async function createRouteAction(prevState: any, formData: FormData) {
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
@@ -95,6 +96,15 @@ export async function createRouteAction(prevState: any, formData: FormData) {
     });
 
     await db.insert(deliveries).values(newDeliveries);
+
+    pushToMotoboys({
+        title: newDeliveries.length > 1 ? "🔥 Várias Corridas Novas!" : "🏍️ Nova Corrida Disponível!",
+        body: newDeliveries.length > 1
+            ? `${newDeliveries.length} entregas aguardando`
+            : newDeliveries[0].address,
+        url: "/app",
+        tag: "nova-corrida",
+    }).catch(() => { });
 
     redirect("/app");
 }

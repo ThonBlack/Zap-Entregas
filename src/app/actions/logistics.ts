@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { geocodeAddress, optimizeRoute, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
 import { newTrackingToken } from "@/lib/trackingToken";
+import { pushToMotoboys, pushToUser } from "@/lib/push";
 
 async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
     const s = await db.query.shopSettings.findFirst({
@@ -71,6 +72,14 @@ export async function addDeliveryAction(formData: FormData) {
         stopOrder: 999,
         publicToken: newTrackingToken(),
     });
+
+    // Fire-and-forget: push fora do ar não pode travar o cadastro
+    pushToMotoboys({
+        title: "🏍️ Nova Corrida Disponível!",
+        body: address,
+        url: "/app",
+        tag: "nova-corrida",
+    }).catch(() => { });
 
     revalidatePath("/app");
     return { success: true };
@@ -204,6 +213,15 @@ export async function acceptDeliveryAction(id: number) {
             })
             .where(and(eq(deliveries.id, id), eq(deliveries.status, "pending")));
 
+        if (delivery.shopkeeperId) {
+            pushToUser(delivery.shopkeeperId, {
+                title: "📦 Corrida aceita",
+                body: `${me.name} aceitou a entrega #${id}`,
+                url: "/app",
+                tag: `entrega-${id}`,
+            }).catch(() => { });
+        }
+
         revalidatePath("/app");
         return { success: true };
     } catch (e) {
@@ -237,6 +255,15 @@ export async function pickupDeliveryAction(id: number) {
                 updatedAt: new Date().toISOString(),
             })
             .where(eq(deliveries.id, id));
+
+        if (delivery.shopkeeperId) {
+            pushToUser(delivery.shopkeeperId, {
+                title: "🛵 Saiu para entrega",
+                body: `${me.name} pegou o pedido da entrega #${id}`,
+                url: "/app",
+                tag: `entrega-${id}`,
+            }).catch(() => { });
+        }
 
         revalidatePath("/app");
         return { success: true };
@@ -378,6 +405,21 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
                 updatedAt: new Date().toISOString(),
             })
             .where(eq(deliveries.id, id));
+
+        if (delivery.shopkeeperId && delivery.shopkeeperId !== me.id) {
+            const recebido =
+                receiptStatus === "recebido" || receiptStatus === "valor_diferente"
+                    ? ` — recebeu R$ ${(receivedAmount ?? 0).toFixed(2).replace(".", ",")} (${receivedMethod})`
+                    : receiptStatus === "nao_recebido" ? " — NÃO recebeu do cliente"
+                    : receiptStatus === "nada_a_receber" ? " — já estava pago"
+                    : "";
+            pushToUser(delivery.shopkeeperId, {
+                title: "✅ Entrega concluída",
+                body: `Entrega #${id} finalizada${recebido}`,
+                url: "/deliveries/history",
+                tag: `entrega-${id}`,
+            }).catch(() => { });
+        }
 
         revalidatePath("/app");
 
