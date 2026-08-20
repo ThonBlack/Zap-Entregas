@@ -31,7 +31,10 @@ async function sendToSubscriptions(
         try {
             await webpush.sendNotification(
                 { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-                body
+                body,
+                // urgency "high": o Android entrega na hora em vez de segurar até o
+                // aparelho sair da economia de bateria. TTL 10min: corrida velha não serve.
+                { urgency: "high", TTL: 600 }
             );
         } catch (err: any) {
             // 404/410 = inscrição expirada/revogada: limpar pra não insistir
