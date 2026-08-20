@@ -51,13 +51,17 @@ export async function pushToUser(userId: number, payload: PushPayload): Promise<
     await sendToSubscriptions(subs, payload);
 }
 
-/** Notifica todos os motoboys ativos (pool de corridas). */
+/**
+ * Notifica o pool de corrida nova: todos os motoboys + os admins.
+ * O admin entra porque é ele quem acompanha a operação (e, hoje, quem testa no celular);
+ * sem isso uma corrida nova não avisava ninguém quando não havia motoboy inscrito.
+ */
 export async function pushToMotoboys(payload: PushPayload): Promise<void> {
     if (!ensureConfigured()) return;
-    const motoboys = await db.select({ id: users.id }).from(users)
-        .where(eq(users.role, "motoboy"));
-    if (!motoboys.length) return;
+    const audience = await db.select({ id: users.id }).from(users)
+        .where(inArray(users.role, ["motoboy", "admin"]));
+    if (!audience.length) return;
     const subs = await db.select().from(pushSubscriptions)
-        .where(inArray(pushSubscriptions.userId, motoboys.map(m => m.id)));
+        .where(inArray(pushSubscriptions.userId, audience.map(m => m.id)));
     await sendToSubscriptions(subs, payload);
 }
