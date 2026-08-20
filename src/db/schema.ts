@@ -33,7 +33,9 @@ export const deliveries = sqliteTable("deliveries", {
     id: integer("id").primaryKey({ autoIncrement: true }),
     shopkeeperId: integer("shopkeeper_id").references(() => users.id),
     motoboyId: integer("motoboy_id").references(() => users.id),
-    status: text("status", { enum: ["pending", "assigned", "picked_up", "delivered", "canceled"] }).default("pending").notNull(),
+    // "draft" = corrida do PDV esperando o lojista/admin conferir endereço e liberar.
+    // Motoboy só enxerga a partir de "pending", então rascunho fica invisível pra ele.
+    status: text("status", { enum: ["draft", "pending", "assigned", "picked_up", "delivered", "canceled"] }).default("pending").notNull(),
     customerName: text("customer_name"),
     customerPhone: text("customer_phone"),
     address: text("address").notNull(),

@@ -7,6 +7,16 @@ import Link from "next/link";
 import { getMotoboyLocationAction } from "@/app/actions/tracking";
 import TrackingMapWrapper from "@/components/map/TrackingMapWrapper";
 
+// O cliente enxerga essa página: nada de status cru em inglês.
+const STATUS_LABEL: Record<string, string> = {
+    draft: "preparando",
+    pending: "aguardando",
+    assigned: "a caminho",
+    picked_up: "em rota",
+    delivered: "entregue",
+    canceled: "cancelado",
+};
+
 export default async function TrackingPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
 
@@ -45,6 +55,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <h1 className="font-bold text-xl text-zinc-900">
+                                {delivery.status === 'draft' && "Preparando seu pedido"}
                                 {delivery.status === 'pending' && "Aguardando Motoboy"}
                                 {delivery.status === 'assigned' && "Motoboy a caminho"}
                                 {delivery.status === 'picked_up' && "Saiu para entrega"}
@@ -56,7 +67,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                         <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase
                             ${delivery.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}
                         `}>
-                            {delivery.status}
+                            {STATUS_LABEL[delivery.status] ?? delivery.status}
                         </div>
                     </div>
 

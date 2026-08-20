@@ -55,6 +55,21 @@ export async function pushToUser(userId: number, payload: PushPayload): Promise<
 }
 
 /**
+ * Notifica quem pode liberar um rascunho: o lojista dono da corrida + os admins.
+ * Usado quando a venda do PDV cria a corrida — ela ainda não vai pros motoboys.
+ */
+export async function pushToDraftReviewers(shopkeeperId: number | null, payload: PushPayload): Promise<void> {
+    if (!ensureConfigured()) return;
+    const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"));
+    const ids = new Set(admins.map(a => a.id));
+    if (shopkeeperId != null) ids.add(shopkeeperId);
+    if (!ids.size) return;
+    const subs = await db.select().from(pushSubscriptions)
+        .where(inArray(pushSubscriptions.userId, [...ids]));
+    await sendToSubscriptions(subs, payload);
+}
+
+/**
  * Notifica o pool de corrida nova: todos os motoboys + os admins.
  * O admin entra porque é ele quem acompanha a operação (e, hoje, quem testa no celular);
  * sem isso uma corrida nova não avisava ninguém quando não havia motoboy inscrito.

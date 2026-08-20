@@ -45,6 +45,7 @@ import { MotoboyView } from "@/components/dashboard/MotoboyView";
 import { PendingConfirmations } from "@/components/dashboard/PendingConfirmations";
 import TrialBanner from "@/components/billing/TrialBanner";
 import NotificationWrapper from "@/components/shared/NotificationWrapper";
+import DraftsBanner from "@/components/deliveries/DraftsBanner";
 
 async function getUserBalance(userId: number) {
     const result = await db
@@ -147,6 +148,7 @@ export default async function Dashboard({
     let myDeliveries: any[] = [];
     let deliveriesTodayCount = 0;
     let recentTransactions: Awaited<ReturnType<typeof getRecentTransactions>> = [];
+    let draftDeliveries: { id: number; address: string; customerName: string | null; createdAt: string | null }[] = [];
 
     const pendingConfirmations = await getPendingConfirmations(user.id);
     const isShopkeeperOrAdmin =
@@ -158,6 +160,21 @@ export default async function Dashboard({
 
     if (isShopkeeperOrAdmin) {
         recentTransactions = await getRecentTransactions();
+
+        // Corridas do PDV esperando conferência do endereço (invisíveis pro motoboy)
+        const draftWhere = (user.role as string) === "admin"
+            ? eq(deliveries.status, "draft")
+            : and(eq(deliveries.status, "draft"), eq(deliveries.shopkeeperId, user.id));
+        draftDeliveries = await db.select({
+            id: deliveries.id,
+            address: deliveries.address,
+            customerName: deliveries.customerName,
+            createdAt: deliveries.createdAt,
+        })
+            .from(deliveries)
+            .where(draftWhere)
+            .orderBy(desc(deliveries.createdAt));
+
         const pendingWhere = (user.role as string) === "admin"
             ? eq(deliveries.status, "pending")
             : and(eq(deliveries.status, "pending"), eq(deliveries.shopkeeperId, user.id));
@@ -298,6 +315,7 @@ export default async function Dashboard({
             <main className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
                 <TrialBanner trialEndsAt={user.trialEndsAt ?? null} isTrialUser={user.isTrialUser ?? false} />
                 <PendingConfirmations confirmations={pendingConfirmations} />
+                <DraftsBanner drafts={draftDeliveries} />
 
                 {isShopkeeperOrAdmin ? (
                     <ShopkeeperView

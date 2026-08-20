@@ -4,7 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { geocodeAddress } from "@/lib/routeUtils";
 import { newTrackingToken } from "@/lib/trackingToken";
-import { pushToMotoboys } from "@/lib/push";
+import { pushToDraftReviewers } from "@/lib/push";
 
 /**
  * API de Integração para PDV
@@ -72,16 +72,17 @@ export async function POST(request: NextRequest) {
             value,
             fee,
             observation: typeof body.observation === "string" ? body.observation.slice(0, 1000) : null,
-            status: "pending",
+            // Nasce rascunho: o lojista/admin confere endereço no mapa e libera pros motoboys.
+            status: "draft",
             publicToken: newTrackingToken(),
         }).returning().get();
 
-        // Agora a frase "os motoboys serão notificados" é verdade: Web Push
-        pushToMotoboys({
-            title: "🏍️ Nova Corrida Disponível!",
+        // Quem é avisado agora é quem libera, não o motoboy.
+        pushToDraftReviewers(user.id, {
+            title: "📦 Corrida do PDV esperando confirmação",
             body: address,
-            url: "/app",
-            tag: "nova-corrida",
+            url: `/deliveries/${newDelivery.id}/confirmar`,
+            tag: `confirmar-${newDelivery.id}`,
         }).catch(() => { });
 
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
@@ -90,7 +91,8 @@ export async function POST(request: NextRequest) {
             success: true,
             deliveryId: newDelivery.id,
             trackingUrl: `${baseUrl}/tracking/${newDelivery.publicToken}`,
-            message: "Entrega criada com sucesso! Os motoboys serão notificados.",
+            status: newDelivery.status,
+            message: "Entrega registrada! Aguardando confirmação do endereço para liberar aos motoboys.",
         });
     } catch (error: any) {
         console.error("Erro na API de integração:", error);
