@@ -14,6 +14,8 @@
     "script:seed-plans": "npx tsx scripts/utils/seed_plans.ts"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
     "@types/leaflet": "^1.9.21",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.5.0",

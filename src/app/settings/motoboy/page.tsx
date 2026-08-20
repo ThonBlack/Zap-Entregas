@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, webauthnCredentials } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getSessionUserId } from "@/lib/session";
@@ -8,6 +8,7 @@ import { ArrowLeft, Settings } from "lucide-react";
 import MotoboySettingsForm from "@/components/admin/MotoboySettingsForm";
 import AvatarForm from "@/components/auth/AvatarForm";
 import GoogleAccountCard from "@/components/auth/GoogleAccountCard";
+import PasskeyCard from "@/components/auth/PasskeyCard";
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 
 const AVISOS_GOOGLE: Record<string, string> = {
@@ -35,6 +36,13 @@ export default async function MotoboySettingsPage({
     if (!user) redirect("/login");
     if (user.role !== 'motoboy' && user.role !== 'admin') redirect("/app");
 
+    const passkeys = await db.select({
+        id: webauthnCredentials.id,
+        deviceName: webauthnCredentials.deviceName,
+        createdAt: webauthnCredentials.createdAt,
+        lastUsedAt: webauthnCredentials.lastUsedAt,
+    }).from(webauthnCredentials).where(eq(webauthnCredentials.userId, userId));
+
     return (
         <div className="min-h-screen bg-zinc-900 pb-20 md:pb-8">
             <header className="bg-zinc-800 border-b border-zinc-700 px-6 py-4 flex items-center gap-4 sticky top-0 z-10 shadow-md">
@@ -59,6 +67,7 @@ export default async function MotoboySettingsPage({
                     userId={user.id}
                     currentGoal={user.dailyGoal || 10}
                 />
+                <PasskeyCard passkeys={passkeys} />
                 <GoogleAccountCard
                     connected={Boolean(user.googleId)}
                     email={user.email}

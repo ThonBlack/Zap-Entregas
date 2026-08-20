@@ -143,6 +143,22 @@ export const shopSettingsRelations = relations(shopSettings, ({ one }) => ({
     }),
 }));
 
+/**
+ * Desbloqueio por digital (WebAuthn/passkey). A digital em si NUNCA sai do
+ * aparelho — o que guardamos aqui é só a chave pública que ele gerou.
+ */
+export const webauthnCredentials = sqliteTable("webauthn_credentials", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("user_id").references(() => users.id).notNull(),
+    credentialId: text("credential_id").notNull().unique(), // base64url
+    publicKey: text("public_key").notNull(),                // base64url
+    counter: integer("counter").default(0).notNull(),       // anti-clonagem do autenticador
+    transports: text("transports"),                         // "internal", "hybrid"… (lista separada por vírgula)
+    deviceName: text("device_name"),                        // pra pessoa saber qual aparelho descadastrar
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+    lastUsedAt: text("last_used_at"),
+});
+
 export const plans = sqliteTable("plans", {
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(), // Starter, Growth, Unlimited

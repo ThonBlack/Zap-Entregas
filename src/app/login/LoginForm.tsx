@@ -6,6 +6,7 @@ import { useActionState } from "react";
 import { AlertCircle, Zap } from "lucide-react";
 import Image from "next/image";
 import GoogleButton from "./GoogleButton";
+import PasskeyLoginButton from "./PasskeyLoginButton";
 
 const initialState = {
     error: "",
@@ -141,16 +142,15 @@ export default function LoginForm({ googleEnabled, avisoExterno }: LoginFormProp
                         </button>
                     </form>
 
-                    {googleEnabled && (
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="h-px flex-1 bg-zinc-700" />
-                                <span className="text-xs text-zinc-500 uppercase tracking-wide">ou</span>
-                                <div className="h-px flex-1 bg-zinc-700" />
-                            </div>
-                            <GoogleButton />
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="h-px flex-1 bg-zinc-700" />
+                            <span className="text-xs text-zinc-500 uppercase tracking-wide">ou</span>
+                            <div className="h-px flex-1 bg-zinc-700" />
                         </div>
-                    )}
+                        <PasskeyLoginButton />
+                        {googleEnabled && <GoogleButton />}
+                    </div>
 
                     <div className="text-center">
                         <Link href="/login/forgot-password" className="text-sm text-zinc-400 hover:text-green-400 transition-colors">
