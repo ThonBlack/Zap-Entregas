@@ -22,4 +22,9 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      # Login com Google (vazio = botão nem aparece). OAUTH_BASE_URL opcional:
+      # sobrescreve APP_URL na hora de montar o endereço de retorno do Google.
+      - OAUTH_BASE_URL=${OAUTH_BASE_URL:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://zapentregas.duckdns.org}

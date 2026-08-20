@@ -7,8 +7,24 @@ import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import MotoboySettingsForm from "@/components/admin/MotoboySettingsForm";
 import AvatarForm from "@/components/auth/AvatarForm";
+import GoogleAccountCard from "@/components/auth/GoogleAccountCard";
+import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 
-export default async function MotoboySettingsPage() {
+const AVISOS_GOOGLE: Record<string, string> = {
+    google_em_uso: "Essa conta Google já está ligada a outro usuário.",
+    google_cancelado: "Conexão com o Google cancelada.",
+    google_state: "A tentativa expirou. Tente de novo.",
+    google_falhou: "Não consegui falar com o Google. Tente de novo.",
+    google_email_nao_verificado: "Esse e-mail não está verificado no Google.",
+    google_desligado: "Login com Google não está configurado neste servidor.",
+};
+
+export default async function MotoboySettingsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ erro?: string; google?: string }>;
+}) {
+    const { erro, google } = await searchParams;
     const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
@@ -42,6 +58,13 @@ export default async function MotoboySettingsPage() {
                 <MotoboySettingsForm
                     userId={user.id}
                     currentGoal={user.dailyGoal || 10}
+                />
+                <GoogleAccountCard
+                    connected={Boolean(user.googleId)}
+                    email={user.email}
+                    enabled={isGoogleLoginConfigured()}
+                    aviso={erro ? AVISOS_GOOGLE[erro] : undefined}
+                    sucesso={google === "conectado"}
                 />
             </main>
         </div>

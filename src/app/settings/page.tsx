@@ -8,8 +8,24 @@ import { shopSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getSessionUserId } from "@/lib/session";
+import { isGoogleLoginConfigured } from "@/lib/google-oauth";
+import GoogleAccountCard from "@/components/auth/GoogleAccountCard";
 
-export default async function SettingsPage() {
+const AVISOS_GOOGLE: Record<string, string> = {
+    google_em_uso: "Essa conta Google já está ligada a outro usuário.",
+    google_cancelado: "Conexão com o Google cancelada.",
+    google_state: "A tentativa expirou. Tente de novo.",
+    google_falhou: "Não consegui falar com o Google. Tente de novo.",
+    google_email_nao_verificado: "Esse e-mail não está verificado no Google.",
+    google_desligado: "Login com Google não está configurado neste servidor.",
+};
+
+export default async function SettingsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ erro?: string; google?: string }>;
+}) {
+    const { erro, google } = await searchParams;
     const userId = await getSessionUserId();
     if (!userId) redirect("/login");
 
@@ -44,6 +60,13 @@ export default async function SettingsPage() {
                     }}
                 />
                 <SettingsForm initialData={currentSettings as any} />
+                <GoogleAccountCard
+                    connected={Boolean(user.googleId)}
+                    email={user.email}
+                    enabled={isGoogleLoginConfigured()}
+                    aviso={erro ? AVISOS_GOOGLE[erro] : undefined}
+                    sucesso={google === "conectado"}
+                />
                 <ApiKeyForm userId={user.id} currentApiKey={user.apiKey || null} />
             </main>
         </div>

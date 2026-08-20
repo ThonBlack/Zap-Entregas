@@ -26,6 +26,7 @@ export const users = sqliteTable("users", {
     trialEndsAt: text("trial_ends_at"), // Data fim do trial (ISO string)
     isTrialUser: integer("is_trial_user", { mode: 'boolean' }).default(false), // Usuário de trial
     apiKey: text("api_key"), // Chave de API para integração com PDV
+    googleId: text("google_id").unique(), // "sub" da conta Google vinculada (login com Google)
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
