@@ -46,9 +46,10 @@ export async function addDeliveryAction(formData: FormData) {
 
     const geoOpts = await loadGeocodeOpts(me.id);
     let lat = 0, lng = 0;
+    let geoPrecision: string | null = null;
     try {
         const coords = await geocodeAddress(address, geoOpts);
-        if (coords) { lat = coords.lat; lng = coords.lng; }
+        if (coords) { lat = coords.lat; lng = coords.lng; geoPrecision = coords.precision; }
     } catch (e) {
         console.error("Geocode form failed", e);
     }
@@ -68,6 +69,7 @@ export async function addDeliveryAction(formData: FormData) {
         observation,
         lat,
         lng,
+        geoPrecision,
         status: "pending",
         stopOrder: 999,
         publicToken: newTrackingToken(),

@@ -45,6 +45,8 @@ export const deliveries = sqliteTable("deliveries", {
     value: real("value").default(0), // Valor do pedido (se motoboy precisar cobrar)
     fee: real("fee").default(0), // Taxa de entrega (ganho do motoboy ou custo do lojista)
     observation: text("observation"),
+    // Quão confiável é o pino: exata | rua | bairro | cidade (avisa na tela de conferência)
+    geoPrecision: text("geo_precision"),
     publicToken: text("public_token").unique(), // Token aleatório do link público de rastreio (IDs sequenciais vazam dados)
     stopOrder: integer("stop_order"), // Ordem da entrega na rota (1, 2, 3...)
     acceptedAt: text("accepted_at"), // Quando motoboy aceitou

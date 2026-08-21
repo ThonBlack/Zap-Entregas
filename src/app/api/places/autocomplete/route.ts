@@ -10,8 +10,9 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Query é obrigatória" }, { status: 400 });
     }
 
+    // Sem chave não é erro: o cliente cai no OpenStreetMap sozinho.
     if (!GOOGLE_MAPS_API_KEY) {
-        return NextResponse.json({ error: "API Key não configurada" }, { status: 500 });
+        return NextResponse.json({ predictions: [], disabled: true });
     }
 
     try {
@@ -20,7 +21,16 @@ export async function GET(request: NextRequest) {
         url.searchParams.append("key", GOOGLE_MAPS_API_KEY);
         url.searchParams.append("language", "pt-BR");
         url.searchParams.append("components", "country:br"); // Restringir ao Brasil
-        url.searchParams.append("types", "address"); // Apenas endereços
+        // Sem filtro de tipo de propósito: metade dos pedidos chega como ponto de
+        // referência ("Faculdade FAZU", "Conjunto Antônio Barbosa"), que "types=address" esconderia.
+
+        // Puxa resultados pra perto da loja, quando o chamador informa onde ela fica.
+        const lat = searchParams.get("lat");
+        const lng = searchParams.get("lng");
+        if (lat && lng) {
+            url.searchParams.append("location", `${lat},${lng}`);
+            url.searchParams.append("radius", "50000");
+        }
 
         const res = await fetch(url.toString());
         const data = await res.json();

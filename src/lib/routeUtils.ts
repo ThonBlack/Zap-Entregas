@@ -1,114 +1,17 @@
-// Wrapper Nominatim com fallback de cidade e bias regional.
-// Em produção: rate limit 1 req/seg do Nominatim público — considerar Google Maps Platform
-// se volume crescer.
+// Utilidades de rota e distância.
+// A busca de endereço vive em @/lib/geocode (cascata Google → OpenStreetMap → CEP)
+// e é reexportada aqui porque o app inteiro já importava deste arquivo.
 
 import { getDistance } from "geolib";
 
-interface Point {
-    lat: number;
-    lng: number;
-    address?: string;
-}
+export { geocodeAddress, isGoogleGeocodingEnabled, consultarViaCep } from "@/lib/geocode";
+export type { GeocodeOpts, GeocodeResult, GeocodePrecision } from "@/lib/geocode";
 
 export interface RoutePoint {
     lat: number;
     lng: number;
     address?: string;
     [key: string]: any;
-}
-
-export interface GeocodeOpts {
-    /** Cidade de fallback (ex: "Uberaba") — anexada ao final se o endereço não tiver UF/cidade */
-    defaultCity?: string | null;
-    /** UF de fallback (ex: "MG") */
-    defaultState?: string | null;
-    /** Coord central da loja — usado pra viewbox e fallback final */
-    shopLat?: number | null;
-    shopLng?: number | null;
-    /** Raio em km do viewbox (padrão 60) */
-    radiusKm?: number;
-}
-
-const STATE_REGEX = /[\/\-,\s][A-Z]{2}(\b|$)/;
-
-function hasStateOrCity(address: string, city?: string | null): boolean {
-    if (STATE_REGEX.test(address)) return true;
-    if (city && address.toLowerCase().includes(city.toLowerCase())) return true;
-    return false;
-}
-
-function buildQuery(address: string, opts?: GeocodeOpts): string {
-    const trimmed = address.trim();
-    if (!opts?.defaultCity) return trimmed;
-    if (hasStateOrCity(trimmed, opts.defaultCity)) return trimmed;
-    return opts.defaultState
-        ? `${trimmed} - ${opts.defaultCity}/${opts.defaultState}`
-        : `${trimmed} - ${opts.defaultCity}`;
-}
-
-function viewboxFromCenter(lat: number, lng: number, radiusKm: number): string {
-    // Aproximação simples: 1 grau lat ≈ 111km
-    const deg = radiusKm / 111;
-    const west = lng - deg;
-    const east = lng + deg;
-    const north = lat + deg;
-    const south = lat - deg;
-    return `${west},${north},${east},${south}`;
-}
-
-export async function geocodeAddress(
-    address: string,
-    opts?: GeocodeOpts
-): Promise<{ lat: number; lng: number } | null> {
-    const q = buildQuery(address, opts);
-
-    const params = new URLSearchParams({
-        format: "json",
-        q,
-        limit: "1",
-        countrycodes: "br",
-        "accept-language": "pt-BR",
-        addressdetails: "0",
-    });
-
-    if (opts?.shopLat != null && opts?.shopLng != null) {
-        const viewbox = viewboxFromCenter(opts.shopLat, opts.shopLng, opts.radiusKm ?? 60);
-        params.set("viewbox", viewbox);
-        params.set("bounded", "1");
-    }
-
-    try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-            headers: {
-                "User-Agent": "ZapEntregas/1.0 (contato@zapentregas.duckdns.org)",
-            },
-        });
-        const data = await response.json();
-        if (data && data[0]) {
-            return {
-                lat: parseFloat(data[0].lat),
-                lng: parseFloat(data[0].lon),
-            };
-        }
-
-        // Fallback: se viewbox foi muito restritivo, tenta sem bounded
-        if (params.get("bounded") === "1") {
-            params.delete("bounded");
-            const retry = await fetch(`https://nominatim.openstreetmap.org/search?${params}`, {
-                headers: { "User-Agent": "ZapEntregas/1.0 (contato@zapentregas.duckdns.org)" },
-            });
-            const retryData = await retry.json();
-            if (retryData && retryData[0]) {
-                return {
-                    lat: parseFloat(retryData[0].lat),
-                    lng: parseFloat(retryData[0].lon),
-                };
-            }
-        }
-    } catch (e) {
-        console.error("Geocoding error:", e);
-    }
-    return null;
 }
 
 /** Distância em km entre dois pontos */

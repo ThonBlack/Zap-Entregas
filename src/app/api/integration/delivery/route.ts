@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
 
         // Geocodificar já na criação (senão a entrega entra sem pin no mapa e sem geofence)
         let lat = 0, lng = 0;
+        let geoPrecision: string | null = null;
         try {
             const s = await db.query.shopSettings.findFirst({
                 where: eq(shopSettings.userId, user.id),
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
                 shopLat: s?.shopLat ?? null,
                 shopLng: s?.shopLng ?? null,
             });
-            if (coords) { lat = coords.lat; lng = coords.lng; }
+            if (coords) { lat = coords.lat; lng = coords.lng; geoPrecision = coords.precision; }
         } catch (e) {
             console.error("[INTEGRATION] geocode falhou:", e);
         }
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
             value,
             fee,
             observation: typeof body.observation === "string" ? body.observation.slice(0, 1000) : null,
+            geoPrecision,
             // Nasce rascunho: o lojista/admin confere endereço no mapa e libera pros motoboys.
             status: "draft",
             publicToken: newTrackingToken(),

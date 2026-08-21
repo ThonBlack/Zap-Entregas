@@ -12,6 +12,9 @@ interface AddressAutocompleteProps {
     defaultCity?: string;
     defaultState?: string;
     required?: boolean;
+    /** Onde fica a loja: puxa as sugestões pra perto em vez de espalhar pelo Brasil. */
+    shopLat?: number | null;
+    shopLng?: number | null;
 }
 
 interface Suggestion {
@@ -19,10 +22,11 @@ interface Suggestion {
     place_id: string;
     lat: string;
     lon: string;
+    source?: "google" | "osm";
 }
 
-// Usa Nominatim (OpenStreetMap) - 100% GRATUITO
-// Com fallback para Google se API key estiver configurada
+// Google Places quando há chave no servidor (acerta número e ponto de referência),
+// com OpenStreetMap de reserva — assim o campo funciona mesmo sem chave.
 
 export default function AddressAutocomplete({
     name,
@@ -32,7 +36,9 @@ export default function AddressAutocomplete({
     className = "",
     defaultCity = "Patos de Minas",
     defaultState = "MG",
-    required = false
+    required = false,
+    shopLat = null,
+    shopLng = null,
 }: AddressAutocompleteProps) {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -53,10 +59,31 @@ export default function AddressAutocomplete({
         setIsLoading(true);
 
         try {
-            // Adicionar cidade e estado para priorizar resultados locais
-            const searchQuery = `${query}, ${defaultCity}, ${defaultState}, Brasil`;
+            // 1ª opção: Google Places (pela nossa rota, pra chave não vazar pro navegador).
+            // É o único que entende ponto de referência e acerta número de casa no Brasil.
+            const params = new URLSearchParams({ query });
+            if (shopLat != null && shopLng != null) {
+                params.set("lat", String(shopLat));
+                params.set("lng", String(shopLng));
+            }
+            const g = await fetch(`/api/places/autocomplete?${params}`);
+            if (g.ok) {
+                const data = await g.json();
+                if (Array.isArray(data.predictions) && data.predictions.length) {
+                    setSuggestions(data.predictions.map((p: { place_id: string; description: string }) => ({
+                        place_id: p.place_id,
+                        display_name: p.description,
+                        lat: "",
+                        lon: "",
+                        source: "google" as const,
+                    })));
+                    setShowSuggestions(true);
+                    return;
+                }
+            }
 
-            // Usar Nominatim (OpenStreetMap) - GRATUITO
+            // 2ª opção: OpenStreetMap, de graça e sem chave.
+            const searchQuery = `${query}, ${defaultCity}, ${defaultState}, Brasil`;
             const url = new URL("https://nominatim.openstreetmap.org/search");
             url.searchParams.append("q", searchQuery);
             url.searchParams.append("format", "json");
@@ -64,15 +91,17 @@ export default function AddressAutocomplete({
             url.searchParams.append("limit", "5");
             url.searchParams.append("countrycodes", "br");
 
-            const res = await fetch(url.toString(), {
-                headers: {
-                    "User-Agent": "ZapEntregas/1.0"
-                }
-            });
+            const res = await fetch(url.toString());
             const data = await res.json();
 
             if (Array.isArray(data)) {
-                setSuggestions(data);
+                setSuggestions(data.map((d: { place_id: string | number; display_name: string; lat: string; lon: string }) => ({
+                    place_id: String(d.place_id),
+                    display_name: d.display_name,
+                    lat: d.lat,
+                    lon: d.lon,
+                    source: "osm" as const,
+                })));
                 setShowSuggestions(true);
             }
         } catch (error) {
@@ -80,7 +109,7 @@ export default function AddressAutocomplete({
         } finally {
             setIsLoading(false);
         }
-    }, [defaultCity, defaultState]);
+    }, [defaultCity, defaultState, shopLat, shopLng]);
 
     // Debounce input
     useEffect(() => {
@@ -100,18 +129,32 @@ export default function AddressAutocomplete({
     }, [inputValue, fetchSuggestions]);
 
     // Selecionar sugestão
-    const handleSelectSuggestion = (suggestion: Suggestion) => {
+    const handleSelectSuggestion = async (suggestion: Suggestion) => {
         const address = suggestion.display_name;
-        const lat = parseFloat(suggestion.lat);
-        const lng = parseFloat(suggestion.lon);
-
         setInputValue(address);
-        setCoords({ lat, lng });
         setShowSuggestions(false);
         setSuggestions([]);
 
-        if (onChange) {
-            onChange(address, lat, lng);
+        let lat = parseFloat(suggestion.lat);
+        let lng = parseFloat(suggestion.lon);
+
+        // O Google só devolve o ponto num segundo pedido, pelo id do lugar.
+        if (suggestion.source === "google") {
+            try {
+                const res = await fetch(`/api/places/details?place_id=${encodeURIComponent(suggestion.place_id)}`);
+                const data = await res.json();
+                const loc = data?.result?.geometry?.location;
+                if (loc) { lat = loc.lat; lng = loc.lng; }
+            } catch {
+                /* sem o ponto, o pino continua onde está e a pessoa arrasta */
+            }
+        }
+
+        if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            setCoords({ lat, lng });
+            onChange?.(address, lat, lng);
+        } else {
+            onChange?.(address);
         }
     };
 

@@ -24,6 +24,8 @@ export interface DraftForConfirm {
     fee: number | null;
     observation: string | null;
     createdAt: string | null;
+    /** exata | rua | bairro | cidade — o quanto dá pra confiar no pino que veio */
+    geoPrecision?: string | null;
 }
 
 interface DraftConfirmFormProps {
@@ -59,6 +61,21 @@ export default function DraftConfirmForm({
     const [pinTouched, setPinTouched] = useState(false);
     const [recenter, setRecenter] = useState(0);
     const [collect, setCollect] = useState((draft.value ?? 0) > 0);
+
+    // O pino quase nunca cai na porta da casa: dizer QUÃO perto ele está evita
+    // que alguém libere uma corrida apontando pro meio do bairro sem perceber.
+    const aviso = pinTouched ? null
+        : hadNoPin
+            ? "Não achei esse endereço no mapa. Arraste o pino até o lugar certo antes de liberar."
+            : isSuspect
+                ? "Esse endereço caiu longe da loja — confira se o pino está no lugar certo."
+                : draft.geoPrecision === "cidade"
+                    ? "Só consegui localizar a cidade — o pino está no centro, longe do lugar real. Ajuste antes de liberar."
+                    : draft.geoPrecision === "bairro"
+                        ? "Localizei só o bairro, não a rua. Confira o pino antes de liberar."
+                        : draft.geoPrecision === "rua"
+                            ? "Achei a rua, mas não o número exato. Confira se o pino está na altura certa."
+                            : null;
 
     const handlePinMove = useCallback((newLat: number, newLng: number) => {
         setLat(newLat);
@@ -106,14 +123,10 @@ export default function DraftConfirmForm({
         <form onSubmit={submit} className="space-y-5">
             <input type="hidden" name="id" value={draft.id} />
 
-            {(isSuspect || hadNoPin) && (
+            {aviso && (
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/40">
                     <AlertTriangle size={20} className="text-yellow-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-yellow-200">
-                        {hadNoPin
-                            ? "Não consegui achar esse endereço no mapa. Arraste o pino até o lugar certo antes de liberar."
-                            : "Esse endereço caiu longe da loja — confira se o pino está no lugar certo."}
-                    </p>
+                    <p className="text-sm text-yellow-200">{aviso}</p>
                 </div>
             )}
 
@@ -125,6 +138,8 @@ export default function DraftConfirmForm({
                     onChange={handleAddressChange}
                     defaultCity={defaultCity ?? "Uberaba"}
                     defaultState={defaultState ?? "MG"}
+                    shopLat={shopLat}
+                    shopLng={shopLng}
                     required
                 />
                 <p className="text-xs text-zinc-500 mt-2 flex items-center gap-1.5">

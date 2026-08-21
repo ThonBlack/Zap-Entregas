@@ -64,6 +64,7 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
     let lng = Number(formData.get("lng"));
     const pinValid = Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0;
 
+    let recalculado: Awaited<ReturnType<typeof geocodeAddress>> = null;
     if (!pinValid) {
         lat = 0; lng = 0;
         try {
@@ -78,7 +79,7 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
                 shopLng: s?.shopLng ?? null,
             };
             const coords = await geocodeAddress(address, opts);
-            if (coords) { lat = coords.lat; lng = coords.lng; }
+            if (coords) { lat = coords.lat; lng = coords.lng; recalculado = coords; }
         } catch (e) {
             console.error("[DRAFT] geocode na confirmação falhou:", e);
         }
@@ -93,6 +94,8 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
     const updated = await db.update(deliveries)
         .set({
             address, lat, lng, value, fee, customerName, customerPhone, observation,
+            // Uma pessoa olhou o mapa e liberou: o ponto deixa de ser um chute.
+            geoPrecision: pinValid ? "exata" : (recalculado?.precision ?? null),
             status: "pending",
             updatedAt: new Date().toISOString(),
         })

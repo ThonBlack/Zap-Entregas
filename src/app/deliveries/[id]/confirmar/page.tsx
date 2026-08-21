@@ -70,6 +70,7 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
                         fee: draft.fee,
                         observation: draft.observation,
                         createdAt: draft.createdAt,
+                        geoPrecision: draft.geoPrecision,
                     }}
                     shopLat={settings?.shopLat ?? null}
                     shopLng={settings?.shopLng ?? null}
