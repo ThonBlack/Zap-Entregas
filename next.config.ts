@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
+// Regras de iframe ficam no proxy (src/proxy.ts): os cabeçalhos daqui
+// são resolvidos durante o build, e a imagem é construída fora do servidor.
+
 const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,

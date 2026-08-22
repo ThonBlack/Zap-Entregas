@@ -19,8 +19,28 @@ type LoadedDraft =
     | { ok: true; draft: typeof deliveries.$inferSelect }
     | { ok: false; error: string };
 
-/** Carrega o rascunho garantindo que quem pediu pode mexer nele. */
-async function loadDraft(id: number): Promise<LoadedDraft> {
+/**
+ * Carrega o rascunho garantindo que quem pediu pode mexer nele.
+ *
+ * Dois caminhos de entrada:
+ *  - logado no Zap (lojista dono ou admin);
+ *  - com o código que o PDV recebeu ao criar a corrida — o caixa não tem conta aqui.
+ *    Esse código autoriza UMA corrida, tem prazo e é apagado ao usar.
+ */
+async function loadDraft(id: number, confirmToken?: string | null): Promise<LoadedDraft> {
+    if (confirmToken) {
+        const draft = await db.query.deliveries.findFirst({
+            where: eq(deliveries.confirmToken, confirmToken),
+        });
+        if (!draft) return { ok: false, error: "Link de conferência inválido." };
+        if (id && draft.id !== id) return { ok: false, error: "Link não confere com a corrida." };
+        if (draft.status !== "draft") return { ok: false, error: "Essa corrida já foi liberada." };
+        if (draft.confirmTokenExpiresAt && new Date(draft.confirmTokenExpiresAt) < new Date()) {
+            return { ok: false, error: "O link de conferência expirou. Confira pelo aplicativo." };
+        }
+        return { ok: true, draft };
+    }
+
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
     if ("error" in auth) return { ok: false, error: auth.error };
     const me = auth.user;
@@ -41,7 +61,8 @@ async function loadDraft(id: number): Promise<LoadedDraft> {
 
 export async function confirmDraftAction(formData: FormData): Promise<ActionResult> {
     const id = Number(formData.get("id"));
-    const loaded = await loadDraft(id);
+    const confirmToken = (formData.get("confirmToken") as string) || null;
+    const loaded = await loadDraft(id, confirmToken);
     if (!loaded.ok) return { error: loaded.error };
     const { draft } = loaded;
 
@@ -93,13 +114,16 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
     // podem notificar os motoboys duas vezes).
     const updated = await db.update(deliveries)
         .set({
+            // Código usado: não serve de novo.
+            confirmToken: null,
+            confirmTokenExpiresAt: null,
             address, lat, lng, value, fee, customerName, customerPhone, observation,
             // Uma pessoa olhou o mapa e liberou: o ponto deixa de ser um chute.
             geoPrecision: pinValid ? "exata" : (recalculado?.precision ?? null),
             status: "pending",
             updatedAt: new Date().toISOString(),
         })
-        .where(and(eq(deliveries.id, id), eq(deliveries.status, "draft")))
+        .where(and(eq(deliveries.id, draft.id), eq(deliveries.status, "draft")))
         .returning();
 
     if (!updated.length) return { error: "Essa corrida já foi liberada." };
@@ -117,12 +141,18 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
 
 export async function cancelDraftAction(formData: FormData): Promise<ActionResult> {
     const id = Number(formData.get("id"));
-    const loaded = await loadDraft(id);
+    const confirmToken = (formData.get("confirmToken") as string) || null;
+    const loaded = await loadDraft(id, confirmToken);
     if (!loaded.ok) return { error: loaded.error };
 
     const canceled = await db.update(deliveries)
-        .set({ status: "canceled", updatedAt: new Date().toISOString() })
-        .where(and(eq(deliveries.id, id), eq(deliveries.status, "draft")))
+        .set({
+            status: "canceled",
+            confirmToken: null,
+            confirmTokenExpiresAt: null,
+            updatedAt: new Date().toISOString(),
+        })
+        .where(and(eq(deliveries.id, loaded.draft.id), eq(deliveries.status, "draft")))
         .returning();
 
     if (!canceled.length) return { error: "Essa corrida já foi liberada." };

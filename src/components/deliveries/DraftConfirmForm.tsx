@@ -38,13 +38,15 @@ interface DraftConfirmFormProps {
     isSuspect: boolean;
     /** A loja esconde o valor do pedido do motoboy — cobrança combinada não apareceria pra ele. */
     hidesValueFromMotoboy: boolean;
+    /** Presente quando a tela foi aberta pelo PDV (sem login). Muda o "depois de salvar". */
+    confirmToken?: string;
 }
 
 const money = (n: number | null | undefined) =>
     n == null ? "" : String(n).replace(".", ",");
 
 export default function DraftConfirmForm({
-    draft, shopLat, shopLng, defaultCity, defaultState, isSuspect, hidesValueFromMotoboy,
+    draft, shopLat, shopLng, defaultCity, defaultState, isSuspect, hidesValueFromMotoboy, confirmToken,
 }: DraftConfirmFormProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -61,6 +63,22 @@ export default function DraftConfirmForm({
     const [pinTouched, setPinTouched] = useState(false);
     const [recenter, setRecenter] = useState(0);
     const [collect, setCollect] = useState((draft.value ?? 0) > 0);
+    const [concluido, setConcluido] = useState<"liberada" | "cancelada" | null>(null);
+
+    const doPdv = Boolean(confirmToken);
+
+    /**
+     * Aberto pelo PDV: avisa a tela da venda e fecha sozinho.
+     * Nada de router.push — aqui não existe app em volta, só esta janela.
+     */
+    const encerrarPeloPdv = (resultado: "liberada" | "cancelada") => {
+        setConcluido(resultado);
+        try {
+            window.parent?.postMessage({ tipo: "zap-entregas:conferencia", resultado, deliveryId: draft.id }, "*");
+            window.opener?.postMessage({ tipo: "zap-entregas:conferencia", resultado, deliveryId: draft.id }, "*");
+        } catch { /* janela sem parente: só mostra o aviso abaixo */ }
+        setTimeout(() => { try { window.close(); } catch { } }, 1200);
+    };
 
     // O pino quase nunca cai na porta da casa: dizer QUÃO perto ele está evita
     // que alguém libere uma corrida apontando pro meio do bairro sem perceber.
@@ -98,9 +116,11 @@ export default function DraftConfirmForm({
         const fd = new FormData(e.currentTarget);
         fd.set("lat", String(lat));
         fd.set("lng", String(lng));
+        if (confirmToken) fd.set("confirmToken", confirmToken);
         startTransition(async () => {
             const res = await confirmDraftAction(fd);
             if (res && "error" in res) { setError(res.error); return; }
+            if (doPdv) { encerrarPeloPdv("liberada"); return; }
             router.push("/app");
             router.refresh();
         });
@@ -111,13 +131,26 @@ export default function DraftConfirmForm({
         setError("");
         const fd = new FormData();
         fd.set("id", String(draft.id));
+        if (confirmToken) fd.set("confirmToken", confirmToken);
         startTransition(async () => {
             const res = await cancelDraftAction(fd);
             if (res && "error" in res) { setError(res.error); return; }
+            if (doPdv) { encerrarPeloPdv("cancelada"); return; }
             router.push("/app");
             router.refresh();
         });
     };
+
+    if (concluido) {
+        return (
+            <div className="p-6 rounded-2xl bg-zinc-800 border border-zinc-700 text-center space-y-2">
+                <p className="text-lg font-semibold text-white">
+                    {concluido === "liberada" ? "✅ Corrida liberada pros motoboys" : "Corrida cancelada"}
+                </p>
+                <p className="text-sm text-zinc-400">Pode voltar pra venda — esta janela fecha sozinha.</p>
+            </div>
+        );
+    }
 
     return (
         <form onSubmit={submit} className="space-y-5">

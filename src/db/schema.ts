@@ -48,6 +48,10 @@ export const deliveries = sqliteTable("deliveries", {
     // Quão confiável é o pino: exata | rua | bairro | cidade (avisa na tela de conferência)
     geoPrecision: text("geo_precision"),
     publicToken: text("public_token").unique(), // Token aleatório do link público de rastreio (IDs sequenciais vazam dados)
+    // Conferência a partir do PDV, sem login: código de uso único e com prazo.
+    // O caixa não tem conta no Zap, então é isto que autoriza ele a ajustar ESTA corrida.
+    confirmToken: text("confirm_token").unique(),
+    confirmTokenExpiresAt: text("confirm_token_expires_at"),
     stopOrder: integer("stop_order"), // Ordem da entrega na rota (1, 2, 3...)
     acceptedAt: text("accepted_at"), // Quando motoboy aceitou
     pickedUpAt: text("picked_up_at"), // Quando saiu da loja

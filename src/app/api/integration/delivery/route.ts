@@ -3,7 +3,7 @@ import { deliveries, users, shopSettings } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { geocodeAddress } from "@/lib/routeUtils";
-import { newTrackingToken } from "@/lib/trackingToken";
+import { newTrackingToken, newConfirmToken, confirmTokenExpiry } from "@/lib/trackingToken";
 import { pushToDraftReviewers } from "@/lib/push";
 
 /**
@@ -11,6 +11,11 @@ import { pushToDraftReviewers } from "@/lib/push";
  *
  * Headers: X-API-KEY: zap_<userId>_<random>
  */
+
+/** Campo de texto do corpo da requisição, aparado e limitado. */
+function str(v: unknown): string | null {
+    return typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : null;
+}
 
 async function authenticateApiKey(apiKey: string | null) {
     if (!apiKey || !apiKey.startsWith("zap_")) return null;
@@ -52,12 +57,25 @@ export async function POST(request: NextRequest) {
                 where: eq(shopSettings.userId, user.id),
                 columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
             });
+            // O PDV pode mandar o endereço já separado (street, number, ...) — quando
+            // manda, o ponto sai bem mais preciso do que interpretando a frase.
+            const partes = typeof body.addressParts === "object" && body.addressParts
+                ? {
+                    street: str(body.addressParts.street),
+                    number: str(body.addressParts.number),
+                    neighborhood: str(body.addressParts.neighborhood),
+                    city: str(body.addressParts.city),
+                    state: str(body.addressParts.state),
+                    cep: str(body.addressParts.cep),
+                }
+                : null;
+
             const coords = await geocodeAddress(address, {
                 defaultCity: s?.defaultCity ?? null,
                 defaultState: s?.defaultState ?? null,
                 shopLat: s?.shopLat ?? null,
                 shopLng: s?.shopLng ?? null,
-            });
+            }, partes);
             if (coords) { lat = coords.lat; lng = coords.lng; geoPrecision = coords.precision; }
         } catch (e) {
             console.error("[INTEGRATION] geocode falhou:", e);
@@ -77,6 +95,8 @@ export async function POST(request: NextRequest) {
             // Nasce rascunho: o lojista/admin confere endereço no mapa e libera pros motoboys.
             status: "draft",
             publicToken: newTrackingToken(),
+            confirmToken: newConfirmToken(),
+            confirmTokenExpiresAt: confirmTokenExpiry(),
         }).returning().get();
 
         // Quem é avisado agora é quem libera, não o motoboy.
@@ -87,12 +107,14 @@ export async function POST(request: NextRequest) {
             tag: `confirmar-${newDelivery.id}`,
         }).catch(() => { });
 
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
+        const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
 
         return NextResponse.json({
             success: true,
             deliveryId: newDelivery.id,
             trackingUrl: `${baseUrl}/tracking/${newDelivery.publicToken}`,
+            // O PDV abre isto numa janela por cima da venda pra conferir o endereço na hora.
+            confirmUrl: `${baseUrl}/confirmar/${newDelivery.confirmToken}`,
             status: newDelivery.status,
             message: "Entrega registrada! Aguardando confirmação do endereço para liberar aos motoboys.",
         });

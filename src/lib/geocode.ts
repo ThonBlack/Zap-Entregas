@@ -1,4 +1,4 @@
-import { parseBrazilianAddress, normalizeStreet } from "@/lib/addressParser";
+import { parseBrazilianAddress, normalizeStreet, type ParsedAddress } from "@/lib/addressParser";
 
 /**
  * Descobrir o ponto no mapa a partir do endereço escrito.
@@ -32,6 +32,17 @@ export interface GeocodeOpts {
     radiusKm?: number;
 }
 
+/** Descarta campo vazio e limpa o CEP, pra não sobrescrever o que foi entendido da frase. */
+function limparPartes(partes: Partial<ParsedAddress>): Partial<ParsedAddress> {
+    const limpo: Partial<ParsedAddress> = {};
+    for (const [k, v] of Object.entries(partes)) {
+        if (typeof v === "string" && v.trim()) {
+            limpo[k as keyof ParsedAddress] = k === "cep" ? v.replace(/\D/g, "") : v.trim();
+        }
+    }
+    return limpo;
+}
+
 const NOMINATIM_UA = "ZapEntregas/1.0 (contato@zapentregas.duckdns.org)";
 
 // O OpenStreetMap público permite 1 consulta por segundo. Estourar isso faz ele
@@ -52,9 +63,14 @@ export function isGoogleGeocodingEnabled(): boolean {
     return Boolean(process.env.GOOGLE_MAPS_API_KEY);
 }
 
+/**
+ * @param partes quando quem chama já tem o endereço em campos separados (o PDV tem!),
+ *               passar aqui evita adivinhar os pedaços a partir da frase.
+ */
 export async function geocodeAddress(
     address: string,
-    opts?: GeocodeOpts
+    opts?: GeocodeOpts,
+    partes?: Partial<ParsedAddress> | null
 ): Promise<GeocodeResult | null> {
     if (!address?.trim()) return null;
 
@@ -62,13 +78,20 @@ export async function geocodeAddress(
     const emCache = cache.get(chave);
     if (emCache && emCache.expira > Date.now()) return emCache.valor;
 
-    const resultado = await buscar(address, opts);
+    const resultado = await buscar(address, opts, partes);
     cache.set(chave, { valor: resultado, expira: Date.now() + CACHE_MS });
     return resultado;
 }
 
-async function buscar(address: string, opts?: GeocodeOpts): Promise<GeocodeResult | null> {
-    const p = parseBrazilianAddress(address);
+async function buscar(
+    address: string,
+    opts?: GeocodeOpts,
+    partes?: Partial<ParsedAddress> | null
+): Promise<GeocodeResult | null> {
+    // Campos vindos prontos valem mais que qualquer palpite sobre a frase.
+    const p: ParsedAddress = partes?.street
+        ? { ...parseBrazilianAddress(address), ...limparPartes(partes) }
+        : parseBrazilianAddress(address);
     const city = p.city || opts?.defaultCity || null;
     const state = p.state || opts?.defaultState || null;
 
