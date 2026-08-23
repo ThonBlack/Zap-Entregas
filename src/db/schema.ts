@@ -82,6 +82,15 @@ export const transactions = sqliteTable("transactions", {
     userId: integer("user_id").references(() => users.id).notNull(), // Quem sofreu a alteração de saldo
     amount: real("amount").notNull(),
     type: text("type", { enum: ["credit", "debit"] }).notNull(),
+    // Natureza do lançamento. Regra de sinal (sempre do ponto de vista do motoboy):
+    //   credit = a loja passa a dever ao motoboy (corrida, devolução de dinheiro)
+    //   debit  = o motoboy passa a dever à loja (dinheiro retido do cliente, pagamento recebido)
+    //   corrida   → credit automático ao finalizar a entrega
+    //   dinheiro  → debit automático quando recebeu em dinheiro do cliente
+    //   pagamento → loja pagou o motoboy (debit) ou motoboy devolveu à loja (credit)
+    //   ajuste    → correção manual, qualquer sentido
+    //   abertura  → saldo/dívida inicial quando o motoboy entra no app
+    kind: text("kind", { enum: ["corrida", "dinheiro", "pagamento", "ajuste", "abertura"] }).default("ajuste").notNull(),
     description: text("description"),
     relatedDeliveryId: integer("related_delivery_id").references(() => deliveries.id),
     creatorId: integer("creator_id").references(() => users.id), // Quem lançou mov

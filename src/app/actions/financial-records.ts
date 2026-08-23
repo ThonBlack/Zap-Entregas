@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { financialRecords } from "@/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { getAuthUser } from "@/lib/session";
+import { getAuthUserWithRole } from "@/lib/session";
 
 function monthRange(year: number, month: number) {
     const start = new Date(Date.UTC(year, month - 1, 1));
@@ -16,7 +16,7 @@ function monthRange(year: number, month: number) {
 }
 
 export async function getFinancialRecordsAction(month?: number, year?: number) {
-    const auth = await getAuthUser();
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
     if ("error" in auth) return auth;
 
     const today = new Date();
@@ -44,7 +44,7 @@ export async function getFinancialRecordsAction(month?: number, year?: number) {
 }
 
 export async function createFinancialRecordAction(formData: FormData) {
-    const auth = await getAuthUser();
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
     if ("error" in auth) return auth;
 
     const description = (formData.get("description") as string)?.trim();
@@ -83,7 +83,7 @@ export async function createFinancialRecordAction(formData: FormData) {
 }
 
 export async function deleteFinancialRecordAction(id: number) {
-    const auth = await getAuthUser();
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
     if ("error" in auth) return auth;
 
     if (!Number.isInteger(id) || id <= 0) return { error: "ID inválido." };
@@ -100,7 +100,7 @@ export async function deleteFinancialRecordAction(id: number) {
 }
 
 export async function markAsPaidAction(id: number) {
-    const auth = await getAuthUser();
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
     if ("error" in auth) return auth;
 
     if (!Number.isInteger(id) || id <= 0) return { error: "ID inválido." };

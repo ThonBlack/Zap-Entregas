@@ -46,26 +46,9 @@ import { PendingConfirmations } from "@/components/dashboard/PendingConfirmation
 import TrialBanner from "@/components/billing/TrialBanner";
 import NotificationWrapper from "@/components/shared/NotificationWrapper";
 import DraftsBanner from "@/components/deliveries/DraftsBanner";
+import { getBalance } from "@/lib/wallet";
 
-async function getUserBalance(userId: number) {
-    const result = await db
-        .select({
-            balance: sql<number>`
-        COALESCE(SUM(
-          CASE
-            WHEN ${transactions.status} = 'confirmed' AND ${transactions.type} = 'credit' THEN ${transactions.amount}
-            WHEN ${transactions.status} = 'confirmed' AND ${transactions.type} = 'debit' THEN -${transactions.amount}
-            ELSE 0
-          END
-        ), 0)
-      `,
-        })
-        .from(transactions)
-        .where(eq(transactions.userId, userId))
-        .get();
-
-    return result?.balance || 0;
-}
+const getUserBalance = getBalance;
 
 async function getPendingConfirmations(userId: number) {
     const result = await db.select({

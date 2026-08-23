@@ -1,8 +1,10 @@
 import { getFinancialRecordsAction, deleteFinancialRecordAction, markAsPaidAction } from "@/app/actions/financial-records";
 import Link from "next/link";
+import { requireShopkeeper } from "@/lib/session";
 import { ArrowLeft, Plus, Trash2, CheckCircle, AlertCircle, DollarSign } from "lucide-react";
 
 export default async function FinanceManagerPage(props: { searchParams: Promise<{ month?: string, year?: string }> }) {
+    await requireShopkeeper();
     const searchParams = await props.searchParams;
     const month = searchParams.month ? parseInt(searchParams.month) : new Date().getMonth() + 1;
     const year = searchParams.year ? parseInt(searchParams.year) : new Date().getFullYear();

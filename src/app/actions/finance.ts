@@ -6,29 +6,32 @@ import { eq, and, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
+import { MANUAL_ENTRY_OPTIONS, type ManualEntryKey } from "@/lib/wallet";
 
-export async function createTransactionAction(formData: FormData) {
+export type ManualEntryState = { error?: string } | null;
+
+export async function createTransactionAction(_prev: ManualEntryState, formData: FormData): Promise<ManualEntryState> {
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
-    if ("error" in auth) return auth;
+    if ("error" in auth) return { error: auth.error };
     const me = auth.user;
 
     const targetUserId = Number(formData.get("motoboyId"));
-    const amountStr = formData.get("amount") as string;
-    const type = formData.get("type") as "credit" | "debit";
-    const description = formData.get("description") as string;
+    const amountStr = String(formData.get("amount") ?? "");
+    const entryKey = String(formData.get("entry") ?? "") as ManualEntryKey;
+    const description = String(formData.get("description") ?? "").trim();
+    const needsConfirmation = formData.get("needsConfirmation") === "on";
+    const returnTo = String(formData.get("returnTo") ?? "") || "/app";
 
-    if (!Number.isInteger(targetUserId) || targetUserId <= 0 || !amountStr || !type) {
-        return { error: "Preencha todos os campos obrigatórios." };
-    }
-    if (type !== "credit" && type !== "debit") {
-        return { error: "Tipo inválido." };
+    const entry = MANUAL_ENTRY_OPTIONS[entryKey];
+    if (!Number.isInteger(targetUserId) || targetUserId <= 0 || !amountStr || !entry) {
+        return { error: "Preencha motoboy, tipo e valor." };
     }
     if (targetUserId === me.id) {
-        return { error: "Não é possível lançar transação para você mesmo." };
+        return { error: "Não dá pra lançar na sua própria carteira." };
     }
 
     const amount = parseFloat(amountStr.replace(",", "."));
-    if (isNaN(amount) || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
         return { error: "Valor inválido." };
     }
 
@@ -44,14 +47,18 @@ export async function createTransactionAction(formData: FormData) {
         userId: targetUserId,
         creatorId: me.id,
         amount,
-        type,
-        description:
-            description ||
-            (type === "credit" ? "Pagamento efetuado pelo lojista" : "Recebimento do lojista"),
-        status: "pending",
+        type: entry.type,
+        kind: entry.kind,
+        description: description || entry.label,
+        status: needsConfirmation ? "pending" : "confirmed",
     });
 
-    redirect("/app");
+    revalidatePath("/app");
+    revalidatePath("/motoboys");
+    revalidatePath(`/motoboys/${targetUserId}/financeiro`);
+    revalidatePath("/finance/extrato");
+    // Só caminhos internos — nada de mandar o usuário pra fora.
+    redirect(returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/app");
 }
 
 export async function confirmTransactionAction(id: number) {

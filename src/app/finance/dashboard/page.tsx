@@ -1,8 +1,10 @@
 import FinancialDashboard from "@/components/admin/FinancialDashboard";
 import Link from "next/link";
+import { requireUser } from "@/lib/session";
 import { ArrowLeft, DollarSign } from "lucide-react";
 
-export default function FinancialDashboardPage() {
+export default async function FinancialDashboardPage() {
+    await requireUser();
     return (
         <div className="min-h-screen bg-zinc-900 pb-20 md:pb-8">
             <header className="bg-zinc-800 border-b border-zinc-700 sticky top-0 z-10 px-6 py-4 flex items-center gap-4 shadow-md">

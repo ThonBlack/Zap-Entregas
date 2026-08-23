@@ -347,9 +347,10 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
         }
 
         const shopId = delivery.shopkeeperId;
-        let fee = 0;
+        // Taxa combinada na corrida (PDV/conferência) vale mais que a regra geral da loja.
+        let fee = delivery.fee && delivery.fee > 0 ? delivery.fee : 0;
 
-        if (shopId) {
+        if (fee === 0 && shopId) {
             const settings = await db.query.shopSettings.findFirst({
                 where: eq(shopSettings.userId, shopId),
             });
@@ -374,6 +375,7 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
                 userId: delivery.motoboyId,
                 amount: fee,
                 type: "credit",
+                kind: "corrida",
                 description: `Corrida #${id} - ${delivery.customerName || "Cliente"}`,
                 relatedDeliveryId: id,
                 creatorId: shopId,
@@ -388,6 +390,7 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
                 userId: delivery.motoboyId,
                 amount: receivedAmount,
                 type: "debit",
+                kind: "dinheiro",
                 description: `Recebido do cliente em dinheiro - Corrida #${id}`,
                 relatedDeliveryId: id,
                 creatorId: shopId,

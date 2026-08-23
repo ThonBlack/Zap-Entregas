@@ -135,11 +135,11 @@ export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveri
             {/* Quick Actions - Verde */}
             <div className="grid grid-cols-2 gap-3">
                 <Link
-                    href="/finance/dashboard"
+                    href="/finance/extrato"
                     className="flex items-center justify-center gap-3 w-full bg-green-600 text-white p-4 rounded-2xl font-bold shadow-md active:scale-[0.98] transition-all hover:bg-green-500"
                 >
                     <DollarSign size={22} />
-                    <span className="text-sm">Financeiro</span>
+                    <span className="text-sm">Extrato</span>
                 </Link>
                 <Link
                     href="/deliveries/history"

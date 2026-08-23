@@ -2,16 +2,16 @@ import Link from "next/link";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { ArrowLeft, Plus, Edit2, User, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Plus, Edit2, User, Trash2, Users, Wallet } from "lucide-react";
 import { createMotoboyAction, updateMotoboyAction, deleteMotoboyAction } from "@/app/actions/motoboy";
-import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/session";
+import { requireShopkeeper } from "@/lib/session";
+import { getBalances, formatBRL } from "@/lib/wallet";
 
 export default async function MotoboysPage() {
-    const userId = await getSessionUserId();
-    if (!userId) redirect("/login");
+    await requireShopkeeper();
 
     const motoboys = await db.select().from(users).where(eq(users.role, 'motoboy')).orderBy(desc(users.createdAt));
+    const balances = await getBalances(motoboys.map(m => m.id));
 
     return (
         <div className="min-h-screen bg-zinc-900 pb-20">
@@ -91,10 +91,19 @@ export default async function MotoboysPage() {
                                     <div>
                                         <div className="font-bold text-white">{motoboy.name}</div>
                                         <div className="text-sm text-zinc-400">{motoboy.phone}</div>
+                                        {(() => {
+                                            const b = balances.get(motoboy.id) ?? 0;
+                                            if (b > 0) return <div className="text-xs text-green-400 font-mono">a pagar {formatBRL(b)}</div>;
+                                            if (b < 0) return <div className="text-xs text-red-400 font-mono">ele deve {formatBRL(-b)}</div>;
+                                            return <div className="text-xs text-zinc-500 font-mono">saldo zerado</div>;
+                                        })()}
                                     </div>
                                 </div>
 
                                 <div className="flex items-center gap-2">
+                                    <Link href={`/motoboys/${motoboy.id}/financeiro`} className="p-2 text-zinc-400 hover:text-green-400 transition-colors bg-zinc-700 rounded-lg hover:bg-zinc-600" title="Financeiro">
+                                        <Wallet size={20} />
+                                    </Link>
                                     <Link href={`/motoboys/${motoboy.id}`} className="p-2 text-zinc-400 hover:text-green-400 transition-colors bg-zinc-700 rounded-lg hover:bg-zinc-600">
                                         <Edit2 size={20} />
                                     </Link>
