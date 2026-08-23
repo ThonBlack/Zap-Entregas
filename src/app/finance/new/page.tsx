@@ -4,7 +4,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { requireShopkeeper } from "@/lib/session";
-import { getBalances, MANUAL_ENTRY_OPTIONS, type ManualEntryKey } from "@/lib/wallet";
+import { getBalances, MANUAL_ENTRY_OPTIONS, safeReturnTo, type ManualEntryKey } from "@/lib/wallet";
 import ManualEntryForm from "@/components/finance/ManualEntryForm";
 
 export default async function NewTransactionPage({
@@ -25,7 +25,7 @@ export default async function NewTransactionPage({
     const defaultMotoboyId = sp.motoboyId ? Number(sp.motoboyId) : undefined;
     const defaultEntry = sp.entry && sp.entry in MANUAL_ENTRY_OPTIONS ? (sp.entry as ManualEntryKey) : undefined;
     const defaultAmount = sp.amount ? Number(sp.amount) : undefined;
-    const returnTo = sp.returnTo && sp.returnTo.startsWith("/") ? sp.returnTo : "/app";
+    const returnTo = safeReturnTo(sp.returnTo);
 
     return (
         <div className="min-h-screen bg-zinc-50 pb-20">

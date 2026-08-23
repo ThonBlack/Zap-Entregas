@@ -6,7 +6,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
-import { MANUAL_ENTRY_OPTIONS, type ManualEntryKey } from "@/lib/wallet";
+import { MANUAL_ENTRY_OPTIONS, safeReturnTo, type ManualEntryKey } from "@/lib/wallet";
 
 export type ManualEntryState = { error?: string } | null;
 
@@ -57,8 +57,7 @@ export async function createTransactionAction(_prev: ManualEntryState, formData:
     revalidatePath("/motoboys");
     revalidatePath(`/motoboys/${targetUserId}/financeiro`);
     revalidatePath("/finance/extrato");
-    // Só caminhos internos — nada de mandar o usuário pra fora.
-    redirect(returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/app");
+    redirect(safeReturnTo(returnTo));
 }
 
 export async function confirmTransactionAction(id: number) {
@@ -76,6 +75,9 @@ export async function confirmTransactionAction(id: number) {
         );
 
     revalidatePath("/app");
+    revalidatePath("/finance/extrato");
+    revalidatePath("/motoboys");
+    revalidatePath(`/motoboys/${auth.user.id}/financeiro`);
     return { success: true };
 }
 
@@ -94,6 +96,9 @@ export async function rejectTransactionAction(id: number) {
         );
 
     revalidatePath("/app");
+    revalidatePath("/finance/extrato");
+    revalidatePath("/motoboys");
+    revalidatePath(`/motoboys/${auth.user.id}/financeiro`);
     return { success: true };
 }
 

@@ -29,3 +29,18 @@ export type ManualEntryKey = keyof typeof MANUAL_ENTRY_OPTIONS;
 export function formatBRL(n: number) {
     return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+
+/** Mês/ano pedidos na URL, com o padrão sendo o mês ATUAL em Brasília (o servidor roda em UTC). */
+export function parseMonth(sp: { m?: string; y?: string }) {
+    const nowBrt = new Date(Date.now() - 3 * 3600 * 1000); // UTC−3, sem horário de verão
+    const m = Number(sp.m), y = Number(sp.y);
+    const okM = Number.isInteger(m) && m >= 1 && m <= 12;
+    const okY = Number.isInteger(y) && y >= 2020 && y <= 2100;
+    return { month: okM ? m : nowBrt.getUTCMonth() + 1, year: okY ? y : nowBrt.getUTCFullYear() };
+}
+
+/** Só aceita caminho interno ("/x"); barra dupla ("//host", "/\\host") vira redirect externo no navegador. */
+export function safeReturnTo(v: unknown, fallback = "/app"): string {
+    const s = typeof v === "string" ? v : "";
+    return s.startsWith("/") && !s.startsWith("//") && !s.startsWith("/\\") ? s : fallback;
+}

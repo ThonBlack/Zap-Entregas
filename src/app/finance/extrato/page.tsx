@@ -3,14 +3,7 @@ import { ArrowLeft, BarChart3 } from "lucide-react";
 import { requireMotoboy } from "@/lib/session";
 import { getStatement } from "@/lib/wallet";
 import StatementView from "@/components/finance/StatementView";
-
-function parseMonth(sp: { m?: string; y?: string }) {
-    const now = new Date();
-    const m = Number(sp.m), y = Number(sp.y);
-    const okM = Number.isInteger(m) && m >= 1 && m <= 12;
-    const okY = Number.isInteger(y) && y >= 2020 && y <= 2100;
-    return { month: okM ? m : now.getMonth() + 1, year: okY ? y : now.getFullYear() };
-}
+import { parseMonth } from "@/lib/wallet-shared";
 
 export default async function ExtratoPage({ searchParams }: { searchParams: Promise<{ m?: string; y?: string }> }) {
     const user = await requireMotoboy();

@@ -46,7 +46,6 @@ export async function POST(request: NextRequest) {
         }
 
         const value = Number.isFinite(body.value) ? body.value : 0;
-        const fee = Number.isFinite(body.fee) ? body.fee : 0;
         const address = body.address.slice(0, 500);
 
         // Geocodificar já na criação (senão a entrega entra sem pin no mapa e sem geofence)
@@ -80,6 +79,20 @@ export async function POST(request: NextRequest) {
         } catch (e) {
             console.error("[INTEGRATION] geocode falhou:", e);
         }
+
+        // "fee" aqui é o que o MOTOBOY ganha (contrato da tela de conferência), não o
+        // frete que o PDV cobra do cliente — por isso body.fee é ignorado. Nasce da
+        // regra da loja e o lojista pode ajustar na conferência.
+        let fee = 0;
+        try {
+            const remu = await db.query.shopSettings.findFirst({
+                where: eq(shopSettings.userId, user.id),
+                columns: { remunerationModel: true, fixedValue: true },
+            });
+            if (remu && (remu.remunerationModel === "fixed" || remu.remunerationModel === "hybrid")) {
+                fee = remu.fixedValue || 0;
+            }
+        } catch { /* sem regra, taxa fica 0 e o lojista preenche na conferência */ }
 
         const newDelivery = await db.insert(deliveries).values({
             shopkeeperId: user.id,

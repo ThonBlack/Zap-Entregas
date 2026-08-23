@@ -22,5 +22,6 @@ ENV DATABASE_PATH=/app/sqlite.db
 # Expose port (internal container port)
 EXPOSE 3000
 
-# Start command (using npm start which runs 'next start')
-CMD ["npm", "start"]
+# Migrações leves rodam antes do servidor: deploy novo ou restore de backup
+# antigo nunca sobe sem as colunas que o código espera.
+CMD ["sh", "-c", "node scripts/utils/add_transaction_kind_column.js && npm start"]

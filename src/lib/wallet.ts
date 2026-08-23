@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { transactions, users } from "@/db/schema";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { TransactionKind } from "./wallet-shared";
 
 export * from "./wallet-shared";
@@ -65,12 +65,15 @@ export type Statement = {
     openingBalance: number;
     /** saldo geral, hoje */
     balance: number;
-    totals: { corridas: number; dinheiro: number; pagamentos: number; ajustes: number; credit: number; debit: number };
+    totals: { corridas: number; dinheiro: number; pagamentos: number; ajustes: number };
     lines: StatementLine[];
 };
 
+// createdAt é gravado em UTC ("YYYY-MM-DD HH:MM:SS"). Pra virada de mês cair à meia-noite
+// de Brasília (UTC−3, sem horário de verão), comparamos a data já deslocada.
+const LOCAL_TS = sql`datetime(${transactions.createdAt}, '-3 hours')`;
+
 function monthRange(month: number, year: number) {
-    // createdAt é gravado em ISO UTC (CURRENT_TIMESTAMP ou toISOString) — comparar como texto funciona.
     const pad = (n: number) => String(n).padStart(2, "0");
     const start = `${year}-${pad(month)}-01`;
     const next = month === 12 ? `${year + 1}-01-01` : `${year}-${pad(month + 1)}-01`;
@@ -82,7 +85,7 @@ export async function getStatement(userId: number, month: number, year: number):
 
     const openingRow = await db.select({ balance: BALANCE_EXPR })
         .from(transactions)
-        .where(and(eq(transactions.userId, userId), sql`${transactions.createdAt} < ${start}`))
+        .where(and(eq(transactions.userId, userId), sql`${LOCAL_TS} < ${start}`))
         .get();
     const opening = Number(openingRow?.balance ?? 0);
     const [balance, rows] = await Promise.all([
@@ -102,19 +105,18 @@ export async function getStatement(userId: number, month: number, year: number):
             .leftJoin(users, eq(transactions.creatorId, users.id))
             .where(and(
                 eq(transactions.userId, userId),
-                sql`${transactions.createdAt} >= ${start}`,
-                sql`${transactions.createdAt} < ${next}`,
+                sql`${LOCAL_TS} >= ${start}`,
+                sql`${LOCAL_TS} < ${next}`,
             ))
             .orderBy(transactions.createdAt, transactions.id),
     ]);
 
-    const totals = { corridas: 0, dinheiro: 0, pagamentos: 0, ajustes: 0, credit: 0, debit: 0 };
+    const totals = { corridas: 0, dinheiro: 0, pagamentos: 0, ajustes: 0 };
     let running = opening;
     const asc: StatementLine[] = rows.map(r => {
         const signed = r.type === "credit" ? r.amount : -r.amount;
         if (r.status === "confirmed") {
             running += signed;
-            if (r.type === "credit") totals.credit += r.amount; else totals.debit += r.amount;
             if (r.kind === "corrida") totals.corridas += r.amount;
             else if (r.kind === "dinheiro") totals.dinheiro += r.amount;
             else if (r.kind === "pagamento") totals.pagamentos += signed;
@@ -137,13 +139,3 @@ export async function getStatement(userId: number, month: number, year: number):
     };
 }
 
-/** Meses que têm lançamento (pra navegação sem ficar clicando em mês vazio). */
-export async function getActiveMonths(userId: number): Promise<{ month: number; year: number }[]> {
-    const rows = await db
-        .select({ ym: sql<string>`strftime('%Y-%m', ${transactions.createdAt})` })
-        .from(transactions)
-        .where(eq(transactions.userId, userId))
-        .groupBy(sql`strftime('%Y-%m', ${transactions.createdAt})`)
-        .orderBy(desc(sql`strftime('%Y-%m', ${transactions.createdAt})`));
-    return rows.map(r => ({ year: Number(r.ym.slice(0, 4)), month: Number(r.ym.slice(5, 7)) }));
-}
