@@ -168,6 +168,8 @@ export default function LoginForm({ googleEnabled, avisoExterno }: LoginFormProp
                     {/* Footer */}
                     <div className="text-center text-xs text-zinc-600 pt-4">
                         © 2026 Zap Entregas • Feito com 💚 no Brasil
+                        {" • "}
+                        <Link href="/privacidade" className="hover:text-zinc-400 transition-colors">Privacidade</Link>
                     </div>
                 </div>
             </div>
