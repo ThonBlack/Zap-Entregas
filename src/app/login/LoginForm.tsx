@@ -149,7 +149,15 @@ export default function LoginForm({ googleEnabled, avisoExterno }: LoginFormProp
                             <div className="h-px flex-1 bg-zinc-700" />
                         </div>
                         <PasskeyLoginButton />
-                        {googleEnabled && <GoogleButton />}
+                        {googleEnabled && (
+                            <div className="space-y-2">
+                                <GoogleButton label="Entrar ou criar conta com Google" />
+                                <p className="text-xs text-zinc-500 text-center leading-relaxed">
+                                    Se você ainda não tem conta, o Google cria uma de <strong className="text-zinc-400">motoboy</strong> na hora.
+                                    Lojista e administrador entram por celular e senha.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <div className="text-center">

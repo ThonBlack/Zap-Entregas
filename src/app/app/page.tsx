@@ -105,6 +105,9 @@ export default async function Dashboard({
 
     if (!user) redirect("/login");
 
+    // Conta criada pelo Google ainda sem telefone: termina o cadastro antes de usar.
+    if (!user.phone) redirect("/completar-cadastro");
+
     if (user.isTrialUser && user.trialEndsAt) {
         const trialEnd = new Date(user.trialEndsAt);
         if (trialEnd < new Date()) {

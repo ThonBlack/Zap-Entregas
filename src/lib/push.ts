@@ -54,6 +54,16 @@ export async function pushToUser(userId: number, payload: PushPayload): Promise<
     await sendToSubscriptions(subs, payload);
 }
 
+/** Notifica só os administradores (ex.: entrou motoboy novo pelo Google). */
+export async function pushToAdmins(payload: PushPayload): Promise<void> {
+    if (!ensureConfigured()) return;
+    const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin"));
+    if (!admins.length) return;
+    const subs = await db.select().from(pushSubscriptions)
+        .where(inArray(pushSubscriptions.userId, admins.map(a => a.id)));
+    await sendToSubscriptions(subs, payload);
+}
+
 /**
  * Notifica quem pode liberar um rascunho: o lojista dono da corrida + os admins.
  * Usado quando a venda do PDV cria a corrida — ela ainda não vai pros motoboys.

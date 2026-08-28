@@ -8,6 +8,7 @@ const AVISOS: Record<string, string> = {
     google_state: "A tentativa de login expirou. Tente de novo.",
     google_falhou: "Não consegui falar com o Google. Tente de novo.",
     google_email_nao_verificado: "Esse e-mail não está verificado no Google.",
+    google_email_em_uso: "Esse e-mail já está no app ligado a outra conta Google. Entre com telefone e senha e ajuste em Configurações.",
     google_sem_conta: "Essa conta Google não está ligada a nenhum usuário. Entre com telefone e senha e conecte o Google em Configurações.",
     conta_desativada: "Conta desativada. Fale com o administrador.",
     sessao_expirada: "Sua sessão expirou. Entre de novo.",

@@ -2,13 +2,11 @@
 
 import { db } from "../../db";
 import { users } from "../../db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { hashPassword } from "../../lib/password";
 import { setSessionCookie } from "../../lib/session";
-
-const TRIAL_DAYS = 30;
-const MAX_TRIAL_USERS = 100;
+import { defaultsDeContaNova } from "../../lib/signup";
 
 export async function registerAction(prevState: any, formData: FormData) {
     const name = formData.get("name") as string;
@@ -35,15 +33,8 @@ export async function registerAction(prevState: any, formData: FormData) {
         return { message: "Este número de celular já está cadastrado." };
     }
 
-    // Check how many users exist to determine if new user gets trial
-    const userCount = await db.select({ count: sql<number>`count(*)` }).from(users).get();
-    const totalUsers = userCount?.count || 0;
-    const givesTrial = totalUsers < MAX_TRIAL_USERS;
-
-    // Calculate trial end date (30 days from now)
-    const trialEndsAt = givesTrial
-        ? new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
-        : null;
+    // Mesmo estado inicial do cadastro pelo Google (plano/teste)
+    const padroes = await defaultsDeContaNova();
 
     // Hash da senha antes de salvar
     const hashedPassword = await hashPassword(password);
@@ -55,10 +46,7 @@ export async function registerAction(prevState: any, formData: FormData) {
         email: email || null, // Email opcional para recuperação de senha
         password: hashedPassword,
         role,
-        plan: givesTrial ? "enterprise" : "free",
-        subscriptionStatus: givesTrial ? "trial" : "active",
-        isTrialUser: givesTrial,
-        trialEndsAt,
+        ...padroes,
     }).returning().get();
 
     if (!newUser) {

@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { appLogs, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { exchangeCodeForProfile, isGoogleLoginConfigured } from "@/lib/google-oauth";
+import { resolverOuCriarUsuarioGoogle } from "@/lib/google-login";
+import { pushToAdmins } from "@/lib/push";
 import { getSessionUserId, setSessionCookie, setTwoFactorPendingCookie } from "@/lib/session";
 
 /** Volta do Google: identifica a pessoa e abre a sessão (ou conecta a conta). */
@@ -34,12 +36,12 @@ export async function GET(request: NextRequest) {
     // E-mail não verificado no Google não serve pra provar identidade.
     if (!profile.emailVerified) return back(falhou, "google_email_nao_verificado");
 
-    const jaVinculado = await db.query.users.findFirst({ where: eq(users.googleId, profile.sub) });
-
     // --- Conectando a conta a partir das Configurações (pessoa já logada) ---
     if (mode === "link") {
         const meId = await getSessionUserId();
         if (!meId) return back("/login", "sessao_expirada");
+
+        const jaVinculado = await db.query.users.findFirst({ where: eq(users.googleId, profile.sub) });
         if (jaVinculado && jaVinculado.id !== meId) return back("/settings", "google_em_uso");
 
         await db.update(users)
@@ -49,21 +51,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.redirect(new URL("/settings?google=conectado", request.url));
     }
 
-    // --- Entrando com Google ---
-    let user = jaVinculado ?? null;
+    // --- Entrando (ou criando conta) com Google ---
+    // Conta nova nasce como motoboy: lojista e admin continuam vindo por telefone.
+    const resultado = await resolverOuCriarUsuarioGoogle(profile);
+    if (!resultado.ok) return back("/login", resultado.erro);
 
-    // Sem vínculo ainda: aceita se o e-mail já estiver cadastrado nesse usuário.
-    if (!user) {
-        const porEmail = await db.query.users.findFirst({ where: eq(users.email, profile.email) });
-        if (porEmail && !porEmail.googleId) {
-            await db.update(users).set({ googleId: profile.sub }).where(eq(users.id, porEmail.id));
-            user = { ...porEmail, googleId: profile.sub };
-        }
-    }
+    const { user, contaNova } = resultado;
 
-    // Conta nova nunca é criada por aqui: senão qualquer pessoa com Google entraria no app.
-    if (!user) return back("/login", "google_sem_conta");
-    if (user.isActive === false) return back("/login", "conta_desativada");
+    if (contaNova) await avisarContaNova(user.id, user.name, profile.email);
 
     if (user.twoFactorEnabled && user.twoFactorSecret) {
         await setTwoFactorPendingCookie(user.id);
@@ -71,5 +66,35 @@ export async function GET(request: NextRequest) {
     }
 
     await setSessionCookie(user.id);
-    return NextResponse.redirect(new URL("/app", request.url));
+
+    // Sem telefone ainda (conta recém-criada pelo Google): pede antes de usar o app.
+    const destino = user.phone ? "/app" : "/completar-cadastro";
+    return NextResponse.redirect(new URL(destino, request.url));
+}
+
+/** Registra no log do app e cutuca os administradores. Nunca derruba o login. */
+async function avisarContaNova(userId: number, nome: string, email: string): Promise<void> {
+    try {
+        await db.insert(appLogs).values({
+            level: "info",
+            event: "google_signup",
+            message: `Motoboy novo pelo Google: ${nome}`,
+            userId,
+            page: "/api/auth/google/callback",
+            metadata: JSON.stringify({ email, role: "motoboy" }),
+        });
+    } catch (e) {
+        console.error("[GOOGLE] não consegui registrar o log da conta nova:", e);
+    }
+
+    try {
+        await pushToAdmins({
+            title: "Motoboy novo pelo Google",
+            body: nome,
+            url: `/admin/users/${userId}`,
+            tag: `google-signup-${userId}`,
+        });
+    } catch (e) {
+        console.error("[GOOGLE] não consegui avisar os admins:", e);
+    }
 }
