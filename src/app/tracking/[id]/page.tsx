@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { getMotoboyLocationAction } from "@/app/actions/tracking";
 import TrackingMapWrapper from "@/components/map/TrackingMapWrapper";
+import { getBrowserMapsKey } from "@/lib/mapsKey";
 
 // O cliente enxerga essa página: nada de status cru em inglês.
 const STATUS_LABEL: Record<string, string> = {
@@ -95,7 +96,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
 
                     <div className="mt-6">
                         {delivery.motoboyId && motoboyLocation ? (
-                            <TrackingMapWrapper motoboyLocation={motoboyLocation} />
+                            <TrackingMapWrapper motoboyLocation={motoboyLocation} googleMapsKey={getBrowserMapsKey()} />
                         ) : (
                             <div className="h-[200px] bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400 text-sm text-center p-4">
                                 {delivery.motoboyId ? "Aguardando sinal do motoboy..." : "Aguardando um motoboy aceitar seu pedido."}

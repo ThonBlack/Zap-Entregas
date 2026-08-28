@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { PackageCheck } from "lucide-react";
 import { isAddressSuspicious } from "@/lib/routeUtils";
 import DraftConfirmForm from "@/components/deliveries/DraftConfirmForm";
+import { getBrowserMapsKey } from "@/lib/mapsKey";
 
 /**
  * Conferência aberta pelo PDV, por cima da venda.
@@ -78,6 +79,7 @@ export default async function ConfirmarPeloPdvPage({ params }: { params: Promise
                     defaultState={settings?.defaultState ?? null}
                     isSuspect={isSuspect}
                     hidesValueFromMotoboy={settings?.showOrderValue === false}
+                    googleMapsKey={getBrowserMapsKey()}
                     confirmToken={token}
                 />
             </main>

@@ -12,8 +12,10 @@ const TrackingMapClient = dynamic(
 
 interface TrackingMapWrapperProps {
     motoboyLocation: { lat: number; lng: number };
+    /** Chave do navegador vinda do servidor; vazia = OpenStreetMap. */
+    googleMapsKey?: string | null;
 }
 
-export default function TrackingMapWrapper({ motoboyLocation }: TrackingMapWrapperProps) {
-    return <TrackingMapClient motoboyLocation={motoboyLocation} />;
+export default function TrackingMapWrapper({ motoboyLocation, googleMapsKey }: TrackingMapWrapperProps) {
+    return <TrackingMapClient motoboyLocation={motoboyLocation} googleMapsKey={googleMapsKey} />;
 }
