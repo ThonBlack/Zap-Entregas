@@ -21,7 +21,12 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
+      # Chave do SERVIDOR (geocode + autocomplete de endereço). Não vai pro navegador.
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
+      # Chave do NAVEGADOR pro mapa da conferência (Maps JavaScript API).
+      # Tem que ser outra chave, restrita por site no console do Google.
+      # Vazia = o mapa cai no OpenStreetMap sozinho.
+      - GOOGLE_MAPS_BROWSER_KEY=${GOOGLE_MAPS_BROWSER_KEY:-}
       # Login com Google (vazio = botão nem aparece). OAUTH_BASE_URL opcional:
       # sobrescreve APP_URL na hora de montar o endereço de retorno do Google.
       - OAUTH_BASE_URL=${OAUTH_BASE_URL:-}

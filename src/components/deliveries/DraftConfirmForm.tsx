@@ -40,6 +40,8 @@ interface DraftConfirmFormProps {
     hidesValueFromMotoboy: boolean;
     /** Presente quando a tela foi aberta pelo PDV (sem login). Muda o "depois de salvar". */
     confirmToken?: string;
+    /** Chave do Google pro navegador (vem do servidor). Vazia = mapa do OpenStreetMap. */
+    googleMapsKey?: string | null;
 }
 
 const money = (n: number | null | undefined) =>
@@ -47,6 +49,7 @@ const money = (n: number | null | undefined) =>
 
 export default function DraftConfirmForm({
     draft, shopLat, shopLng, defaultCity, defaultState, isSuspect, hidesValueFromMotoboy, confirmToken,
+    googleMapsKey,
 }: DraftConfirmFormProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -189,6 +192,7 @@ export default function DraftConfirmForm({
                 recenterTrigger={recenter}
                 shopLat={shopLat}
                 shopLng={shopLng}
+                googleMapsKey={googleMapsKey}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

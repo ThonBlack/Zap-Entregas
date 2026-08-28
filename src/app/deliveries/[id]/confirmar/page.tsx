@@ -7,6 +7,7 @@ import { ArrowLeft, PackageCheck } from "lucide-react";
 import { getAuthUserWithRole } from "@/lib/session";
 import { isAddressSuspicious } from "@/lib/routeUtils";
 import DraftConfirmForm from "@/components/deliveries/DraftConfirmForm";
+import { getBrowserMapsKey } from "@/lib/mapsKey";
 
 /**
  * Conferência da corrida criada pelo PDV: ajustar endereço no mapa, definir
@@ -78,6 +79,7 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
                     defaultState={settings?.defaultState ?? null}
                     isSuspect={isSuspect}
                     hidesValueFromMotoboy={settings?.showOrderValue === false}
+                    googleMapsKey={getBrowserMapsKey()}
                 />
             </main>
         </div>
