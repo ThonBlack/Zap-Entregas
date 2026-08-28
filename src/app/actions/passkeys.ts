@@ -138,7 +138,12 @@ export async function finishPasskeyLogin(
     const stored = await db.query.webauthnCredentials.findFirst({
         where: eq(webauthnCredentials.credentialId, response.id),
     });
-    if (!stored) return { error: "Essa digital não está cadastrada aqui." };
+    if (!stored) {
+        return {
+            error: "Essa digital ainda não está ativada aqui. Entre uma vez com celular e senha " +
+                "(ou com o Google) e ative a digital — depois é só ela.",
+        };
+    }
 
     let verification;
     try {

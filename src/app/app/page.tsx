@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { db } from "@/db";
-import { users, transactions, deliveries, shopSettings } from "@/db/schema";
+import { users, transactions, deliveries, shopSettings, webauthnCredentials } from "@/db/schema";
 import { eq, sql, desc, and, or, gte, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getSessionUserId, clearSessionCookie } from "@/lib/session";
@@ -46,6 +46,7 @@ import { PendingConfirmations } from "@/components/dashboard/PendingConfirmation
 import TrialBanner from "@/components/billing/TrialBanner";
 import NotificationWrapper from "@/components/shared/NotificationWrapper";
 import DraftsBanner from "@/components/deliveries/DraftsBanner";
+import PasskeyInvite from "@/components/auth/PasskeyInvite";
 import { getBalance } from "@/lib/wallet";
 
 const getUserBalance = getBalance;
@@ -137,6 +138,13 @@ export default async function Dashboard({
     let draftDeliveries: { id: number; address: string; customerName: string | null; createdAt: string | null }[] = [];
 
     const pendingConfirmations = await getPendingConfirmations(user.id);
+
+    // Sem nenhuma digital cadastrada? O convite pra ligar aparece após o login.
+    const digitaisCadastradas = await db.select({ id: webauthnCredentials.id })
+        .from(webauthnCredentials)
+        .where(eq(webauthnCredentials.userId, user.id))
+        .limit(1);
+    const semDigital = digitaisCadastradas.length === 0;
     const isShopkeeperOrAdmin =
         !isAdminViewingAsMotoboy &&
         (user.role === "shopkeeper" || (user.role as string) === "admin");
@@ -300,6 +308,7 @@ export default async function Dashboard({
 
             <main className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
                 <TrialBanner trialEndsAt={user.trialEndsAt ?? null} isTrialUser={user.isTrialUser ?? false} />
+                {semDigital && <PasskeyInvite />}
                 <PendingConfirmations confirmations={pendingConfirmations} />
                 <DraftsBanner drafts={draftDeliveries} />
 
