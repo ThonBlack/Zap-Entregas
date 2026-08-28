@@ -374,7 +374,7 @@ export default async function AdminDashboardPage() {
                                                 <span className="text-white font-medium">{user.name}</span>
                                             </div>
                                         </td>
-                                        <td className="py-3 px-3 text-zinc-400">{user.phone}</td>
+                                        <td className="py-3 px-3 text-zinc-400">{user.phone || "—"}</td>
                                         <td className="py-3 px-3">
                                             <Badge className={
                                                 user.role === 'admin' ? 'bg-purple-600' :

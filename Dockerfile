@@ -24,4 +24,4 @@ EXPOSE 3000
 
 # Migrações leves rodam antes do servidor: deploy novo ou restore de backup
 # antigo nunca sobe sem as colunas que o código espera.
-CMD ["sh", "-c", "node scripts/utils/add_transaction_kind_column.js && npm start"]
+CMD ["sh", "-c", "node scripts/utils/add_transaction_kind_column.js && node scripts/utils/make_phone_nullable.js && npm start"]

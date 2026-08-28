@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Fingerprint, Loader2, Plus, Trash2 } from "lucide-react";
-import { startRegistration, browserSupportsWebAuthn } from "@simplewebauthn/browser";
-import { startPasskeyRegistration, finishPasskeyRegistration, deletePasskeyAction } from "@/app/actions/passkeys";
+import { deletePasskeyAction } from "@/app/actions/passkeys";
+import { usePasskeyRegistration } from "./usePasskeyRegistration";
 
 export interface PasskeyItem {
     id: number;
@@ -27,35 +27,11 @@ const quando = (iso: string | null) => {
 
 export default function PasskeyCard({ passkeys }: PasskeyCardProps) {
     const router = useRouter();
-    const [suportado, setSuportado] = useState<boolean | null>(null);
-    const [erro, setErro] = useState("");
-    const [ok, setOk] = useState("");
-    const [cadastrando, setCadastrando] = useState(false);
+    const { suportado, cadastrando, erro, ok, setErro, setOk, cadastrar } = usePasskeyRegistration();
     const [isPending, startTransition] = useTransition();
 
-    useEffect(() => { setSuportado(browserSupportsWebAuthn()); }, []);
-
-    const cadastrar = async () => {
-        setErro(""); setOk(""); setCadastrando(true);
-        try {
-            const options = await startPasskeyRegistration();
-            if ("error" in options) { setErro(options.error); return; }
-
-            const resposta = await startRegistration({ optionsJSON: options });
-
-            const res = await finishPasskeyRegistration(resposta);
-            if ("error" in res) { setErro(res.error); return; }
-
-            setOk("Pronto! Agora dá pra entrar com a digital deste aparelho.");
-            router.refresh();
-        } catch (e: unknown) {
-            const nome = (e as { name?: string })?.name;
-            if (nome === "NotAllowedError") setErro("Cadastro cancelado.");
-            else if (nome === "InvalidStateError") setErro("Este aparelho já está cadastrado.");
-            else setErro("Não consegui cadastrar a digital neste aparelho.");
-        } finally {
-            setCadastrando(false);
-        }
+    const cadastrarNesteAparelho = async () => {
+        if (await cadastrar()) router.refresh();
     };
 
     const remover = (id: number) => {
@@ -119,7 +95,7 @@ export default function PasskeyCard({ passkeys }: PasskeyCardProps) {
             {suportado !== false && (
                 <button
                     type="button"
-                    onClick={cadastrar}
+                    onClick={cadastrarNesteAparelho}
                     disabled={cadastrando}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold transition-colors disabled:opacity-50"
                 >

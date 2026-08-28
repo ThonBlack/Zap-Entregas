@@ -90,7 +90,7 @@ export default async function MotoboysPage() {
                                     )}
                                     <div>
                                         <div className="font-bold text-white">{motoboy.name}</div>
-                                        <div className="text-sm text-zinc-400">{motoboy.phone}</div>
+                                        <div className="text-sm text-zinc-400">{motoboy.phone || "sem telefone"}</div>
                                         {(() => {
                                             const b = balances.get(motoboy.id) ?? 0;
                                             if (b > 0) return <div className="text-xs text-green-400 font-mono">a pagar {formatBRL(b)}</div>;

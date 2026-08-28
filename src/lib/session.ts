@@ -107,7 +107,8 @@ type Role = "admin" | "shopkeeper" | "motoboy";
 export type SessionUser = {
     id: number;
     name: string;
-    phone: string;
+    /** Vazio enquanto a conta criada pelo Google não completa o cadastro. */
+    phone: string | null;
     role: Role;
     plan: string;
     subscriptionStatus: string;

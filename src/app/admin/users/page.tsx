@@ -172,7 +172,7 @@ export default async function AdminUsersListPage({
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="py-3 px-4 text-zinc-300 font-mono text-xs">{u.phone}</td>
+                                        <td className="py-3 px-4 text-zinc-300 font-mono text-xs">{u.phone || "—"}</td>
                                         <td className="py-3 px-4">
                                             <Badge className={
                                                 u.role === "admin" ? "bg-purple-600" :
