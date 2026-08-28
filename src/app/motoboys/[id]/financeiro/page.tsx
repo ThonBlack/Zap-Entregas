@@ -53,7 +53,7 @@ export default async function MotoboyFinanceiroPage({
                 )}
                 <div className="min-w-0">
                     <h1 className="text-lg font-bold text-white truncate">{motoboy.name}</h1>
-                    <p className="text-xs text-zinc-400">{motoboy.phone}</p>
+                    <p className="text-xs text-zinc-400">{motoboy.phone || "sem telefone"}</p>
                 </div>
             </header>
 

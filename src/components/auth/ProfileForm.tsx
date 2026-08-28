@@ -17,7 +17,7 @@ interface ProfileFormProps {
         id: number;
         name: string;
         avatarUrl: string | null;
-        phone: string;
+        phone: string | null;
     };
 }
 

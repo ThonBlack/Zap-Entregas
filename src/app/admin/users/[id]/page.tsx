@@ -114,7 +114,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                     <div className="grid md:grid-cols-2 gap-4 mt-6">
                         <div className="flex items-center gap-3 text-zinc-400">
                             <Phone size={18} />
-                            <span>{user.phone}</span>
+                            <span>{user.phone || "sem telefone"}</span>
                         </div>
                         <div className="flex items-center gap-3 text-zinc-400">
                             <Calendar size={18} />

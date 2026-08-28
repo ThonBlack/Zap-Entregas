@@ -4,7 +4,9 @@ import { sql, relations } from "drizzle-orm";
 export const users = sqliteTable("users", {
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
-    phone: text("phone").notNull().unique(), // Login principal via telefone
+    // Login principal via telefone. Fica vazio só entre "criei a conta pelo Google"
+    // e "completei o cadastro" — daí em diante todo mundo tem telefone.
+    phone: text("phone").unique(),
     email: text("email").unique(), // Email opcional para recuperação de senha
     role: text("role", { enum: ["admin", "shopkeeper", "motoboy"] }).default("motoboy").notNull(),
     password: text("password"), // Opcional se for magic link, mas bom ter para auth simples

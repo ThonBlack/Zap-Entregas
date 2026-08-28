@@ -5,7 +5,7 @@ import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { createTransactionAction, type ManualEntryState } from "@/app/actions/finance";
 import { MANUAL_ENTRY_OPTIONS, type ManualEntryKey, formatBRL } from "@/lib/wallet-shared";
 
-type Motoboy = { id: number; name: string; phone: string; balance?: number };
+type Motoboy = { id: number; name: string; phone: string | null; balance?: number };
 
 type Props = {
     motoboys: Motoboy[];
@@ -38,7 +38,7 @@ export default function ManualEntryForm({ motoboys, defaultMotoboyId, defaultEnt
                 >
                     <option value="">Escolha um motoboy...</option>
                     {motoboys.map(m => (
-                        <option key={m.id} value={m.id}>{m.name} ({m.phone})</option>
+                        <option key={m.id} value={m.id}>{m.name}{m.phone ? ` (${m.phone})` : " (sem telefone)"}</option>
                     ))}
                 </select>
                 {selected?.balance != null && (

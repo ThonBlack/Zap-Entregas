@@ -43,7 +43,9 @@ export async function startPasskeyRegistration(): Promise<PublicKeyCredentialCre
         rpName: RP_NAME,
         rpID: rpID(),
         userID: new TextEncoder().encode(String(auth.user.id)),
-        userName: auth.user.phone,
+        // Quem criou a conta pelo Google ainda pode não ter telefone; o campo é
+        // só o rótulo que o aparelho mostra na lista de digitais.
+        userName: auth.user.phone || `usuario-${auth.user.id}`,
         userDisplayName: auth.user.name,
         attestationType: "none",
         // Não deixa cadastrar o mesmo aparelho duas vezes.
