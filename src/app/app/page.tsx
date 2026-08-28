@@ -44,9 +44,8 @@ import { ShopkeeperView } from "@/components/dashboard/ShopkeeperView";
 import { MotoboyView } from "@/components/dashboard/MotoboyView";
 import { PendingConfirmations } from "@/components/dashboard/PendingConfirmations";
 import TrialBanner from "@/components/billing/TrialBanner";
-import NotificationWrapper from "@/components/shared/NotificationWrapper";
+import FirstRunWrapper from "@/components/shared/FirstRunWrapper";
 import DraftsBanner from "@/components/deliveries/DraftsBanner";
-import PasskeyInvite from "@/components/auth/PasskeyInvite";
 import { getBalance } from "@/lib/wallet";
 
 const getUserBalance = getBalance;
@@ -308,7 +307,7 @@ export default async function Dashboard({
 
             <main className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
                 <TrialBanner trialEndsAt={user.trialEndsAt ?? null} isTrialUser={user.isTrialUser ?? false} />
-                {semDigital && <PasskeyInvite />}
+                <FirstRunWrapper userId={user.id} semDigital={semDigital} />
                 <PendingConfirmations confirmations={pendingConfirmations} />
                 <DraftsBanner drafts={draftDeliveries} />
 
@@ -329,10 +328,6 @@ export default async function Dashboard({
                 )}
             </main>
 
-            <NotificationWrapper
-                userId={user.id}
-                userRole={user.role as "motoboy" | "shopkeeper" | "admin"}
-            />
         </div>
     );
 }
