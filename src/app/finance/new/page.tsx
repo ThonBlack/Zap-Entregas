@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { requireShopkeeper } from "@/lib/session";
+import { motoboyScope } from "@/lib/team";
 import { getBalances, MANUAL_ENTRY_OPTIONS, safeReturnTo, type ManualEntryKey } from "@/lib/wallet";
 import ManualEntryForm from "@/components/finance/ManualEntryForm";
 
@@ -12,13 +12,14 @@ export default async function NewTransactionPage({
 }: {
     searchParams: Promise<{ motoboyId?: string; entry?: string; amount?: string; returnTo?: string }>;
 }) {
-    await requireShopkeeper();
+    const me = await requireShopkeeper();
     const sp = await searchParams;
 
+    // Só a equipe da loja (admin vê todas) — a lista é de quem pode receber lançamento.
     const motoboys = await db
         .select({ id: users.id, name: users.name, phone: users.phone })
         .from(users)
-        .where(eq(users.role, "motoboy"));
+        .where(motoboyScope(me));
     const balances = await getBalances(motoboys.map(m => m.id));
     const list = motoboys.map(m => ({ ...m, balance: balances.get(m.id) ?? 0 }));
 

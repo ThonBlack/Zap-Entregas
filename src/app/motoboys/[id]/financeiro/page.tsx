@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
 import { ArrowLeft, Plus, HandCoins, User } from "lucide-react";
 import { requireShopkeeper } from "@/lib/session";
+import { carregarMotoboyGerenciado } from "@/lib/team";
 import { getStatement, formatBRL } from "@/lib/wallet";
 import StatementView from "@/components/finance/StatementView";
 import { parseMonth } from "@/lib/wallet-shared";
@@ -16,15 +14,11 @@ export default async function MotoboyFinanceiroPage({
     params: Promise<{ id: string }>;
     searchParams: Promise<{ m?: string; y?: string }>;
 }) {
-    await requireShopkeeper();
+    const me = await requireShopkeeper();
     const { id } = await params;
-    const motoboyId = Number(id);
-    if (!Number.isInteger(motoboyId)) notFound();
 
-    const motoboy = await db.query.users.findFirst({
-        where: and(eq(users.id, motoboyId), eq(users.role, "motoboy")),
-        columns: { id: true, name: true, phone: true, avatarUrl: true },
-    });
+    // Carteira é dinheiro: lojista só abre a do motoboy da própria loja.
+    const motoboy = await carregarMotoboyGerenciado(me, Number(id));
     if (!motoboy) notFound();
 
     const { month, year } = parseMonth(await searchParams);

@@ -1,12 +1,13 @@
 "use server";
 
 import { db } from "@/db";
-import { transactions, users } from "@/db/schema";
+import { transactions } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
 import { MANUAL_ENTRY_OPTIONS, safeReturnTo, type ManualEntryKey } from "@/lib/wallet";
+import { carregarMotoboyGerenciado } from "@/lib/team";
 
 export type ManualEntryState = { error?: string } | null;
 
@@ -35,11 +36,10 @@ export async function createTransactionAction(_prev: ManualEntryState, formData:
         return { error: "Valor inválido." };
     }
 
-    const target = await db.query.users.findFirst({
-        where: eq(users.id, targetUserId),
-        columns: { id: true, role: true },
-    });
-    if (!target || target.role !== "motoboy") {
+    // Lançar dinheiro na carteira de um motoboy de OUTRA loja mexeria na dívida
+    // dela. Só motoboy da própria equipe (admin passa por todos).
+    const target = await carregarMotoboyGerenciado(me, targetUserId);
+    if (!target) {
         return { error: "Motoboy não encontrado." };
     }
 
