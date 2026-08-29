@@ -4,10 +4,11 @@ import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, PackageCheck } from "lucide-react";
-import { getAuthUserWithRole } from "@/lib/session";
+import { getAuthUserWithRole, getSessionUserId } from "@/lib/session";
 import { isAddressSuspicious } from "@/lib/routeUtils";
 import DraftConfirmForm from "@/components/deliveries/DraftConfirmForm";
 import { getBrowserMapsKey } from "@/lib/mapsKey";
+import { fmtShortDateTime } from "@/lib/datetime";
 
 /**
  * Conferência da corrida criada pelo PDV: ajustar endereço no mapa, definir
@@ -17,8 +18,11 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
     const { id: rawId } = await params;
     const id = Number(rawId);
 
+    // Deslogado vai pro login; logado sem permissão (motoboy, por ex.) volta pro
+    // painel dele — mandar pro /login quem já está logado só gera confusão.
+    const sessionUserId = await getSessionUserId();
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
-    if ("error" in auth) redirect("/login");
+    if ("error" in auth) redirect(sessionUserId ? "/app" : "/login");
     const me = auth.user;
 
     if (!Number.isInteger(id) || id <= 0) redirect("/app");
@@ -51,7 +55,7 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
                         <div>
                             <h1 className="font-bold leading-tight">Conferir corrida</h1>
                             <p className="text-xs text-zinc-400">
-                                Veio do PDV{draft.createdAt ? ` · ${new Date(draft.createdAt + "Z").toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}` : ""}
+                                Veio do PDV{draft.createdAt ? ` · ${fmtShortDateTime(draft.createdAt)}` : ""}
                             </p>
                         </div>
                     </div>
