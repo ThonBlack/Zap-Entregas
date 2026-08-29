@@ -2,20 +2,23 @@
 
 import { db } from "../../db";
 import { users } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { hashPassword } from "../../lib/password";
 import { setSessionCookie } from "../../lib/session";
 import { defaultsDeContaNova } from "../../lib/signup";
+import { isPlausiblePhone, normalizePhone, phoneVariants } from "../../lib/phone";
+import { conviteDeLojistaValido } from "../../lib/registerInvite";
 
 export async function registerAction(prevState: any, formData: FormData) {
     const name = formData.get("name") as string;
-    const phone = formData.get("phone") as string;
+    const phoneDigitado = formData.get("phone") as string;
     const email = formData.get("email") as string | null;
     const password = formData.get("password") as string;
     const role = formData.get("role") as "shopkeeper" | "motoboy";
+    const conviteLojista = (formData.get("convite_lojista") as string) || "";
 
-    if (!name || !phone || !password || !role) {
+    if (!name || !phoneDigitado || !password || !role) {
         return { message: "Preencha todos os campos obrigatórios." };
     }
 
@@ -27,8 +30,24 @@ export async function registerAction(prevState: any, formData: FormData) {
         return { message: "Tipo de conta inválido." };
     }
 
-    // Check if user already exists
-    const existingUser = await db.select().from(users).where(eq(users.phone, phone)).get();
+    // Conta de lojista não sai por cadastro aberto: quem manda no app é ela
+    // (vê endereço, telefone e dinheiro). Só com o código de convite da loja.
+    if (role === "shopkeeper" && !conviteDeLojistaValido(conviteLojista)) {
+        return { message: "Cadastro de lojista é só por convite. Fale com a loja." };
+    }
+
+    if (!isPlausiblePhone(phoneDigitado)) {
+        return { message: "Digite o celular com DDD, só números. Ex.: 34996802886" };
+    }
+    const phone = normalizePhone(phoneDigitado);
+
+    // Confere contra todas as formas do mesmo número (com/sem 55, com/sem 9º
+    // dígito), senão a mesma pessoa cria duas contas e nenhuma acha a outra.
+    const existingUser = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(inArray(users.phone, phoneVariants(phoneDigitado)))
+        .get();
     if (existingUser) {
         return { message: "Este número de celular já está cadastrado." };
     }
