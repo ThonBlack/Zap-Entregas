@@ -33,3 +33,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://zapentregas.duckdns.org}
+      # Código que libera o cadastro de LOJISTA em /register (a tela só mostra a
+      # opção com ?convite_lojista=<este código>). Vazio = ninguém se cadastra
+      # como lojista; quem cria é o admin, pelo painel. Lido em tempo de execução.
+      - REGISTER_SHOPKEEPER_CODE=${REGISTER_SHOPKEEPER_CODE:-}
