@@ -2,10 +2,11 @@ import Link from "next/link";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { ArrowLeft, Save, Trash2 } from "lucide-react";
-import { updateMotoboyAction } from "@/app/actions/motoboy";
+import { ArrowLeft, Save, Send } from "lucide-react";
+import { updateMotoboyAction, generateInviteAction } from "@/app/actions/motoboy";
 import { redirect } from "next/navigation";
 import { getSessionUserId } from "@/lib/session";
+import { hasPendingInvite } from "@/lib/invite";
 
 export default async function EditMotoboyPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
@@ -65,6 +66,39 @@ export default async function EditMotoboyPage({ params }: { params: Promise<{ id
                             Salvar Alterações
                         </button>
                     </form>
+                </div>
+
+                {/* Acesso do motoboy — o link que deixa ele criar a senha dele */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-200 space-y-3">
+                    <h2 className="font-bold text-zinc-900">Acesso ao aplicativo</h2>
+                    <p className="text-sm text-zinc-600">
+                        {hasPendingInvite(motoboy)
+                            ? "Há um convite valendo. Abra pra mandar de novo no WhatsApp ou copiar o link."
+                            : motoboy.password
+                                ? "Ele já tem senha. Se esqueceu ou trocou de celular, gere um convite novo pra ele definir outra."
+                                : "Ele ainda não tem senha. Gere um convite pra ele criar a dele."}
+                    </p>
+
+                    {hasPendingInvite(motoboy) ? (
+                        <Link
+                            href={`/motoboys/${motoboy.id}/convite`}
+                            className="w-full flex items-center justify-center gap-2 bg-zinc-900 text-white font-bold py-3 rounded-lg hover:bg-zinc-800 transition-colors"
+                        >
+                            <Send size={18} />
+                            Ver convite
+                        </Link>
+                    ) : (
+                        <form action={generateInviteAction}>
+                            <input type="hidden" name="id" value={motoboy.id} />
+                            <button
+                                type="submit"
+                                className="w-full flex items-center justify-center gap-2 bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-500 transition-colors"
+                            >
+                                <Send size={18} />
+                                Gerar novo convite
+                            </button>
+                        </form>
+                    )}
                 </div>
             </main>
         </div>

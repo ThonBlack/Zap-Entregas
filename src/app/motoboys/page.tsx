@@ -2,10 +2,11 @@ import Link from "next/link";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { ArrowLeft, Plus, Edit2, User, Trash2, Users, Wallet } from "lucide-react";
-import { createMotoboyAction, updateMotoboyAction, deleteMotoboyAction } from "@/app/actions/motoboy";
+import { ArrowLeft, Plus, Edit2, User, Trash2, Users, Wallet, Send } from "lucide-react";
+import { createMotoboyAction, deleteMotoboyAction } from "@/app/actions/motoboy";
 import { requireShopkeeper } from "@/lib/session";
 import { getBalances, formatBRL } from "@/lib/wallet";
+import { hasPendingInvite, isInviteExpired } from "@/lib/invite";
 
 export default async function MotoboysPage() {
     await requireShopkeeper();
@@ -60,12 +61,19 @@ export default async function MotoboysPage() {
                                     className="w-full p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-sm text-zinc-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-500"
                                 />
                             </div>
-                            <input
-                                type="text"
-                                name="password"
-                                placeholder="Senha (Padrão: 123456)"
-                                className="w-full p-3 bg-zinc-700 border border-zinc-600 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-sm"
-                            />
+                            <div>
+                                <label className="block text-sm font-medium text-zinc-300 mb-1">Senha (opcional)</label>
+                                <input
+                                    type="text"
+                                    name="password"
+                                    placeholder="Deixe em branco"
+                                    className="w-full p-3 bg-zinc-700 border border-zinc-600 rounded-lg text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all text-sm"
+                                />
+                                <p className="text-xs text-zinc-400 mt-1">
+                                    Em branco = o próprio motoboy cria a senha dele pelo link de convite
+                                    que aparece na tela seguinte.
+                                </p>
+                            </div>
                         </div>
                         <button type="submit" className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-500 transition-colors">
                             Cadastrar
@@ -89,7 +97,24 @@ export default async function MotoboysPage() {
                                         </div>
                                     )}
                                     <div>
-                                        <div className="font-bold text-white">{motoboy.name}</div>
+                                        <div className="font-bold text-white flex items-center gap-2 flex-wrap">
+                                            {motoboy.name}
+                                            {hasPendingInvite(motoboy) && (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-900/40 text-amber-300 border border-amber-700/50">
+                                                    Convite pendente
+                                                </span>
+                                            )}
+                                            {motoboy.inviteToken && isInviteExpired(motoboy.inviteTokenExpiresAt) && (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-900/40 text-red-300 border border-red-700/50">
+                                                    Convite expirado
+                                                </span>
+                                            )}
+                                            {!motoboy.inviteToken && !motoboy.password && (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-zinc-700 text-zinc-300 border border-zinc-600">
+                                                    Sem acesso
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="text-sm text-zinc-400">{motoboy.phone || "sem telefone"}</div>
                                         {(() => {
                                             const b = balances.get(motoboy.id) ?? 0;
@@ -101,6 +126,13 @@ export default async function MotoboysPage() {
                                 </div>
 
                                 <div className="flex items-center gap-2">
+                                    <Link
+                                        href={`/motoboys/${motoboy.id}/convite`}
+                                        className={`p-2 transition-colors bg-zinc-700 rounded-lg hover:bg-zinc-600 ${hasPendingInvite(motoboy) ? "text-amber-300 hover:text-amber-200" : "text-zinc-400 hover:text-green-400"}`}
+                                        title={hasPendingInvite(motoboy) ? "Reenviar convite" : "Gerar convite"}
+                                    >
+                                        <Send size={20} />
+                                    </Link>
                                     <Link href={`/motoboys/${motoboy.id}/financeiro`} className="p-2 text-zinc-400 hover:text-green-400 transition-colors bg-zinc-700 rounded-lg hover:bg-zinc-600" title="Financeiro">
                                         <Wallet size={20} />
                                     </Link>
