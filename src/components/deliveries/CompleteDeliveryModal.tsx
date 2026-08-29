@@ -99,7 +99,7 @@ export default function CompleteDeliveryModal({ isOpen, onClose, onConfirm, orde
                             value={amount}
                             onChange={(e) => setAmount(e.target.value)}
                             placeholder="0,00"
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
+                            className="w-full px-4 py-2 bg-white text-zinc-900 placeholder-zinc-400 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none"
                         />
                     </div>
                 )}
@@ -131,7 +131,7 @@ export default function CompleteDeliveryModal({ isOpen, onClose, onConfirm, orde
                         rows={2}
                         maxLength={500}
                         placeholder="Ex.: cliente pediu troco, portão azul..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none resize-none"
+                        className="w-full px-4 py-2 bg-white text-zinc-900 placeholder-zinc-400 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none resize-none"
                     />
                 </div>
 

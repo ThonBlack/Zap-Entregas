@@ -96,7 +96,7 @@ export default function TwoFactorSetupPage() {
                                         value={code}
                                         onChange={(e) => setCode(e.target.value)}
                                         placeholder="000 000"
-                                        className="w-full text-center text-xl tracking-widest p-3 border border-zinc-300 rounded-xl focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all"
+                                        className="w-full text-center text-xl tracking-widest p-3 bg-white text-zinc-900 placeholder-zinc-400 border border-zinc-300 rounded-xl focus:ring-2 focus:ring-black focus:border-transparent outline-none transition-all"
                                     />
                                     {error && <div className="text-red-500 text-sm text-center font-medium">{error}</div>}
                                     <button

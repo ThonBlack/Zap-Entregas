@@ -38,7 +38,7 @@ export default async function EditMotoboyPage({ params }: { params: Promise<{ id
                                 type="text"
                                 name="name"
                                 defaultValue={motoboy.name}
-                                className="w-full p-3 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                                className="w-full p-3 bg-zinc-50 text-zinc-900 placeholder-zinc-400 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                             />
                         </div>
 
