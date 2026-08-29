@@ -135,7 +135,9 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
         tag: "nova-corrida",
     }).catch(() => { });
 
-    revalidatePath("/app");
+    // Aberto pelo PDV (com token): revalidar aqui re-renderiza a propria tela de
+    // conferencia, que ja nao acha mais o token e mostraria "Link invalido".
+    if (!confirmToken) revalidatePath("/app");
     return { success: true };
 }
 
@@ -157,6 +159,7 @@ export async function cancelDraftAction(formData: FormData): Promise<ActionResul
 
     if (!canceled.length) return { error: "Essa corrida já foi liberada." };
 
-    revalidatePath("/app");
+    // Mesmo motivo do confirmDraftAction: com token, a tela do PDV se auto-invalida.
+    if (!confirmToken) revalidatePath("/app");
     return { success: true };
 }

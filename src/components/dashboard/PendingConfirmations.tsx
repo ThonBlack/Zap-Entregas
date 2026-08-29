@@ -1,6 +1,7 @@
 import { confirmTransactionAction, rejectTransactionAction } from "@/app/actions/finance";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { fmtDateTime } from "@/lib/datetime";
 
 interface PendingConfirmation {
     id: number;
@@ -26,7 +27,7 @@ export function PendingConfirmations({ confirmations }: { confirmations: Pending
                         <div>
                             <p className="font-medium text-zinc-900">{pc.description}</p>
                             <p className="text-sm text-zinc-500">
-                                Lançado por: <span className="font-semibold">{pc.creatorName}</span> • {new Date(pc.createdAt).toLocaleDateString()}
+                                Lançado por: <span className="font-semibold">{pc.creatorName}</span> • {fmtDateTime(pc.createdAt)}
                             </p>
                         </div>
                         <div className="flex flex-col items-end gap-2">

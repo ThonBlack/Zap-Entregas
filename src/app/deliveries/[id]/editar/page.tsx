@@ -3,7 +3,7 @@ import { deliveries, shopSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, PackageCheck } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { getAuthUserWithRole, getSessionUserId } from "@/lib/session";
 import { isAddressSuspicious } from "@/lib/routeUtils";
 import DraftConfirmForm from "@/components/deliveries/DraftConfirmForm";
@@ -11,15 +11,16 @@ import { getBrowserMapsKey } from "@/lib/mapsKey";
 import { fmtShortDateTime } from "@/lib/datetime";
 
 /**
- * Conferência da corrida criada pelo PDV: ajustar endereço no mapa, definir
- * cobrança e observação antes de liberar pros motoboys.
+ * Corrigir uma corrida que já foi liberada mas ninguém aceitou ainda.
+ *
+ * Reaproveita a tela de conferência do PDV em modo "edicao": os campos são os
+ * mesmos (endereço no mapa, cliente, telefone, valor, taxa, observação), só muda
+ * o que acontece ao salvar.
  */
-export default async function ConfirmarCorridaPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditarCorridaPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: rawId } = await params;
     const id = Number(rawId);
 
-    // Deslogado vai pro login; logado sem permissão (motoboy, por ex.) volta pro
-    // painel dele — mandar pro /login quem já está logado só gera confusão.
     const sessionUserId = await getSessionUserId();
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
     if ("error" in auth) redirect(sessionUserId ? "/app" : "/login");
@@ -27,20 +28,21 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
 
     if (!Number.isInteger(id) || id <= 0) redirect("/app");
 
-    const draft = await db.query.deliveries.findFirst({ where: eq(deliveries.id, id) });
+    const corrida = await db.query.deliveries.findFirst({ where: eq(deliveries.id, id) });
 
     // Lojista só mexe no que é dele; admin vê tudo.
-    if (!draft || (me.role !== "admin" && draft.shopkeeperId !== me.id)) redirect("/app");
+    if (!corrida || (me.role !== "admin" && corrida.shopkeeperId !== me.id)) redirect("/app");
 
-    // Já liberada (ou cancelada): não há o que conferir.
-    if (draft.status !== "draft") redirect("/app");
+    // Rascunho tem tela própria (a de conferência). Aceita/entregue não se edita.
+    if (corrida.status === "draft") redirect(`/deliveries/${id}/confirmar`);
+    if (corrida.status !== "pending" || corrida.motoboyId != null) redirect("/app");
 
-    const settings = draft.shopkeeperId != null
-        ? await db.query.shopSettings.findFirst({ where: eq(shopSettings.userId, draft.shopkeeperId) })
+    const settings = corrida.shopkeeperId != null
+        ? await db.query.shopSettings.findFirst({ where: eq(shopSettings.userId, corrida.shopkeeperId) })
         : null;
 
     const isSuspect = isAddressSuspicious(
-        draft.lat ?? 0, draft.lng ?? 0, settings?.shopLat, settings?.shopLng, 100
+        corrida.lat ?? 0, corrida.lng ?? 0, settings?.shopLat, settings?.shopLng, 100
     );
 
     return (
@@ -51,11 +53,11 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
                         <ArrowLeft size={20} />
                     </Link>
                     <div className="flex items-center gap-2">
-                        <PackageCheck size={20} className="text-green-400" />
+                        <Pencil size={20} className="text-green-400" />
                         <div>
-                            <h1 className="font-bold leading-tight">Conferir corrida</h1>
+                            <h1 className="font-bold leading-tight">Editar corrida #{corrida.id}</h1>
                             <p className="text-xs text-zinc-400">
-                                Veio do PDV{draft.createdAt ? ` · ${fmtShortDateTime(draft.createdAt)}` : ""}
+                                Ninguém aceitou ainda{corrida.createdAt ? ` · criada ${fmtShortDateTime(corrida.createdAt)}` : ""}
                             </p>
                         </div>
                     </div>
@@ -64,18 +66,19 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
 
             <main className="max-w-3xl mx-auto p-4 md:p-6">
                 <DraftConfirmForm
+                    modo="edicao"
                     draft={{
-                        id: draft.id,
-                        address: draft.address,
-                        lat: draft.lat,
-                        lng: draft.lng,
-                        customerName: draft.customerName,
-                        customerPhone: draft.customerPhone,
-                        value: draft.value,
-                        fee: draft.fee,
-                        observation: draft.observation,
-                        createdAt: draft.createdAt,
-                        geoPrecision: draft.geoPrecision,
+                        id: corrida.id,
+                        address: corrida.address,
+                        lat: corrida.lat,
+                        lng: corrida.lng,
+                        customerName: corrida.customerName,
+                        customerPhone: corrida.customerPhone,
+                        value: corrida.value,
+                        fee: corrida.fee,
+                        observation: corrida.observation,
+                        createdAt: corrida.createdAt,
+                        geoPrecision: corrida.geoPrecision,
                     }}
                     shopLat={settings?.shopLat ?? null}
                     shopLng={settings?.shopLng ?? null}

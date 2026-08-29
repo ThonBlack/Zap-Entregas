@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronRight, PackageSearch } from "lucide-react";
+import { fmtTime } from "@/lib/datetime";
 
 interface DraftsBannerProps {
     drafts: { id: number; address: string; customerName: string | null; createdAt: string | null }[];
@@ -36,7 +37,7 @@ export default function DraftsBanner({ drafts }: DraftsBannerProps) {
                                 <p className="text-sm text-white truncate">{d.address}</p>
                                 <p className="text-xs text-zinc-400 truncate">
                                     {d.customerName || "Sem nome"}
-                                    {d.createdAt && ` · ${new Date(d.createdAt + "Z").toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" })}`}
+                                    {d.createdAt && ` · ${fmtTime(d.createdAt)}`}
                                 </p>
                             </div>
                             <span className="text-xs font-medium text-yellow-300 whitespace-nowrap">Conferir</span>

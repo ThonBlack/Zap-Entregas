@@ -65,7 +65,7 @@ export type Statement = {
     openingBalance: number;
     /** saldo geral, hoje */
     balance: number;
-    totals: { corridas: number; dinheiro: number; pagamentos: number; ajustes: number };
+    totals: { corridas: number; dinheiro: number; pagamentos: number; ajustes: number; abertura: number };
     lines: StatementLine[];
 };
 
@@ -111,7 +111,7 @@ export async function getStatement(userId: number, month: number, year: number):
             .orderBy(transactions.createdAt, transactions.id),
     ]);
 
-    const totals = { corridas: 0, dinheiro: 0, pagamentos: 0, ajustes: 0 };
+    const totals = { corridas: 0, dinheiro: 0, pagamentos: 0, ajustes: 0, abertura: 0 };
     let running = opening;
     const asc: StatementLine[] = rows.map(r => {
         const signed = r.type === "credit" ? r.amount : -r.amount;
@@ -120,6 +120,9 @@ export async function getStatement(userId: number, month: number, year: number):
             if (r.kind === "corrida") totals.corridas += r.amount;
             else if (r.kind === "dinheiro") totals.dinheiro += r.amount;
             else if (r.kind === "pagamento") totals.pagamentos += signed;
+            // "abertura" é a conta antiga trazida pro app: some dentro de "Ajustes"
+            // ninguém entende de onde veio o número.
+            else if (r.kind === "abertura") totals.abertura += signed;
             else totals.ajustes += signed;
         }
         return {

@@ -84,12 +84,10 @@ export default function ManualEntryForm({ motoboys, defaultMotoboyId, defaultEnt
                 <div className="relative">
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">R$</span>
                     <input
-                        type="number"
+                        type="text"
                         name="amount"
-                        step="0.01"
-                        min="0.01"
                         inputMode="decimal"
-                        defaultValue={defaultAmount && defaultAmount > 0 ? defaultAmount.toFixed(2) : ""}
+                        defaultValue={defaultAmount && defaultAmount > 0 ? defaultAmount.toFixed(2).replace(".", ",") : ""}
                         className="w-full p-4 pl-12 bg-zinc-50 border border-zinc-200 rounded-xl font-mono text-xl font-bold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-green-500"
                         placeholder="0,00"
                         required

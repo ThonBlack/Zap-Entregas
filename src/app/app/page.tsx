@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/db";
 import { users, transactions, deliveries, shopSettings, webauthnCredentials } from "@/db/schema";
-import { eq, sql, desc, and, or, gte, inArray } from "drizzle-orm";
+import { eq, sql, desc, and, or, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { requireUser, clearSessionCookie } from "@/lib/session";
 import { LogOut, ShieldCheck, Settings, Store, Bike, Crown } from "lucide-react";
@@ -51,11 +51,52 @@ import { getBalance } from "@/lib/wallet";
 
 const getUserBalance = getBalance;
 
+/**
+ * Contagens do topo do painel do lojista.
+ *
+ * Antes eram calculadas no navegador em cima da lista de pendentes — que só traz
+ * status "pending". Resultado: EM ROTA e FEITAS ficavam sempre em 0.
+ *
+ * As datas moram no banco em UTC (às vezes "YYYY-MM-DD HH:MM:SS" do CURRENT_TIMESTAMP,
+ * às vezes ISO com "Z"): comparar texto direto erra. Por isso a conta de "hoje" é
+ * feita pelo próprio SQLite, deslocando 3h pra Brasília (UTC−3, sem horário de verão).
+ */
+type PainelCounts = { pendentes: number; emRota: number; feitasHoje: number; hoje: number };
+
+const HOJE_BRT = sql`date('now', '-3 hours')`;
+const ehHoje = (col: typeof deliveries.deliveredAt) =>
+    sql`datetime(${col}, '-3 hours') >= ${HOJE_BRT}`;
+
+async function getPainelCounts(shopkeeperId: number | null): Promise<PainelCounts> {
+    // shopkeeperId null = admin, que enxerga a operação inteira.
+    const doDono = shopkeeperId == null
+        ? undefined
+        : eq(deliveries.shopkeeperId, shopkeeperId);
+    const juntar = (extra: any) => doDono ? and(doDono, extra) : extra;
+
+    const [row] = await db.select({
+        pendentes: sql<number>`SUM(CASE WHEN ${deliveries.status} = 'pending' THEN 1 ELSE 0 END)`,
+        emRota: sql<number>`SUM(CASE WHEN ${deliveries.status} IN ('assigned','picked_up') THEN 1 ELSE 0 END)`,
+        feitasHoje: sql<number>`SUM(CASE WHEN ${deliveries.status} = 'delivered' AND datetime(${deliveries.deliveredAt}, '-3 hours') >= ${HOJE_BRT} THEN 1 ELSE 0 END)`,
+        hoje: sql<number>`SUM(CASE WHEN ${deliveries.status} NOT IN ('draft','canceled') AND datetime(${deliveries.createdAt}, '-3 hours') >= ${HOJE_BRT} THEN 1 ELSE 0 END)`,
+    })
+        .from(deliveries)
+        .where(juntar(sql`1 = 1`));
+
+    return {
+        pendentes: Number(row?.pendentes ?? 0),
+        emRota: Number(row?.emRota ?? 0),
+        feitasHoje: Number(row?.feitasHoje ?? 0),
+        hoje: Number(row?.hoje ?? 0),
+    };
+}
+
 async function getPendingConfirmations(userId: number) {
     const result = await db.select({
         id: transactions.id,
         amount: transactions.amount,
         type: transactions.type,
+        kind: transactions.kind,
         description: transactions.description,
         createdAt: transactions.createdAt,
         creatorName: users.name,
@@ -71,7 +112,7 @@ async function getPendingConfirmations(userId: number) {
         )
         .orderBy(desc(transactions.createdAt));
 
-    return result as { id: number; amount: number; type: "credit" | "debit"; description: string; createdAt: string; creatorName: string | null }[];
+    return result as { id: number; amount: number; type: "credit" | "debit"; kind: string | null; description: string; createdAt: string; creatorName: string | null }[];
 }
 
 /**
@@ -150,6 +191,7 @@ export default async function Dashboard({
     let myDeliveries: any[] = [];
     let deliveriesTodayCount = 0;
     let recentTransactions: Awaited<ReturnType<typeof getRecentTransactions>> = [];
+    let painelCounts: PainelCounts = { pendentes: 0, emRota: 0, feitasHoje: 0, hoje: 0 };
     let draftDeliveries: { id: number; address: string; customerName: string | null; createdAt: string | null }[] = [];
 
     const pendingConfirmations = await getPendingConfirmations(user.id);
@@ -164,11 +206,9 @@ export default async function Dashboard({
         !isAdminViewingAsMotoboy &&
         (user.role === "shopkeeper" || (user.role as string) === "admin");
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     if (isShopkeeperOrAdmin) {
         recentTransactions = await getRecentTransactions(user);
+        painelCounts = await getPainelCounts((user.role as string) === "admin" ? null : user.id);
 
         // Corridas do PDV esperando conferência do endereço (invisíveis pro motoboy)
         const draftWhere = (user.role as string) === "admin"
@@ -253,7 +293,7 @@ export default async function Dashboard({
             .where(and(
                 eq(deliveries.motoboyId, user.id),
                 eq(deliveries.status, "delivered"),
-                gte(deliveries.deliveredAt, today.toISOString())
+                ehHoje(deliveries.deliveredAt)
             ));
         deliveriesTodayCount = todayDelivered[0]?.count || 0;
     }
@@ -331,6 +371,7 @@ export default async function Dashboard({
                     <ShopkeeperView
                         pendingDeliveries={pendingDeliveries}
                         recentTransactions={recentTransactions}
+                        counts={painelCounts}
                         user={user}
                     />
                 ) : (
