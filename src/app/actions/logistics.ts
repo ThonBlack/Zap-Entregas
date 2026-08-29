@@ -431,7 +431,10 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
         return {
             success: true,
-            reviewUrl: `${baseUrl}/review/${id}`,
+            // Pelo token público, nunca pelo id: com /review/<id> o cliente trocava
+            // o número e lia as entregas dos outros. Entrega antiga sem token não
+            // ganha link (é raro e some no próximo cadastro).
+            reviewUrl: delivery.publicToken ? `${baseUrl}/review/${delivery.publicToken}` : null,
             customerPhone: delivery.customerPhone,
             customerName: delivery.customerName || "Cliente",
         };

@@ -2,13 +2,14 @@ import { db } from "@/db";
 import { users, webauthnCredentials } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/session";
+import { requireMotoboy } from "@/lib/session";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import MotoboySettingsForm from "@/components/admin/MotoboySettingsForm";
 import AvatarForm from "@/components/auth/AvatarForm";
 import GoogleAccountCard from "@/components/auth/GoogleAccountCard";
 import PasskeyCard from "@/components/auth/PasskeyCard";
+import ChangePasswordCard from "@/components/auth/ChangePasswordCard";
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 
 const AVISOS_GOOGLE: Record<string, string> = {
@@ -26,15 +27,15 @@ export default async function MotoboySettingsPage({
     searchParams: Promise<{ erro?: string; google?: string }>;
 }) {
     const { erro, google } = await searchParams;
-    const userId = await getSessionUserId();
-    if (!userId) redirect("/login");
+    // requireMotoboy já barra lojista e conta desativada.
+    const sessao = await requireMotoboy();
+    const userId = sessao.id;
 
     const user = await db.query.users.findFirst({
         where: eq(users.id, userId)
     });
 
     if (!user) redirect("/login");
-    if (user.role !== 'motoboy' && user.role !== 'admin') redirect("/app");
 
     const passkeys = await db.select({
         id: webauthnCredentials.id,
@@ -67,6 +68,7 @@ export default async function MotoboySettingsPage({
                     userId={user.id}
                     currentGoal={user.dailyGoal || 10}
                 />
+                <ChangePasswordCard temSenha={Boolean(user.password)} />
                 <PasskeyCard passkeys={passkeys} />
                 <GoogleAccountCard
                     connected={Boolean(user.googleId)}

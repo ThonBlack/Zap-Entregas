@@ -1,20 +1,28 @@
 import { db } from "@/db";
-import { deliveries, reviews, users } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { deliveries, reviews } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import ReviewForm from "@/components/deliveries/ReviewForm";
 
 interface ReviewPageProps {
-    params: Promise<{ id: string }>;
+    params: Promise<{ token: string }>;
 }
 
+/**
+ * Avaliação da entrega, aberta pelo cliente (sem login).
+ *
+ * O endereço é o TOKEN público da entrega — o mesmo do rastreio —, nunca o id.
+ * Com /review/1, /review/2… qualquer um ia trocando o número e lia nome do
+ * cliente e do entregador de todas as entregas da operação. A rota antiga por
+ * id não existe mais: link velho dá 404, e é isso mesmo.
+ */
 export default async function ReviewPage({ params }: ReviewPageProps) {
-    const { id } = await params;
-    const deliveryId = parseInt(id);
+    const { token } = await params;
 
-    // Buscar a entrega
+    if (!token || token.length < 8) notFound();
+
     const delivery = await db.query.deliveries.findFirst({
-        where: eq(deliveries.id, deliveryId),
+        where: eq(deliveries.publicToken, token),
         with: {
             motoboy: true,
             shopkeeper: true
@@ -27,7 +35,7 @@ export default async function ReviewPage({ params }: ReviewPageProps) {
 
     // Verificar se já foi avaliada
     const existingReview = await db.query.reviews.findFirst({
-        where: eq(reviews.deliveryId, deliveryId)
+        where: eq(reviews.deliveryId, delivery.id)
     });
 
     if (existingReview) {
@@ -65,9 +73,7 @@ export default async function ReviewPage({ params }: ReviewPageProps) {
                 </div>
 
                 <ReviewForm
-                    deliveryId={delivery.id}
-                    motoboyId={delivery.motoboyId!}
-                    shopkeeperId={delivery.shopkeeperId}
+                    token={token}
                     customerName={delivery.customerName || "Cliente"}
                 />
             </div>

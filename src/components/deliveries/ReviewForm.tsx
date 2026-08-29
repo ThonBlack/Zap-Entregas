@@ -5,13 +5,12 @@ import { Star, Send, MessageSquare, Truck, Heart } from "lucide-react";
 import { submitReviewAction } from "@/app/actions/review";
 
 interface ReviewFormProps {
-    deliveryId: number;
-    motoboyId: number;
-    shopkeeperId: number | null;
+    /** Token público da entrega — é ele que autoriza a avaliação, não o id. */
+    token: string;
     customerName: string;
 }
 
-export default function ReviewForm({ deliveryId, motoboyId, shopkeeperId, customerName }: ReviewFormProps) {
+export default function ReviewForm({ token, customerName }: ReviewFormProps) {
     const [ratingGeneral, setRatingGeneral] = useState(0);
     const [ratingDelivery, setRatingDelivery] = useState(0);
     const [feedback, setFeedback] = useState("");
@@ -25,9 +24,7 @@ export default function ReviewForm({ deliveryId, motoboyId, shopkeeperId, custom
 
         startTransition(async () => {
             await submitReviewAction({
-                deliveryId,
-                motoboyId,
-                shopkeeperId,
+                token,
                 customerName,
                 ratingGeneral,
                 ratingDelivery,

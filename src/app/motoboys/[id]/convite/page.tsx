@@ -1,10 +1,8 @@
 import Link from "next/link";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { ArrowLeft, CheckCircle2, RefreshCw, Send } from "lucide-react";
 
 import { requireShopkeeper } from "@/lib/session";
+import { carregarMotoboyGerenciado } from "@/lib/team";
 import { generateInviteAction } from "@/app/actions/motoboy";
 import {
     APK_URL,
@@ -26,11 +24,10 @@ export default async function ConviteProntoPage({ params }: { params: Promise<{ 
     const dono = await requireShopkeeper();
     const { id } = await params;
 
-    const motoboy = await db.query.users.findFirst({
-        where: eq(users.id, Number(id)),
-    });
+    // Só motoboy da própria loja (admin vê todos) — convite é chave de acesso.
+    const motoboy = await carregarMotoboyGerenciado(dono, Number(id));
 
-    if (!motoboy || motoboy.role !== "motoboy") {
+    if (!motoboy) {
         return (
             <Moldura>
                 <p className="text-zinc-400">Motoboy não encontrado.</p>

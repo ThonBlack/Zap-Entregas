@@ -1,23 +1,27 @@
 import Link from "next/link";
-import { db } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { ArrowLeft, Save, Send } from "lucide-react";
-import { updateMotoboyAction, generateInviteAction } from "@/app/actions/motoboy";
-import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/session";
+import { notFound } from "next/navigation";
+import { ArrowLeft, Save, Send, KeyRound, AlertTriangle } from "lucide-react";
+import { updateMotoboyAction, generateInviteAction, resetMotoboyAccessAction } from "@/app/actions/motoboy";
+import { requireShopkeeper } from "@/lib/session";
+import { carregarMotoboyGerenciado } from "@/lib/team";
 import { hasPendingInvite } from "@/lib/invite";
 
-export default async function EditMotoboyPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditMotoboyPage({
+    params,
+    searchParams,
+}: {
+    params: Promise<{ id: string }>;
+    searchParams: Promise<{ erro?: string }>;
+}) {
+    const me = await requireShopkeeper();
     const { id } = await params;
-    const userId = await getSessionUserId();
-    if (!userId) redirect("/login");
+    const { erro } = await searchParams;
 
-    const motoboy = await db.query.users.findFirst({
-        where: eq(users.id, Number(id))
-    });
+    // Motoboy de outra loja é tratado como inexistente — nem confirma que o id existe.
+    const motoboy = await carregarMotoboyGerenciado(me, Number(id));
+    if (!motoboy) notFound();
 
-    if (!motoboy) return <div>Motoboy não encontrado</div>;
+    const inativo = motoboy.isActive === false;
 
     return (
         <div className="min-h-screen bg-zinc-50 pb-20">
@@ -25,10 +29,32 @@ export default async function EditMotoboyPage({ params }: { params: Promise<{ id
                 <Link href="/motoboys" className="text-zinc-500 hover:text-zinc-900">
                     <ArrowLeft size={24} />
                 </Link>
-                <h1 className="text-xl font-bold text-zinc-900">Editar {motoboy.name}</h1>
+                <h1 className="text-xl font-bold text-zinc-900 flex items-center gap-2 flex-wrap">
+                    Editar {motoboy.name}
+                    {inativo && (
+                        <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-200 text-zinc-700 border border-zinc-300">
+                            Desativado
+                        </span>
+                    )}
+                </h1>
             </header>
 
             <main className="max-w-xl mx-auto p-6 space-y-6">
+                {erro && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl flex items-start gap-2 text-sm">
+                        <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+                        <span>{erro}</span>
+                    </div>
+                )}
+
+                {inativo && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-sm">
+                        Este motoboy está <strong>desativado</strong>: ele não entra mais no app e
+                        não aparece na lista da equipe. O extrato e a dívida dele continuam
+                        guardados — dá pra reativar na tela da equipe, em &ldquo;Mostrar desativados&rdquo;.
+                    </div>
+                )}
+
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-zinc-200">
                     <form action={updateMotoboyAction} className="space-y-4">
                         <input type="hidden" name="id" value={motoboy.id} />
@@ -57,6 +83,7 @@ export default async function EditMotoboyPage({ params }: { params: Promise<{ id
                         {/* Preview */}
                         {motoboy.avatarUrl && (
                             <div className="flex justify-center py-4">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img src={motoboy.avatarUrl} alt="Preview" className="w-24 h-24 rounded-full object-cover border-4 border-zinc-100 shadow-sm" />
                             </div>
                         )}
@@ -97,6 +124,27 @@ export default async function EditMotoboyPage({ params }: { params: Promise<{ id
                                 <Send size={18} />
                                 Gerar novo convite
                             </button>
+                        </form>
+                    )}
+
+                    {/*
+                        Ninguém neste app tem e-mail cadastrado e não há servidor de e-mail:
+                        "esqueci a senha" não tem como chegar em lugar nenhum. Quem redefine
+                        é a loja, aqui: apaga a senha atual e manda um convite novo.
+                    */}
+                    {motoboy.password && (
+                        <form action={resetMotoboyAccessAction} className="pt-3 border-t border-zinc-100">
+                            <input type="hidden" name="id" value={motoboy.id} />
+                            <button
+                                type="submit"
+                                className="w-full flex items-center justify-center gap-2 bg-white border border-zinc-300 text-zinc-700 font-semibold py-3 rounded-lg hover:bg-zinc-50 transition-colors"
+                            >
+                                <KeyRound size={18} />
+                                Redefinir acesso (apaga a senha e gera convite)
+                            </button>
+                            <p className="text-xs text-zinc-500 mt-2">
+                                Use quando ele esquecer a senha. A senha atual deixa de valer na hora.
+                            </p>
                         </form>
                     )}
                 </div>

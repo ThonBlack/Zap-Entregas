@@ -119,11 +119,55 @@ GOOGLE_MAPS_BROWSER_KEY=AIza... PORT=3005 npm start
 
 ---
 
-## 🗄️ Banco de Dados
+## 🔐 Quem pode criar conta
 
-- **SQLite**: Local ou volume Docker (`/data/sqlite.db`).
-- **Migrações**: Gerenciadas via Drizzle ORM.
+`/register` é público (o app é instalável e o link circula no WhatsApp), mas
+**conta de lojista não sai por cadastro aberto** — quem é lojista vê endereço,
+telefone e dinheiro da operação.
+
+| Variável | Onde roda | Pra que serve |
+| --- | --- | --- |
+| `REGISTER_SHOPKEEPER_CODE` | servidor | libera a opção "Sou Lojista" em `/register` |
+
+- A tela nasce em **"Sou Motoboy"**. A opção de lojista só aparece quando a URL
+  traz `?convite_lojista=<REGISTER_SHOPKEEPER_CODE>`, e a server action confere o
+  código de novo (a tela nunca é a tranca).
+- **Vazio ou não configurado = ninguém se cadastra como lojista.** Quem cria é o
+  admin, em `/admin/users/new`. Esse é o padrão, e é o certo pra hoje: o app
+  atende uma loja só.
+- Nada de `NEXT_PUBLIC_*`: a imagem Docker é montada fora do servidor e a env
+  ficaria congelada dentro do pacote. É lida em tempo de execução.
+
+Pra abrir o cadastro de uma loja nova: ponha um código aleatório no `.env` do
+servidor, reinicie o container e mande o link
+`https://zapentregas.duckdns.org/register?convite_lojista=<código>` pra pessoa.
 
 ---
 
-*Última atualização: 23/01/2026 - Refatoração Completa*
+## 🗄️ Banco de Dados
+
+- **SQLite**: Local ou volume Docker (`/data/sqlite.db`).
+- **Chave estrangeira LIGADA** (`PRAGMA foreign_keys = ON` em `src/db/index.ts`).
+  Consequência prática: não dá pra apagar um usuário que tem corrida ou
+  lançamento — por isso excluir motoboy com histórico vira **desativação**
+  (`is_active = 0`), que mantém o extrato e a dívida de pé.
+- **Migrações**: scripts aditivos em `scripts/utils/add_*.js`, chamados no `CMD`
+  do Dockerfile — sobem sozinhos a cada deploy e são repetíveis (se a coluna já
+  existe, não fazem nada). **Não usar `drizzle-kit push` em produção.**
+
+Scripts que rodam no boot do container, nesta ordem:
+
+```
+add_transaction_kind_column.js
+make_phone_nullable.js
+add_invite_token_columns.js
+add_shopkeeper_id_column.js   # vínculo loja ↔ motoboy (users.shopkeeper_id)
+```
+
+> `add_shopkeeper_id_column.js` faz **backfill**: motoboy que já existia fica
+> ligado ao lojista de id 2 (Vapor Fume, dono da chave do PDV). Pra outro id:
+> `BACKFILL_SHOPKEEPER_ID=3 node scripts/utils/add_shopkeeper_id_column.js`.
+
+---
+
+*Última atualização: 29/08/2026 - Rodada de segurança (isolamento por loja, sessão, cadastro)*

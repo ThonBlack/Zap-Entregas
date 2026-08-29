@@ -7,10 +7,11 @@ import { db } from "@/db";
 import { shopSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/session";
+import { requireShopkeeper } from "@/lib/session";
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 import GoogleAccountCard from "@/components/auth/GoogleAccountCard";
 import PasskeyCard from "@/components/auth/PasskeyCard";
+import ChangePasswordCard from "@/components/auth/ChangePasswordCard";
 import { webauthnCredentials } from "@/db/schema";
 
 const AVISOS_GOOGLE: Record<string, string> = {
@@ -28,8 +29,10 @@ export default async function SettingsPage({
     searchParams: Promise<{ erro?: string; google?: string }>;
 }) {
     const { erro, google } = await searchParams;
-    const userId = await getSessionUserId();
-    if (!userId) redirect("/login");
+    // Tela da LOJA: motoboy não entra (aqui ficam a regra de pagamento, o que ele
+    // pode ver de cada entrega e a chave de API do PDV). Conta desativada também não.
+    const sessao = await requireShopkeeper();
+    const userId = sessao.id;
 
     const user = await db.query.users.findFirst({
         where: eq(users.id, userId)
@@ -76,6 +79,7 @@ export default async function SettingsPage({
                     aviso={erro ? AVISOS_GOOGLE[erro] : undefined}
                     sucesso={google === "conectado"}
                 />
+                <ChangePasswordCard temSenha={Boolean(user.password)} />
                 <PasskeyCard passkeys={passkeys} />
                 <ApiKeyForm userId={user.id} currentApiKey={user.apiKey || null} />
             </main>

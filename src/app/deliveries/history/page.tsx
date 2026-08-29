@@ -2,16 +2,16 @@ import { db } from "@/db";
 import { deliveries, users } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/session";
+import { requireUser } from "@/lib/session";
 import Link from "next/link";
 import { ArrowLeft, Calendar, MapPin, DollarSign, ShieldCheck } from "lucide-react";
 
 export default async function HistoryPage() {
-    const userId = await getSessionUserId();
-    if (!userId) redirect("/login");
+    // requireUser: conta desativada não abre o histórico com a sessão antiga.
+    const sessao = await requireUser();
 
     const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
+        where: eq(users.id, sessao.id),
     });
 
     if (!user) redirect("/login");

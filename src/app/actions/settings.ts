@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "node:crypto";
 import { saveFile } from "@/lib/upload";
-import { getAuthUser } from "@/lib/session";
+import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -171,8 +171,9 @@ export async function updateDailyGoalAction(goal: number) {
 }
 
 export async function generateApiKeyAction() {
-    const auth = await getAuthUser();
-    if ("error" in auth) redirect("/login");
+    // Chave de API é a credencial do PDV da LOJA — motoboy não gera uma pra si.
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+    if ("error" in auth) return { success: false, error: auth.error };
     const userId = auth.user.id;
 
     try {

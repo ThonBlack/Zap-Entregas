@@ -2,7 +2,7 @@
 
 import { registerAction } from "../actions/register";
 import Link from "next/link";
-import { useState, useActionState, useEffect, Suspense } from "react";
+import { useState, useActionState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import GoogleButton from "../login/GoogleButton";
 
@@ -13,18 +13,20 @@ const initialState = {
 interface RegisterFormProps {
     /** Servidor sem GOOGLE_CLIENT_ID: o botão nem aparece. */
     googleEnabled: boolean;
+    /**
+     * Código de convite da loja, já conferido no servidor. Sem ele a tela é só
+     * de motoboy — conta de lojista não sai por cadastro aberto.
+     */
+    conviteLojista: string | null;
 }
 
-function RegisterInner({ googleEnabled }: RegisterFormProps) {
+function RegisterInner({ googleEnabled, conviteLojista }: RegisterFormProps) {
     const sp = useSearchParams();
-    const initialRole = sp?.get("role") === "motoboy" ? "motoboy" : "shopkeeper";
+    const podeSerLojista = !!conviteLojista;
+    // O padrão é motoboy: é o cadastro que qualquer um pode fazer.
+    const initialRole = podeSerLojista && sp?.get("role") === "shopkeeper" ? "shopkeeper" : "motoboy";
     const [role, setRole] = useState<"shopkeeper" | "motoboy">(initialRole);
     const [state, formAction, isPending] = useActionState(registerAction, initialState);
-
-    useEffect(() => {
-        const r = sp?.get("role");
-        if (r === "motoboy" || r === "shopkeeper") setRole(r);
-    }, [sp]);
 
     return (
         <div className="min-h-screen bg-zinc-900 flex items-center justify-center p-4">
@@ -35,30 +37,41 @@ function RegisterInner({ googleEnabled }: RegisterFormProps) {
                 </div>
 
                 <form action={formAction} className="space-y-6">
-                    {/* Role Selection */}
-                    <div className="grid grid-cols-2 gap-4 p-1 bg-zinc-700/50 rounded-lg">
-                        <button
-                            type="button"
-                            onClick={() => setRole("shopkeeper")}
-                            className={`p-3 rounded-md text-sm font-medium transition-all ${role === "shopkeeper"
-                                ? "bg-green-600 text-white shadow-lg"
-                                : "text-zinc-400 hover:text-white hover:bg-zinc-600"
-                                }`}
-                        >
-                            Sou Lojista
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setRole("motoboy")}
-                            className={`p-3 rounded-md text-sm font-medium transition-all ${role === "motoboy"
-                                ? "bg-green-600 text-white shadow-lg"
-                                : "text-zinc-400 hover:text-white hover:bg-zinc-600"
-                                }`}
-                        >
-                            Sou Motoboy
-                        </button>
-                    </div>
+                    {/* Escolher o papel só faz sentido com o convite da loja em mãos.
+                        Sem ele, esta tela é a de cadastro de motoboy e ponto. */}
+                    {podeSerLojista ? (
+                        <div className="grid grid-cols-2 gap-4 p-1 bg-zinc-700/50 rounded-lg">
+                            <button
+                                type="button"
+                                onClick={() => setRole("shopkeeper")}
+                                className={`p-3 rounded-md text-sm font-medium transition-all ${role === "shopkeeper"
+                                    ? "bg-green-600 text-white shadow-lg"
+                                    : "text-zinc-400 hover:text-white hover:bg-zinc-600"
+                                    }`}
+                            >
+                                Sou Lojista
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setRole("motoboy")}
+                                className={`p-3 rounded-md text-sm font-medium transition-all ${role === "motoboy"
+                                    ? "bg-green-600 text-white shadow-lg"
+                                    : "text-zinc-400 hover:text-white hover:bg-zinc-600"
+                                    }`}
+                            >
+                                Sou Motoboy
+                            </button>
+                        </div>
+                    ) : (
+                        <p className="text-center text-sm text-zinc-400 bg-zinc-700/40 rounded-lg p-3">
+                            Cadastro de <strong className="text-zinc-200">motoboy</strong>. Conta de
+                            loja é criada pela própria loja.
+                        </p>
+                    )}
                     <input type="hidden" name="role" value={role} />
+                    {conviteLojista && (
+                        <input type="hidden" name="convite_lojista" value={conviteLojista} />
+                    )}
 
                     <div className="space-y-4">
                         <div>
@@ -132,7 +145,7 @@ function RegisterInner({ googleEnabled }: RegisterFormProps) {
                         <GoogleButton label="Criar conta com Google" />
                         <p className="text-xs text-zinc-500 text-center leading-relaxed">
                             Pelo Google a conta sai pronta como <strong className="text-zinc-400">motoboy</strong>, sem senha —
-                            depois o app pede seu celular. Conta de lojista é só pelo formulário acima.
+                            depois o app pede seu celular.
                         </p>
                     </div>
                 )}
@@ -148,10 +161,10 @@ function RegisterInner({ googleEnabled }: RegisterFormProps) {
     );
 }
 
-export default function RegisterForm({ googleEnabled }: RegisterFormProps) {
+export default function RegisterForm({ googleEnabled, conviteLojista }: RegisterFormProps) {
     return (
         <Suspense fallback={<div className="min-h-screen bg-zinc-900" />}>
-            <RegisterInner googleEnabled={googleEnabled} />
+            <RegisterInner googleEnabled={googleEnabled} conviteLojista={conviteLojista} />
         </Suspense>
     );
 }

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { sql, relations } from "drizzle-orm";
 
 export const users = sqliteTable("users", {
@@ -9,6 +9,10 @@ export const users = sqliteTable("users", {
     phone: text("phone").unique(),
     email: text("email").unique(), // Email opcional para recuperação de senha
     role: text("role", { enum: ["admin", "shopkeeper", "motoboy"] }).default("motoboy").notNull(),
+    // De qual loja este motoboy é. Preenchido com o id do lojista que o cadastrou.
+    // NULL = motoboy criado pelo admin sem escolher loja ("da casa"): só o admin
+    // enxerga. Vazio pros lojistas e admins (a coluna só faz sentido pro motoboy).
+    shopkeeperId: integer("shopkeeper_id").references((): AnySQLiteColumn => users.id),
     password: text("password"), // Opcional se for magic link, mas bom ter para auth simples
     avatarUrl: text("avatar_url"),
     lastAvatarUpdate: text("last_avatar_update"), // Data da última troca de foto

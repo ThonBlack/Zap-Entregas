@@ -2,7 +2,7 @@
 
 import { db } from "../../db";
 import { users } from "../../db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { authenticator } from "otplib";
@@ -15,6 +15,7 @@ import {
     clearTwoFactorPendingCookie,
     getSessionUserId,
 } from "../../lib/session";
+import { phoneVariants, pickPhoneMatch } from "../../lib/phone";
 
 export async function loginAction(prevState: any, formData: FormData) {
     const phone = formData.get("phone") as string;
@@ -24,7 +25,14 @@ export async function loginAction(prevState: any, formData: FormData) {
         return { error: "Preencha todos os campos" };
     }
 
-    const user = await db.select().from(users).where(eq(users.phone, phone)).get();
+    // O mesmo celular pode estar gravado com máscara, com 55 na frente ou sem o
+    // 9º dígito. Procuramos por todas as formas equivalentes: quem foi cadastrado
+    // como "3496944103" entra digitando "(34) 99694-4103".
+    const candidatos = await db
+        .select()
+        .from(users)
+        .where(inArray(users.phone, phoneVariants(phone)));
+    const user = pickPhoneMatch(candidatos, phone);
 
     if (!user || !user.password) {
         return { error: "Credenciais inválidas" };

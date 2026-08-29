@@ -3,9 +3,10 @@ import { db } from "@/db";
 import { users, transactions, deliveries, shopSettings, webauthnCredentials } from "@/db/schema";
 import { eq, sql, desc, and, or, gte, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getSessionUserId, clearSessionCookie } from "@/lib/session";
+import { requireUser, clearSessionCookie } from "@/lib/session";
 import { LogOut, ShieldCheck, Settings, Store, Bike, Crown } from "lucide-react";
 import { isAddressSuspicious } from "@/lib/routeUtils";
+import { ehAdmin, idsDaEquipe, type Ator } from "@/lib/team";
 
 type VisibilityFlags = {
     showCustomerName: boolean;
@@ -73,7 +74,20 @@ async function getPendingConfirmations(userId: number) {
     return result as { id: number; amount: number; type: "credit" | "debit"; description: string; createdAt: string; creatorName: string | null }[];
 }
 
-async function getRecentTransactions() {
+/**
+ * Últimos lançamentos que ESTA loja pode ver: os da equipe dela mais os que ela
+ * mesma lançou. Antes trazia os dez últimos do banco inteiro — a loja A lia o
+ * movimento de dinheiro da loja B.
+ */
+async function getRecentTransactions(me: Ator) {
+    const equipe = await idsDaEquipe(me);
+
+    const escopo = ehAdmin(me)
+        ? undefined
+        : equipe.length
+            ? or(inArray(transactions.userId, equipe), eq(transactions.creatorId, me.id))
+            : eq(transactions.creatorId, me.id);
+
     const result = await db.select({
         id: transactions.id,
         amount: transactions.amount,
@@ -85,6 +99,7 @@ async function getRecentTransactions() {
     })
         .from(transactions)
         .leftJoin(users, eq(transactions.userId, users.id))
+        .where(escopo)
         .orderBy(desc(transactions.createdAt))
         .limit(10);
 
@@ -96,11 +111,12 @@ export default async function Dashboard({
 }: {
     searchParams: Promise<{ as?: string }>;
 }) {
-    const userId = await getSessionUserId();
-    if (!userId) redirect("/login");
+    // requireUser (e não o id cru do cookie): conta desativada cai no login em
+    // vez de continuar entrando com a sessão que ficou salva no celular.
+    const sessao = await requireUser();
 
     const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
+        where: eq(users.id, sessao.id),
     });
 
     if (!user) redirect("/login");
@@ -152,7 +168,7 @@ export default async function Dashboard({
     today.setHours(0, 0, 0, 0);
 
     if (isShopkeeperOrAdmin) {
-        recentTransactions = await getRecentTransactions();
+        recentTransactions = await getRecentTransactions(user);
 
         // Corridas do PDV esperando conferência do endereço (invisíveis pro motoboy)
         const draftWhere = (user.role as string) === "admin"

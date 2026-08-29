@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getAuthUser } from "@/lib/session";
 
 interface SubscriptionInput {
@@ -38,6 +38,12 @@ export async function removePushSubscriptionAction(endpoint: string) {
     if ("error" in auth) return auth;
 
     if (typeof endpoint !== "string" || !endpoint) return { error: "Endpoint inválido" };
-    await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, endpoint));
+
+    // Só a própria inscrição: sem o filtro por usuário, qualquer pessoa logada
+    // que soubesse o endpoint desligava a notificação do celular de outra.
+    await db.delete(pushSubscriptions).where(and(
+        eq(pushSubscriptions.endpoint, endpoint),
+        eq(pushSubscriptions.userId, auth.user.id),
+    ));
     return { success: true };
 }
