@@ -28,6 +28,13 @@ export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveri
     const levelEmoji = level === "Ouro" ? "🥇" : level === "Prata" ? "🥈" : "🥉";
     const isFreeUser = user.plan === 'free' || !user.plan;
 
+    // Saldo positivo = a loja deve ao motoboy; negativo = ele segurou mais dinheiro
+    // do que ganhou e deve à loja. Sem essa frase o número sozinho engana.
+    const saldoLegenda = balance > 0 ? "A receber da loja"
+        : balance < 0 ? "Você deve à loja"
+            : "Saldo zerado";
+    const saldoCor = balance < 0 ? "bg-red-800 border-red-700" : "bg-green-700 border-green-600";
+
     return (
         <div className="space-y-5">
             <AdBanner plan={user.plan} position="bottom" />
@@ -104,15 +111,15 @@ export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveri
 
             {/* Balance Cards - Verde Sólido */}
             <div className="grid grid-cols-2 gap-4">
-                <Card className="p-4 bg-green-700 border-green-600">
+                <Card className={`p-4 ${saldoCor}`}>
                     <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shadow-md">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${balance < 0 ? "bg-red-600" : "bg-green-500"}`}>
                             <DollarSign className="text-white" size={24} />
                         </div>
-                        <div>
-                            <p className="text-xs text-green-200 font-medium uppercase">Saldo</p>
+                        <div className="min-w-0">
+                            <p className="text-xs text-white/80 font-medium uppercase">{saldoLegenda}</p>
                             <p className="text-2xl font-bold text-white">
-                                {balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                {Math.abs(balance).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </p>
                         </div>
                     </div>
@@ -133,7 +140,7 @@ export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveri
             </div>
 
             {/* Quick Actions - Verde */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <Link
                     href="/finance/extrato"
                     className="flex items-center justify-center gap-3 w-full bg-green-600 text-white p-4 rounded-2xl font-bold shadow-md active:scale-[0.98] transition-all hover:bg-green-500"
@@ -148,6 +155,13 @@ export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveri
                     <History size={22} className="text-green-400" />
                     <span className="text-sm">Histórico</span>
                 </Link>
+                <Link
+                    href="/upgrade"
+                    className="col-span-2 md:col-span-1 flex items-center justify-center gap-3 w-full bg-yellow-500 text-yellow-900 p-4 rounded-2xl font-bold shadow-md active:scale-[0.98] transition-all hover:bg-yellow-400"
+                >
+                    <Crown size={22} />
+                    <span className="text-sm">{isFreeUser ? "Assinar PRO" : "Meu plano"}</span>
+                </Link>
             </div>
 
             {/* Link to Upgrade */}
@@ -160,7 +174,7 @@ export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveri
                                     <Crown className="text-white" size={20} />
                                 </div>
                                 <div>
-                                    <p className="font-bold text-yellow-900">Seja PRO! 🚀</p>
+                                    <p className="font-bold text-yellow-900">Assinar PRO 🚀</p>
                                     <p className="text-xs text-yellow-800">Remova anúncios e desbloqueie recursos</p>
                                 </div>
                             </div>

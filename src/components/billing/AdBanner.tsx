@@ -14,15 +14,18 @@ export default function AdBanner({ plan = "free", position = "bottom" }: AdBanne
     // Don't show ads for paid users
     if (plan !== "free" || dismissed) return null;
 
+    // Antes era `fixed` e cobria os botões do rodapé no celular (não dava pra
+    // finalizar entrega sem fechar o anúncio). Agora ele ocupa o próprio espaço
+    // na página: empurra o conteúdo em vez de tampar.
     const positionClasses = {
-        top: "fixed top-0 left-0 right-0 z-40",
-        bottom: "fixed bottom-0 left-0 right-0 z-40",
-        inline: "w-full my-4"
+        top: "w-full mb-4 rounded-xl overflow-hidden",
+        bottom: "w-full mb-4 rounded-xl overflow-hidden",
+        inline: "w-full my-4 rounded-xl overflow-hidden"
     };
 
     return (
         <div className={`${positionClasses[position]} bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 text-white p-3 shadow-lg`}>
-            <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                     <Sparkles size={20} className="animate-pulse" />
                     <div>
