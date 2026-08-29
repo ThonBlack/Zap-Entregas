@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Play, Plus, Trash2, Phone, MapPin } from "lucide-react";
+import { Play, Trash2, Phone, Pencil } from "lucide-react";
+import Link from "next/link";
 import { optimizeSelectedRouteAction, type DeliveryReceipt } from "@/app/actions/logistics";
 import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import CompleteDeliveryModal from "@/components/deliveries/CompleteDeliveryModal";
@@ -27,6 +28,30 @@ interface PendingDeliveriesFormProps {
     deliveries: Delivery[];
     isMotoboy?: boolean;
     currentUserId?: number;
+}
+
+/**
+ * Link do WhatsApp com o endereço de rastreio COMPLETO.
+ *
+ * Montado só na hora do clique: no servidor `window` não existe e o link sairia
+ * como "/tracking/abc" — sem domínio, inútil pro cliente. Por isso o href do <a>
+ * é só um atalho e a navegação de verdade acontece no onClick.
+ */
+function montarLinkWhatsApp(delivery: Delivery) {
+    const fone = (delivery.customerPhone || "").replace(/\D/g, '');
+    const origem = typeof window !== "undefined" ? window.location.origin : "";
+    const rastreio = delivery.publicToken && origem
+        ? `\nAcompanhe em tempo real: ${origem}/tracking/${delivery.publicToken}`
+        : "";
+    const texto = `Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️${rastreio}`;
+    return `https://wa.me/55${fone}?text=${encodeURIComponent(texto)}`;
+}
+
+/** "2,2 km" / "180 m" — distância que qualquer pessoa entende. */
+function distanciaLegivel(metros: number) {
+    return metros >= 1000
+        ? `${(metros / 1000).toFixed(1).replace('.', ',')} km`
+        : `${Math.round(metros)} m`;
 }
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -246,7 +271,11 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                     {/* WhatsApp Button - sempre visível se tiver telefone */}
                                     {delivery.customerPhone && (
                                         <a
-                                            href={`https://wa.me/55${delivery.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(`Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️${delivery.publicToken ? `\nAcompanhe em tempo real: ${typeof window !== 'undefined' ? window.location.origin : ''}/tracking/${delivery.publicToken}` : ''}`)}`}
+                                            href={montarLinkWhatsApp(delivery)}
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                window.open(montarLinkWhatsApp(delivery), '_blank', 'noopener,noreferrer');
+                                            }}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="p-1 px-2 bg-green-500 text-white text-xs font-bold rounded flex items-center gap-1 hover:bg-green-400 shadow-sm"
@@ -294,12 +323,23 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                                     ? 'bg-green-600 text-white hover:bg-green-500'
                                                     : 'bg-zinc-700 text-zinc-500 cursor-not-allowed'
                                                 }`}
-                                            title={!canDeliver ? `Você está a ${Math.round(distance)}m do local. Aproxime-se para finalizar.` : "Marcar como Entregue"}
+                                            title={!canDeliver ? `Você está a ${distanciaLegivel(distance)} do local. Aproxime-se para finalizar.` : "Marcar como Entregue"}
                                         >
                                             <CheckCircleIcon canDeliver={canDeliver} />
                                             <span>Entregue</span>
                                         </button>
                                     ) : null}
+
+                                    {/* BOTÃO: EDITAR - lojista, enquanto ninguém aceitou */}
+                                    {!isMotoboy && delivery.status === 'pending' && !delivery.motoboyId && (
+                                        <Link
+                                            href={`/deliveries/${delivery.id}/editar`}
+                                            className="p-1 bg-zinc-600 text-white rounded hover:bg-zinc-500"
+                                            title="Editar esta corrida"
+                                        >
+                                            <Pencil size={16} />
+                                        </Link>
+                                    )}
 
                                     {/* BOTÃO: EXCLUIR - só para lojista/admin */}
                                     {!isMotoboy && (
@@ -334,6 +374,11 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                                 ⚠️ Endereço fora do raio da loja — verifique
                                             </p>
                                         )}
+                                        {!canDeliver && (
+                                            <p className="text-xs text-orange-300 bg-orange-900/30 border border-orange-700/40 rounded px-2 py-1 mb-1 inline-flex items-center gap-1">
+                                                📍 Você está a {distanciaLegivel(distance)} — chegue mais perto pra finalizar
+                                            </p>
+                                        )}
                                         {delivery.observation && (
                                             <p className="text-zinc-400 text-xs italic mb-1 border-l-2 border-zinc-600 pl-2">
                                                 📝 {delivery.observation}
@@ -346,7 +391,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                             )}
                                             {isMotoboy && currentLocation && delivery.lat && (
                                                 <span className={distance > 200 ? "text-orange-400" : "text-green-400"}>
-                                                    Distância: {distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : Math.round(distance) + 'm'}
+                                                    Distância: {distanciaLegivel(distance)}
                                                 </span>
                                             )}
                                         </div>
