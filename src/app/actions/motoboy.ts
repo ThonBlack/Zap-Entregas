@@ -8,6 +8,7 @@ import { saveFile } from "@/lib/upload";
 import { revalidatePath } from "next/cache";
 import { hashPassword } from "@/lib/password";
 import { getAuthUserWithRole } from "@/lib/session";
+import { generateInviteToken, getInviteExpiration } from "@/lib/invite";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -49,23 +50,61 @@ export async function createMotoboyAction(formData: FormData) {
         avatarUrl = await saveFile(file);
     }
 
-    const finalPassword = password || crypto.randomUUID().slice(0, 12);
-    const hashedPassword = await hashPassword(finalPassword);
+    // Sem senha digitada a conta nasce SEM senha (null). Nada de senha aleatória:
+    // ela só existiria no banco, ninguém veria, e o motoboy ficaria trancado
+    // do lado de fora. Quem cria a senha é ele, pelo link do convite.
+    const hashedPassword = password ? await hashPassword(password) : null;
+
+    let novoId: number | undefined;
 
     try {
-        await db.insert(users).values({
+        const [criado] = await db.insert(users).values({
             name,
             phone,
             password: hashedPassword,
             avatarUrl,
             lastAvatarUpdate: avatarUrl ? new Date().toISOString() : null,
             role: "motoboy",
-        });
+            inviteToken: generateInviteToken(),
+            inviteTokenExpiresAt: getInviteExpiration(),
+        }).returning({ id: users.id });
+        novoId = criado?.id;
     } catch {
         return { error: "Erro ao criar motoboy. Telefone já cadastrado?" };
     }
 
-    redirect("/motoboys");
+    if (!novoId) return { error: "Erro ao criar motoboy." };
+
+    revalidatePath("/motoboys");
+    redirect(`/motoboys/${novoId}/convite`);
+}
+
+/**
+ * Gera um convite novo pro motoboy (o anterior, se houver, deixa de valer).
+ * Usado quando o link venceu, se perdeu no WhatsApp ou o motoboy trocou de celular.
+ */
+export async function generateInviteAction(formData: FormData): Promise<void> {
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+    if ("error" in auth) redirect("/login");
+
+    const id = Number(formData.get("id"));
+    if (!Number.isInteger(id) || id <= 0) redirect("/motoboys");
+
+    const target = await db.query.users.findFirst({
+        where: eq(users.id, id),
+        columns: { id: true, role: true },
+    });
+    if (!target || target.role !== "motoboy") redirect("/motoboys");
+
+    await db.update(users)
+        .set({
+            inviteToken: generateInviteToken(),
+            inviteTokenExpiresAt: getInviteExpiration(),
+        })
+        .where(eq(users.id, id));
+
+    revalidatePath("/motoboys");
+    redirect(`/motoboys/${id}/convite`);
 }
 
 export async function updateMotoboyAction(formData: FormData) {
