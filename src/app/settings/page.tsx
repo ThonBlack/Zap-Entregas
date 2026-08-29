@@ -11,6 +11,7 @@ import { requireShopkeeper } from "@/lib/session";
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 import GoogleAccountCard from "@/components/auth/GoogleAccountCard";
 import PasskeyCard from "@/components/auth/PasskeyCard";
+import ChangePasswordCard from "@/components/auth/ChangePasswordCard";
 import { webauthnCredentials } from "@/db/schema";
 
 const AVISOS_GOOGLE: Record<string, string> = {
@@ -78,6 +79,7 @@ export default async function SettingsPage({
                     aviso={erro ? AVISOS_GOOGLE[erro] : undefined}
                     sucesso={google === "conectado"}
                 />
+                <ChangePasswordCard temSenha={Boolean(user.password)} />
                 <PasskeyCard passkeys={passkeys} />
                 <ApiKeyForm userId={user.id} currentApiKey={user.apiKey || null} />
             </main>

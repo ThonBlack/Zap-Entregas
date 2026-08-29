@@ -9,6 +9,7 @@ import MotoboySettingsForm from "@/components/admin/MotoboySettingsForm";
 import AvatarForm from "@/components/auth/AvatarForm";
 import GoogleAccountCard from "@/components/auth/GoogleAccountCard";
 import PasskeyCard from "@/components/auth/PasskeyCard";
+import ChangePasswordCard from "@/components/auth/ChangePasswordCard";
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 
 const AVISOS_GOOGLE: Record<string, string> = {
@@ -67,6 +68,7 @@ export default async function MotoboySettingsPage({
                     userId={user.id}
                     currentGoal={user.dailyGoal || 10}
                 />
+                <ChangePasswordCard temSenha={Boolean(user.password)} />
                 <PasskeyCard passkeys={passkeys} />
                 <GoogleAccountCard
                     connected={Boolean(user.googleId)}
