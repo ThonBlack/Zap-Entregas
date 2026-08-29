@@ -2,7 +2,7 @@ import { db } from "@/db";
 import { users, webauthnCredentials } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/session";
+import { requireMotoboy } from "@/lib/session";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import MotoboySettingsForm from "@/components/admin/MotoboySettingsForm";
@@ -26,15 +26,15 @@ export default async function MotoboySettingsPage({
     searchParams: Promise<{ erro?: string; google?: string }>;
 }) {
     const { erro, google } = await searchParams;
-    const userId = await getSessionUserId();
-    if (!userId) redirect("/login");
+    // requireMotoboy já barra lojista e conta desativada.
+    const sessao = await requireMotoboy();
+    const userId = sessao.id;
 
     const user = await db.query.users.findFirst({
         where: eq(users.id, userId)
     });
 
     if (!user) redirect("/login");
-    if (user.role !== 'motoboy' && user.role !== 'admin') redirect("/app");
 
     const passkeys = await db.select({
         id: webauthnCredentials.id,

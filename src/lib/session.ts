@@ -9,6 +9,15 @@ import { users } from "@/db/schema";
 
 const COOKIE_NAME = "session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
+/**
+ * Idade máxima do token, conferida NO SERVIDOR.
+ *
+ * O cookie tem prazo (7 dias), mas prazo de cookie é só um pedido ao navegador:
+ * quem copiasse o valor entrava pra sempre, porque a assinatura não vencia nunca.
+ * 30 dias é folgado de propósito — o motoboy abre o app todo dia e não pode cair
+ * na tela de login no meio do expediente.
+ */
+const TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const TWOFA_COOKIE = "2fa_pending";
 const TWOFA_MAX_AGE = 60 * 5;
 
@@ -50,6 +59,12 @@ function parseToken(token: string | undefined | null): number | null {
     if (!timingSafeEqual(sig, expected)) return null;
     const id = Number(rawId);
     if (!Number.isInteger(id) || id <= 0) return null;
+
+    // Token velho não vale mais, mesmo com assinatura boa.
+    const ts = Number(rawTs);
+    if (!Number.isFinite(ts) || ts <= 0) return null;
+    if (Date.now() - ts > TOKEN_MAX_AGE_MS) return null;
+
     return id;
 }
 
