@@ -60,8 +60,10 @@ export function usePushNotifications(userId: number) {
 
         const n = new Notification(titulo, {
             body: corpo,
-            icon: icone || "/icon-512.png",
-            badge: "/icon-512.png",
+            icon: icone || "/icon-192.png",
+            // badge = iconezinho da barra de status: o Android usa só o recorte e pinta
+            // de branco, então precisa ser a silhueta monocromática (senão vira quadrado).
+            badge: "/badge-96.png",
             tag: `zap-${Date.now()}`,
             requireInteraction: true,
         });
