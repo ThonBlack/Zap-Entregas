@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { geocodeAddress } from "@/lib/routeUtils";
 import { newTrackingToken, newConfirmToken, confirmTokenExpiry } from "@/lib/trackingToken";
 import { pushToDraftReviewers } from "@/lib/push";
+import { parseMoney } from "@/lib/money";
 
 /**
  * API de Integração para PDV
@@ -36,17 +37,56 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const body = await request.json();
+        // O PDV é código de terceiro: corpo quebrado tem que voltar 400 explicando,
+        // e não 500 "erro interno" (que manda o caixa ligar pro suporte à toa).
+        let body: any;
+        try {
+            body = await request.json();
+        } catch {
+            return NextResponse.json(
+                { success: false, error: "JSON inválido" },
+                { status: 400 }
+            );
+        }
+        if (!body || typeof body !== "object") {
+            return NextResponse.json(
+                { success: false, error: "JSON inválido" },
+                { status: 400 }
+            );
+        }
 
-        if (!body.address || typeof body.address !== "string") {
+        // Endereço só com espaço é o mesmo que endereço em branco.
+        const address = typeof body.address === "string" ? body.address.trim().slice(0, 500) : "";
+        if (!address) {
             return NextResponse.json(
                 { success: false, error: "Endereço é obrigatório" },
                 { status: 400 }
             );
         }
 
-        const value = Number.isFinite(body.value) ? body.value : 0;
-        const address = body.address.slice(0, 500);
+        // O PDV manda o valor como o Brasil escreve ("12,50"). Number("12,50") é
+        // NaN e a corrida entrava valendo zero sem ninguém perceber.
+        let value = 0;
+        if (body.value !== undefined && body.value !== null && body.value !== "") {
+            const parsed = parseMoney(body.value);
+            if (parsed === null) {
+                return NextResponse.json(
+                    { success: false, error: "Valor inválido. Use 12.50 ou \"12,50\"." },
+                    { status: 400 }
+                );
+            }
+            if (parsed < 0) {
+                return NextResponse.json(
+                    { success: false, error: "Valor não pode ser negativo" },
+                    { status: 400 }
+                );
+            }
+            value = parsed;
+        }
+
+        // O PDV às vezes manda "fee" achando que define o ganho do motoboy. Não
+        // define (ver abaixo) — então avisamos na resposta em vez de ignorar calado.
+        const feeIgnored = body.fee !== undefined && body.fee !== null && body.fee !== "";
 
         // Geocodificar já na criação (senão a entrega entra sem pin no mapa e sem geofence)
         let lat = 0, lng = 0;
@@ -125,6 +165,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
             success: true,
             deliveryId: newDelivery.id,
+            // Avisa o PDV que o "fee" que ele mandou não foi usado.
+            ...(feeIgnored ? { feeIgnored: true } : {}),
             trackingUrl: `${baseUrl}/tracking/${newDelivery.publicToken}`,
             // O PDV abre isto numa janela por cima da venda pra conferir o endereço na hora.
             confirmUrl: `${baseUrl}/confirmar/${newDelivery.confirmToken}`,
