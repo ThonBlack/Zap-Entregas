@@ -6,6 +6,7 @@ import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { fmtDateTime } from "@/lib/datetime";
 import {
     LayoutDashboard, Package, TrendingUp, Users, DollarSign,
     AlertCircle, ArrowLeft, Plus, Smartphone, ShoppingCart,
@@ -249,7 +250,7 @@ export default async function MasterDashboardPage() {
                                             </span>
                                         )}
                                         <span className="text-zinc-600 text-xs">
-                                            {new Date(event.createdAt!).toLocaleString('pt-BR')}
+                                            {fmtDateTime(event.createdAt)}
                                         </span>
                                     </div>
                                 ))}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Clock, XCircle } from "lucide-react";
 import { KIND_LABEL, formatBRL, type Statement } from "@/lib/wallet";
+import { fmtShortDateTime, hojeBrasilia } from "@/lib/datetime";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -11,12 +12,6 @@ type Props = {
     /** "motoboy" = fala "você"; "loja" = fala "ele" */
     perspective: "motoboy" | "loja";
 };
-
-function fmtDate(iso: string) {
-    const d = new Date(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z");
-    if (Number.isNaN(d.getTime())) return iso;
-    return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
-}
 
 export function BalanceHeadline({ balance, perspective }: { balance: number; perspective: "motoboy" | "loja" }) {
     const abs = formatBRL(Math.abs(balance));
@@ -35,6 +30,10 @@ export default function StatementView({ statement, basePath, perspective }: Prop
     const next = month === 12 ? { m: 1, y: year + 1 } : { m: month + 1, y: year };
     const head = BalanceHeadline({ balance, perspective });
 
+    // Mês seguinte só existe se ainda não passou do mês corrente em Brasília.
+    const hoje = hojeBrasilia();
+    const temProximo = next.y < hoje.year || (next.y === hoje.year && next.m <= hoje.month);
+
     const toneBg = { green: "bg-green-700 border-green-600", red: "bg-red-800 border-red-700", zinc: "bg-zinc-700 border-zinc-600" }[head.tone];
 
     return (
@@ -45,15 +44,21 @@ export default function StatementView({ statement, basePath, perspective }: Prop
                 <p className="text-3xl font-bold mt-1">{head.value}</p>
             </div>
 
-            {/* Navegação de mês */}
+            {/* Navegação de mês — o futuro não tem lançamento, então não tem pra onde ir */}
             <div className="flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl px-2 py-2">
                 <Link href={`${basePath}?m=${prev.m}&y=${prev.y}`} className="p-2 text-zinc-300 hover:text-white" aria-label="Mês anterior">
                     <ChevronLeft size={20} />
                 </Link>
                 <span className="font-bold text-white capitalize">{MESES[month - 1]} / {year}</span>
-                <Link href={`${basePath}?m=${next.m}&y=${next.y}`} className="p-2 text-zinc-300 hover:text-white" aria-label="Próximo mês">
-                    <ChevronRight size={20} />
-                </Link>
+                {temProximo ? (
+                    <Link href={`${basePath}?m=${next.m}&y=${next.y}`} className="p-2 text-zinc-300 hover:text-white" aria-label="Próximo mês">
+                        <ChevronRight size={20} />
+                    </Link>
+                ) : (
+                    <span className="p-2 text-zinc-700" aria-hidden="true">
+                        <ChevronRight size={20} />
+                    </span>
+                )}
             </div>
 
             {/* Resumo do mês */}
@@ -62,6 +67,11 @@ export default function StatementView({ statement, basePath, perspective }: Prop
                 <Resumo label="Dinheiro retido" value={-totals.dinheiro} tone="red" />
                 <Resumo label="Pagamentos" value={totals.pagamentos} />
                 <Resumo label="Ajustes" value={totals.ajustes} />
+                {totals.abertura !== 0 && (
+                    <div className="col-span-2">
+                        <Resumo label="Saldo inicial" value={totals.abertura} />
+                    </div>
+                )}
             </div>
 
             <div className="text-xs text-zinc-400 flex justify-between px-1">
@@ -92,7 +102,7 @@ export default function StatementView({ statement, basePath, perspective }: Prop
                                 </div>
                                 <div className="text-sm text-white truncate mt-0.5">{l.description || KIND_LABEL[l.kind]}</div>
                                 <div className="text-xs text-zinc-500">
-                                    {fmtDate(l.createdAt)}
+                                    {fmtShortDateTime(l.createdAt)}
                                     {l.creatorName && l.kind !== "corrida" && l.kind !== "dinheiro" ? ` · por ${l.creatorName}` : ""}
                                 </div>
                             </div>

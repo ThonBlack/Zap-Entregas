@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { ArrowLeft, Calendar, MapPin, DollarSign, ShieldCheck } from "lucide-react";
+import { fmtDateTime } from "@/lib/datetime";
 
 export default async function HistoryPage() {
     const userId = await getSessionUserId();
@@ -59,7 +60,7 @@ export default async function HistoryPage() {
     return (
         <div className="min-h-screen bg-zinc-900 pb-20 md:pb-8">
             <header className="bg-zinc-800 border-b border-zinc-700 px-6 py-4 flex items-center gap-4 sticky top-0 z-10 shadow-md">
-                <Link href="/" className="p-2 -ml-2 text-zinc-400 hover:text-green-400 rounded-full hover:bg-zinc-700 transition-colors">
+                <Link href="/app" className="p-2 -ml-2 text-zinc-400 hover:text-green-400 rounded-full hover:bg-zinc-700 transition-colors">
                     <ArrowLeft size={24} />
                 </Link>
                 <div>
@@ -94,7 +95,7 @@ export default async function HistoryPage() {
                                         Entregue
                                     </span>
                                     <span className="text-zinc-400 text-xs">
-                                        {new Date(item.updatedAt || "").toLocaleString('pt-BR')}
+                                        {fmtDateTime(item.deliveredAt || item.updatedAt)}
                                     </span>
                                 </div>
                                 <h3 className="font-bold text-white text-lg">

@@ -6,6 +6,7 @@ import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { fmtDate } from "@/lib/datetime";
 import {
     ArrowLeft, Users as UsersIcon, Eye, Bike, Store, Crown, UserPlus,
 } from "lucide-react";
@@ -198,7 +199,7 @@ export default async function AdminUsersListPage({
                                             )}
                                         </td>
                                         <td className="py-3 px-4 text-zinc-500 text-xs">
-                                            {u.createdAt ? new Date(u.createdAt).toLocaleDateString("pt-BR") : "—"}
+                                            {fmtDate(u.createdAt)}
                                         </td>
                                         <td className="py-3 px-4 text-right">
                                             <Link

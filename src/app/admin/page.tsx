@@ -6,6 +6,7 @@ import { getSessionUserId, clearSessionCookie } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { fmtDate } from "@/lib/datetime";
 import {
     Users, CreditCard, TrendingUp, Settings, DollarSign,
     Package, AlertTriangle, Clock, UserPlus, ArrowUpRight,
@@ -398,7 +399,7 @@ export default async function AdminDashboardPage() {
                                             )}
                                         </td>
                                         <td className="py-3 px-3 text-zinc-500 text-xs">
-                                            {user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : '-'}
+                                            {fmtDate(user.createdAt, '-')}
                                         </td>
                                         <td className="py-3 px-3">
                                             <Link href={`/admin/users/${user.id}`} className="p-2 hover:bg-zinc-700 rounded-lg transition-colors inline-flex">

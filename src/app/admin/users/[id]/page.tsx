@@ -6,6 +6,7 @@ import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { fmtDateTime } from "@/lib/datetime";
 import {
     ArrowLeft, User, Phone, Calendar, CreditCard, Package,
     DollarSign, Star, Clock, Settings, Ban, CheckCircle, Edit
@@ -200,7 +201,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                                 <div key={d.id} className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
                                     <div>
                                         <p className="text-white text-sm font-medium">{d.address}</p>
-                                        <p className="text-zinc-500 text-xs">{d.createdAt ? new Date(d.createdAt).toLocaleString('pt-BR') : '-'}</p>
+                                        <p className="text-zinc-500 text-xs">{fmtDateTime(d.createdAt, '-')}</p>
                                     </div>
                                     <Badge className={
                                         d.status === 'delivered' ? 'bg-green-600' :
@@ -229,7 +230,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                                 <div key={t.id} className="flex items-center justify-between p-3 bg-zinc-900 rounded-lg">
                                     <div>
                                         <p className="text-white text-sm font-medium">{t.description || `Transação #${t.id}`}</p>
-                                        <p className="text-zinc-500 text-xs">{t.createdAt ? new Date(t.createdAt).toLocaleString('pt-BR') : '-'}</p>
+                                        <p className="text-zinc-500 text-xs">{fmtDateTime(t.createdAt, '-')}</p>
                                     </div>
                                     <span className={`font-bold ${t.type === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
                                         {t.type === 'credit' ? '+' : '-'}R$ {t.amount?.toFixed(2)}
