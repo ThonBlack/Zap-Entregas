@@ -138,7 +138,8 @@ export default function CompleteDeliveryModal({ isOpen, onClose, onConfirm, orde
                 {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
 
                 <p className="text-xs text-gray-400 mb-4">
-                    Ao confirmar, os dados de contato do cliente ficam ocultos (LGPD).
+                    Ao confirmar, o motoboy deixa de ver endereço, telefone e observação
+                    desta entrega no histórico dele (LGPD). A loja continua vendo tudo.
                 </p>
 
                 <div className="flex gap-3 justify-end">

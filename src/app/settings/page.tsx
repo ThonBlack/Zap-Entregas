@@ -51,7 +51,7 @@ export default async function SettingsPage({
     return (
         <div className="min-h-screen bg-zinc-900 pb-20 md:pb-8">
             <header className="bg-zinc-800 border-b border-zinc-700 px-6 py-4 flex items-center gap-4 sticky top-0 z-10 shadow-md">
-                <Link href="/" className="p-2 -ml-2 text-zinc-400 hover:text-green-400 rounded-full hover:bg-zinc-700 transition-colors">
+                <Link href="/app" className="p-2 -ml-2 text-zinc-400 hover:text-green-400 rounded-full hover:bg-zinc-700 transition-colors">
                     <ArrowLeft size={24} />
                 </Link>
                 <div className="flex items-center gap-2">
