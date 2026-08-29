@@ -6,9 +6,12 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 interface ReviewData {
-    deliveryId: number;
-    motoboyId: number;
-    shopkeeperId: number | null;
+    /**
+     * Token público da entrega (o mesmo do link de rastreio). O cliente não tem
+     * login: é o token que prova que ele recebeu ESTA entrega. Com o id
+     * sequencial, qualquer um avaliava a entrega dos outros trocando o número.
+     */
+    token: string;
     customerName: string;
     ratingGeneral: number;
     ratingDelivery: number;
@@ -22,12 +25,12 @@ function clampRating(value: number): number {
 
 export async function submitReviewAction(data: ReviewData) {
     try {
-        if (!Number.isInteger(data.deliveryId) || data.deliveryId <= 0) {
+        if (typeof data.token !== "string" || data.token.length < 8) {
             return { error: "Entrega inválida" };
         }
 
         const delivery = await db.query.deliveries.findFirst({
-            where: eq(deliveries.id, data.deliveryId),
+            where: eq(deliveries.publicToken, data.token),
             columns: { id: true, motoboyId: true, shopkeeperId: true, status: true },
         });
         if (!delivery) return { error: "Entrega não encontrada" };
@@ -35,7 +38,7 @@ export async function submitReviewAction(data: ReviewData) {
         if (!delivery.motoboyId) return { error: "Entrega sem motoboy" };
 
         const existing = await db.query.reviews.findFirst({
-            where: eq(reviews.deliveryId, data.deliveryId),
+            where: eq(reviews.deliveryId, delivery.id),
             columns: { id: true },
         });
         if (existing) return { error: "Esta entrega já foi avaliada." };
@@ -50,7 +53,7 @@ export async function submitReviewAction(data: ReviewData) {
         const customerName = typeof data.customerName === "string" ? data.customerName.slice(0, 100) : "";
 
         await db.insert(reviews).values({
-            deliveryId: data.deliveryId,
+            deliveryId: delivery.id,
             motoboyId: delivery.motoboyId,
             shopkeeperId: delivery.shopkeeperId,
             customerName,
