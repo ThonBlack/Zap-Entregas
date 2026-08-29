@@ -28,20 +28,25 @@ interface PendingDeliveriesFormProps {
     deliveries: Delivery[];
     isMotoboy?: boolean;
     currentUserId?: number;
+    /** Endereço público do site (APP_URL), vindo do servidor. Vazio = usa a janela atual. */
+    baseUrl?: string;
 }
 
 /**
  * Link do WhatsApp com o endereço de rastreio COMPLETO.
  *
- * Montado só na hora do clique: no servidor `window` não existe e o link sairia
- * como "/tracking/abc" — sem domínio, inútil pro cliente. Por isso o href do <a>
- * é só um atalho e a navegação de verdade acontece no onClick.
+ * O endereço do site vem do servidor (APP_URL) porque aqui, no navegador, o
+ * componente é renderizado ANTES no servidor — onde `window` não existe e o link
+ * sairia "/tracking/abc", sem domínio e inútil pro cliente.
+ *
+ * Se APP_URL não estiver configurada, o clique cai no endereço da própria janela
+ * (window.location.origin), que sempre existe na hora do clique.
  */
-function montarLinkWhatsApp(delivery: Delivery) {
+function montarLinkWhatsApp(delivery: Delivery, baseUrl: string) {
     const fone = (delivery.customerPhone || "").replace(/\D/g, '');
-    const origem = typeof window !== "undefined" ? window.location.origin : "";
-    const rastreio = delivery.publicToken && origem
-        ? `\nAcompanhe em tempo real: ${origem}/tracking/${delivery.publicToken}`
+    const raiz = baseUrl.replace(/\/+$/, "");
+    const rastreio = delivery.publicToken && raiz
+        ? `\nAcompanhe em tempo real: ${raiz}/tracking/${delivery.publicToken}`
         : "";
     const texto = `Olá ${delivery.customerName || 'Cliente'}, seu pedido está a caminho! 🏍️${rastreio}`;
     return `https://wa.me/55${fone}?text=${encodeURIComponent(texto)}`;
@@ -69,7 +74,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     return R * c;
 }
 
-export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, currentUserId }: PendingDeliveriesFormProps) {
+export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, currentUserId, baseUrl = "" }: PendingDeliveriesFormProps) {
     const [selected, setSelected] = useState<number[]>([]);
     const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [loadingAction, setLoadingAction] = useState<number | null>(null);
@@ -271,10 +276,11 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                     {/* WhatsApp Button - sempre visível se tiver telefone */}
                                     {delivery.customerPhone && (
                                         <a
-                                            href={montarLinkWhatsApp(delivery)}
+                                            href={montarLinkWhatsApp(delivery, baseUrl)}
                                             onClick={(e) => {
                                                 e.preventDefault();
-                                                window.open(montarLinkWhatsApp(delivery), '_blank', 'noopener,noreferrer');
+                                                const link = montarLinkWhatsApp(delivery, baseUrl || window.location.origin);
+                                                window.open(link, '_blank', 'noopener,noreferrer');
                                             }}
                                             target="_blank"
                                             rel="noopener noreferrer"

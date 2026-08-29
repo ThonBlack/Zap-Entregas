@@ -133,7 +133,7 @@ export function ShopkeeperView({ pendingDeliveries, recentTransactions, counts, 
 
             {/* Pending Deliveries */}
             <section>
-                <PendingDeliveriesForm deliveries={pendingDeliveries} />
+                <PendingDeliveriesForm deliveries={pendingDeliveries} baseUrl={process.env.APP_URL ?? ""} />
             </section>
 
             {/* Financial Summary */}

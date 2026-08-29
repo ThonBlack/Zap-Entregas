@@ -190,6 +190,7 @@ export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveri
                     deliveries={pendingDeliveries}
                     isMotoboy={true}
                     currentUserId={user.id}
+                    baseUrl={process.env.APP_URL ?? ""}
                 />
             </section>
 
