@@ -86,7 +86,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                             name="name"
                             type="text"
                             defaultValue={user.name}
-                            className="w-full max-w-md p-2 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full max-w-md p-2 bg-white text-zinc-900 placeholder-zinc-400 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                             placeholder="Nome do estabelecimento"
                         />
                     </div>

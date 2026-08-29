@@ -33,7 +33,7 @@ export default function ManualEntryForm({ motoboys, defaultMotoboyId, defaultEnt
                     name="motoboyId"
                     value={motoboyId}
                     onChange={e => setMotoboyId(Number(e.target.value))}
-                    className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full p-4 bg-zinc-50 text-zinc-900 placeholder-zinc-400 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
                     required
                 >
                     <option value="">Escolha um motoboy...</option>
@@ -103,7 +103,7 @@ export default function ManualEntryForm({ motoboys, defaultMotoboyId, defaultEnt
                     type="text"
                     name="description"
                     maxLength={140}
-                    className="w-full p-4 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full p-4 bg-zinc-50 text-zinc-900 placeholder-zinc-400 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
                     placeholder="Ex: acerto da semana, PIX de sábado..."
                 />
             </div>

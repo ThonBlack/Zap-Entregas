@@ -45,13 +45,13 @@ export default function NewFinancialRecordPage() {
                     {/* Descrição */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-                        <input type="text" name="description" required placeholder="Ex: Aluguel, Conta de Luz" className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        <input type="text" name="description" required placeholder="Ex: Aluguel, Conta de Luz" className="w-full p-3 bg-white text-zinc-900 placeholder-zinc-400 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                     </div>
 
                     {/* Categoria */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-                        <select name="category" className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <select name="category" className="w-full p-3 bg-white text-zinc-900 placeholder-zinc-400 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="Operacional">Operacional</option>
                             <option value="Pessoal">Pessoal</option>
                             <option value="Impostos">Impostos</option>
@@ -63,19 +63,19 @@ export default function NewFinancialRecordPage() {
                     {/* Valor */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
-                        <input type="number" name="amount" step="0.01" required placeholder="0,00" className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        <input type="number" name="amount" step="0.01" required placeholder="0,00" className="w-full p-3 bg-white text-zinc-900 placeholder-zinc-400 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                     </div>
 
                     {/* Data de Vencimento */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Data de Vencimento</label>
-                        <input type="date" name="dueDate" required className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+                        <input type="date" name="dueDate" required className="w-full p-3 bg-white text-zinc-900 placeholder-zinc-400 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" />
                     </div>
 
                     {/* Status */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Status Inicial</label>
-                        <select name="status" className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <select name="status" className="w-full p-3 bg-white text-zinc-900 placeholder-zinc-400 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
                             <option value="pending">Pendente</option>
                             <option value="paid">Pago</option>
                         </select>
