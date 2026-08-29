@@ -2,11 +2,12 @@
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { hashPassword } from "@/lib/password";
 import { getAuthUser } from "@/lib/session";
+import { isPlausiblePhone, normalizePhone, phoneVariants } from "@/lib/phone";
 
 export interface CompletarCadastroState {
     message?: string;
@@ -24,18 +25,21 @@ export async function completarCadastroAction(
     const auth = await getAuthUser();
     if ("error" in auth) redirect("/login");
 
-    const telefone = ((formData.get("phone") as string) || "").replace(/\D/g, "");
+    const digitado = (formData.get("phone") as string) || "";
     const senha = ((formData.get("password") as string) || "").trim();
 
-    if (telefone.length < 10 || telefone.length > 11) {
+    if (!isPlausiblePhone(digitado)) {
         return { message: "Digite o celular com DDD, só números. Ex.: 34996802886" };
     }
+    // Grava no formato do projeto: só dígitos, sem o 55.
+    const telefone = normalizePhone(digitado);
+
     if (senha && senha.length < 8) {
         return { message: "A senha deve ter pelo menos 8 caracteres." };
     }
 
     const jaUsado = await db.select({ id: users.id }).from(users)
-        .where(eq(users.phone, telefone)).get();
+        .where(inArray(users.phone, phoneVariants(digitado))).get();
     if (jaUsado && jaUsado.id !== auth.user.id) {
         return { message: "Esse celular já está cadastrado em outra conta." };
     }

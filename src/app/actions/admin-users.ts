@@ -2,12 +2,13 @@
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import crypto from "node:crypto";
 import { hashPassword } from "@/lib/password";
 import { getAuthUserWithRole } from "@/lib/session";
+import { isPlausiblePhone, normalizePhone, phoneVariants } from "@/lib/phone";
 
 const VALID_ROLES = ["shopkeeper", "motoboy", "admin"] as const;
 const VALID_PLANS = ["free", "basic", "pro", "growth", "enterprise"] as const;
@@ -17,7 +18,9 @@ export async function adminCreateUserAction(prevState: any, formData: FormData) 
     if ("error" in auth) return { error: auth.error };
 
     const name = ((formData.get("name") as string) || "").trim();
-    const phone = ((formData.get("phone") as string) || "").trim();
+    const phoneDigitado = ((formData.get("phone") as string) || "").trim();
+    // Grava no formato do projeto: só dígitos, sem o 55.
+    const phone = normalizePhone(phoneDigitado);
     const emailRaw = ((formData.get("email") as string) || "").trim();
     const email = emailRaw || null;
     const role = (formData.get("role") as string) || "";
@@ -30,11 +33,15 @@ export async function adminCreateUserAction(prevState: any, formData: FormData) 
     if (!VALID_ROLES.includes(role as any)) return { error: "Papel inválido." };
     if (!VALID_PLANS.includes(plan as any)) return { error: "Plano inválido." };
     if (password.length < 8) return { error: "Senha mínima de 8 caracteres." };
+    if (!isPlausiblePhone(phoneDigitado)) {
+        return { error: "Telefone inválido. Use DDD + número (ex.: 34996802886)." };
+    }
 
+    // Confere todas as formas do mesmo número (com/sem 55, com/sem 9º dígito).
     const existing = await db
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.phone, phone))
+        .where(inArray(users.phone, phoneVariants(phoneDigitado)))
         .get();
     if (existing) return { error: "Telefone já cadastrado." };
 
