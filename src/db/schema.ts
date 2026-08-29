@@ -29,6 +29,10 @@ export const users = sqliteTable("users", {
     isTrialUser: integer("is_trial_user", { mode: 'boolean' }).default(false), // Usuário de trial
     apiKey: text("api_key"), // Chave de API para integração com PDV
     googleId: text("google_id").unique(), // "sub" da conta Google vinculada (login com Google)
+    // Convite do motoboy: quem é cadastrado pela loja nasce SEM senha e recebe
+    // este código pra criar a dele. Uso único (apagado ao usar) e com prazo.
+    inviteToken: text("invite_token").unique(),
+    inviteTokenExpiresAt: text("invite_token_expires_at"),
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
