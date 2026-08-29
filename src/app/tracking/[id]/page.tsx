@@ -63,10 +63,18 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                                 {delivery.status === 'delivered' && "Entregue"}
                                 {delivery.status === 'canceled' && "Cancelado"}
                             </h1>
-                            <p className="text-zinc-500 text-sm">Previsão: 15-20 min</p>
+                            <p className="text-zinc-500 text-sm">
+                                {delivery.status === 'delivered'
+                                    ? "Pedido entregue. Obrigado!"
+                                    : delivery.status === 'canceled'
+                                        ? "Esse pedido foi cancelado. Fale com a loja."
+                                        : "Previsão: 15-20 min"}
+                            </p>
                         </div>
                         <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase
-                            ${delivery.status === 'delivered' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}
+                            ${delivery.status === 'delivered' ? 'bg-green-100 text-green-700'
+                                : delivery.status === 'canceled' ? 'bg-red-100 text-red-700'
+                                    : 'bg-blue-100 text-blue-700'}
                         `}>
                             {STATUS_LABEL[delivery.status] ?? delivery.status}
                         </div>
@@ -95,11 +103,17 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                     </div>
 
                     <div className="mt-6">
-                        {delivery.motoboyId && motoboyLocation ? (
+                        {delivery.motoboyId && motoboyLocation && delivery.status !== 'canceled' && delivery.status !== 'delivered' ? (
                             <TrackingMapWrapper motoboyLocation={motoboyLocation} googleMapsKey={getBrowserMapsKey()} />
                         ) : (
                             <div className="h-[200px] bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400 text-sm text-center p-4">
-                                {delivery.motoboyId ? "Aguardando sinal do motoboy..." : "Aguardando um motoboy aceitar seu pedido."}
+                                {delivery.status === 'canceled'
+                                    ? "Pedido cancelado — não há entrega em andamento."
+                                    : delivery.status === 'delivered'
+                                        ? "Entrega concluída."
+                                        : delivery.motoboyId
+                                            ? "Aguardando sinal do motoboy..."
+                                            : "Aguardando um motoboy aceitar seu pedido."}
                             </div>
                         )}
                     </div>
