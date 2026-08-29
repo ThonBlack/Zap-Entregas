@@ -23,6 +23,13 @@ export async function createRouteAction(prevState: any, formData: FormData) {
 
     if (!addresses.length) return { error: "Adicione ao menos um endereço" };
 
+    // Mesma trava do cadastro avulso (addDeliveryAction): plano no limite não cria rota.
+    const { canCreateDelivery } = await import("@/lib/planLimits");
+    const limitCheck = await canCreateDelivery(me.id);
+    if (!limitCheck.allowed) {
+        return { error: limitCheck.reason || "Limite de entregas atingido." };
+    }
+
     const recentDelivery = await db.query.deliveries.findFirst({
         where: and(
             eq(deliveries.shopkeeperId, me.id),
@@ -44,6 +51,12 @@ export async function createRouteAction(prevState: any, formData: FormData) {
         defaultState: shopCfg?.defaultState ?? null,
         shopLat: shopCfg?.shopLat ?? null,
         shopLng: shopCfg?.shopLng ?? null,
+    };
+
+    // Campo de valor é texto (o celular manda "12,50"): vira número aqui.
+    const parseMoney = (raw: FormDataEntryValue | undefined) => {
+        const n = Number(String(raw ?? "").trim().replace(",", "."));
+        return Number.isFinite(n) && n >= 0 ? n : 0;
     };
 
     const points = await Promise.all(addresses.map(async (addr, index) => {
@@ -69,7 +82,7 @@ export async function createRouteAction(prevState: any, formData: FormData) {
             customerName: names[originalIndex] as string,
             customerPhone: phones[originalIndex] as string,
             observation: observations[originalIndex] as string,
-            value: Number(values[originalIndex]) || 0,
+            value: parseMoney(values[originalIndex]),
             status: "pending" as const,
             stopOrder: i + 1,
             lat: p.lat,
@@ -78,7 +91,9 @@ export async function createRouteAction(prevState: any, formData: FormData) {
         };
     });
 
-    const failedPoints = points.filter(p => p.lat === 0);
+    // Quando NENHUM endereço geocodificou, optimizedPath já é a lista inteira —
+    // repetir os que falharam duplicaria todas as corridas.
+    const failedPoints = validPoints.length ? points.filter(p => p.lat === 0) : [];
     failedPoints.forEach((p, i) => {
         newDeliveries.push({
             shopkeeperId: me.id,
@@ -86,7 +101,7 @@ export async function createRouteAction(prevState: any, formData: FormData) {
             customerName: names[p.index] as string,
             customerPhone: phones[p.index] as string,
             observation: observations[p.index] as string,
-            value: Number(values[p.index]) || 0,
+            value: parseMoney(values[p.index]),
             status: "pending" as const,
             stopOrder: optimizedPath.length + i + 1,
             lat: 0,

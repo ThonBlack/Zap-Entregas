@@ -27,7 +27,7 @@ export default function NewRoutePage() {
     return (
         <div className="min-h-screen bg-zinc-900 pb-20 md:pb-8">
             <header className="bg-zinc-800 border-b border-zinc-700 px-6 py-4 flex items-center gap-4 sticky top-0 z-10 shadow-md">
-                <Link href="/" className="p-2 text-zinc-400 hover:text-green-400 rounded-full hover:bg-zinc-700 transition-colors">
+                <Link href="/app" className="p-2 text-zinc-400 hover:text-green-400 rounded-full hover:bg-zinc-700 transition-colors">
                     <ArrowLeft size={20} />
                 </Link>
                 <div className="flex items-center gap-2">
@@ -73,8 +73,8 @@ export default function NewRoutePage() {
                                             <DollarSign size={18} className="absolute left-3 top-3 text-zinc-500" />
                                             <input
                                                 name="value"
-                                                type="number"
-                                                step="0.01"
+                                                type="text"
+                                                inputMode="decimal"
                                                 placeholder="0,00"
                                                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-zinc-600 bg-zinc-700 text-white placeholder-zinc-500 focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
                                             />
