@@ -11,14 +11,13 @@ import Avatar from "@/components/auth/Avatar";
 interface ShopkeeperViewProps {
     pendingDeliveries: any[];
     recentTransactions: any[];
+    /** Contagens vindas do servidor (a lista aqui só tem as pendentes). */
+    counts: { pendentes: number; emRota: number; feitasHoje: number; hoje: number };
     user: any;
 }
 
-export function ShopkeeperView({ pendingDeliveries, recentTransactions, user }: ShopkeeperViewProps) {
-    const pending = pendingDeliveries.filter(d => d.status === 'pending').length;
-    const inProgress = pendingDeliveries.filter(d => d.status === 'assigned' || d.status === 'picked_up').length;
-    const delivered = pendingDeliveries.filter(d => d.status === 'delivered').length;
-    const totalToday = pending + inProgress + delivered;
+export function ShopkeeperView({ pendingDeliveries, recentTransactions, counts, user }: ShopkeeperViewProps) {
+    const { pendentes: pending, emRota: inProgress, feitasHoje: delivered, hoje: totalToday } = counts;
     const isFreeUser = user.plan === 'free' || !user.plan;
 
     return (
@@ -35,7 +34,7 @@ export function ShopkeeperView({ pendingDeliveries, recentTransactions, user }: 
                                 Olá, {user.name.split(' ')[0]}! 👋
                             </h1>
                             <p className="text-sm text-green-100">
-                                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Sao_Paulo' })}
                             </p>
                         </div>
                     </div>
@@ -60,7 +59,7 @@ export function ShopkeeperView({ pendingDeliveries, recentTransactions, user }: 
                             <CheckCircle size={18} className="text-yellow-300" />
                             <div>
                                 <p className="text-lg font-bold text-white">{delivered}</p>
-                                <p className="text-[10px] text-green-100 uppercase">Feitas</p>
+                                <p className="text-[10px] text-green-100 uppercase">Feitas hoje</p>
                             </div>
                         </div>
                     </div>
@@ -101,7 +100,7 @@ export function ShopkeeperView({ pendingDeliveries, recentTransactions, user }: 
             <div className="flex flex-wrap justify-between items-center gap-4 px-1">
                 <div className="flex items-center gap-2">
                     <Badge className="bg-green-600 text-white border-0">
-                        📅 Hoje: {totalToday} entregas
+                        📅 Hoje: {totalToday} {totalToday === 1 ? "entrega" : "entregas"}
                     </Badge>
                     {isFreeUser && (
                         <Link href="/upgrade">
