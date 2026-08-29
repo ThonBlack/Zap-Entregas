@@ -7,6 +7,7 @@ import { AlertTriangle, Bike, Loader2, MapPin, Trash2 } from "lucide-react";
 import AddressAutocomplete from "@/components/map/AddressAutocomplete";
 import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import { confirmDraftAction, cancelDraftAction } from "@/app/actions/drafts";
+import { updatePendingDeliveryAction } from "@/app/actions/deliveries";
 
 const PinPicker = dynamic(() => import("@/components/map/PinPicker"), {
     ssr: false,
@@ -42,15 +43,22 @@ interface DraftConfirmFormProps {
     confirmToken?: string;
     /** Chave do Google pro navegador (vem do servidor). Vazia = mapa do OpenStreetMap. */
     googleMapsKey?: string | null;
+    /**
+     * "conferencia" (padrão) = rascunho do PDV virando corrida.
+     * "edicao" = corrida já liberada, ainda sem motoboy, sendo corrigida pelo lojista.
+     */
+    modo?: "conferencia" | "edicao";
 }
 
+// Dinheiro na tela é sempre "150,50" — nunca "150.5".
 const money = (n: number | null | undefined) =>
-    n == null ? "" : String(n).replace(".", ",");
+    n == null ? "" : n.toFixed(2).replace(".", ",");
 
 export default function DraftConfirmForm({
     draft, shopLat, shopLng, defaultCity, defaultState, isSuspect, hidesValueFromMotoboy, confirmToken,
-    googleMapsKey,
+    googleMapsKey, modo = "conferencia",
 }: DraftConfirmFormProps) {
+    const editando = modo === "edicao";
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [error, setError] = useState("");
@@ -85,7 +93,7 @@ export default function DraftConfirmForm({
 
     // O pino quase nunca cai na porta da casa: dizer QUÃO perto ele está evita
     // que alguém libere uma corrida apontando pro meio do bairro sem perceber.
-    const aviso = pinTouched ? null
+    const aviso = (pinTouched || (editando && !hadNoPin && !isSuspect)) ? null
         : hadNoPin
             ? "Não achei esse endereço no mapa. Arraste o pino até o lugar certo antes de liberar."
             : isSuspect
@@ -120,8 +128,11 @@ export default function DraftConfirmForm({
         fd.set("lat", String(lat));
         fd.set("lng", String(lng));
         if (confirmToken) fd.set("confirmToken", confirmToken);
+        fd.set("pinTouched", pinTouched ? "1" : "0");
         startTransition(async () => {
-            const res = await confirmDraftAction(fd);
+            const res = editando
+                ? await updatePendingDeliveryAction(fd)
+                : await confirmDraftAction(fd);
             if (res && "error" in res) { setError(res.error); return; }
             if (doPdv) { encerrarPeloPdv("liberada"); return; }
             router.push("/app");
@@ -280,21 +291,32 @@ export default function DraftConfirmForm({
             )}
 
             <div className="flex flex-col-reverse md:flex-row gap-3 pt-1">
-                <button
-                    type="button"
-                    onClick={() => setShowCancel(true)}
-                    disabled={isPending}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-50"
-                >
-                    <Trash2 size={18} /> Cancelar corrida
-                </button>
+                {editando ? (
+                    <button
+                        type="button"
+                        onClick={() => router.push("/app")}
+                        disabled={isPending}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-50"
+                    >
+                        Voltar sem salvar
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setShowCancel(true)}
+                        disabled={isPending}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+                    >
+                        <Trash2 size={18} /> Cancelar corrida
+                    </button>
+                )}
                 <button
                     type="submit"
                     disabled={isPending}
                     className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold transition-colors disabled:opacity-50"
                 >
                     {isPending ? <Loader2 size={18} className="animate-spin" /> : <Bike size={18} />}
-                    Liberar pros motoboys
+                    {editando ? "Salvar alterações" : "Liberar pros motoboys"}
                 </button>
             </div>
 
