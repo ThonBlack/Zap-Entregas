@@ -1,5 +1,6 @@
 import "server-only";
 import crypto from "node:crypto";
+import { appBaseUrl } from "./appUrl";
 
 /**
  * Convite do motoboy.
@@ -24,11 +25,7 @@ export const APK_URL = "https://zapentregas.duckdns.org/baixar/zap-entregas.apk"
  * localhost. APP_URL/OAUTH_BASE_URL vêm do compose da VPS, em tempo de execução.
  */
 export function getAppBaseUrl(): string {
-    const base =
-        process.env.APP_URL ||
-        process.env.OAUTH_BASE_URL ||
-        "https://zapentregas.duckdns.org";
-    return base.replace(/\/+$/, "");
+    return appBaseUrl();
 }
 
 /** 32 bytes aleatórios — impossível de adivinhar, seguro pra ir na URL. */

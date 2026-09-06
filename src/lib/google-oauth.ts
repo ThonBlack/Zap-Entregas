@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { appBaseUrl } from "./appUrl";
 
 /**
  * Login com Google feito na mão (OAuth 2.0 + OpenID Connect).
@@ -29,8 +30,7 @@ export function isGoogleLoginConfigured(): boolean {
  * APP_URL é lida em tempo de execução, direto do compose da VPS.
  */
 export function googleRedirectUri(): string {
-    const base = process.env.OAUTH_BASE_URL || process.env.APP_URL || "https://zapentregas.duckdns.org";
-    return `${base.replace(/\/$/, "")}/api/auth/google/callback`;
+    return `${appBaseUrl()}/api/auth/google/callback`;
 }
 
 export function newOauthState(): string {

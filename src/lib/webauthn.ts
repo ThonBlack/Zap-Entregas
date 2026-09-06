@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { appBaseUrl } from "./appUrl";
 
 /**
  * Desbloqueio por digital (WebAuthn / passkey).
@@ -25,7 +26,7 @@ export function expectedOrigin(): string {
 function baseUrl(): string {
     // Mesma regra do login com Google: env lida em tempo de execução, nunca NEXT_PUBLIC_*
     // (que é congelada quando a imagem é construída na máquina do dev).
-    return process.env.OAUTH_BASE_URL || process.env.APP_URL || "https://zapentregas.duckdns.org";
+    return appBaseUrl();
 }
 
 export const RP_NAME = "Zap Entregas";

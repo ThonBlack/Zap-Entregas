@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { db } from "@/db";
 import { appLogs, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { absoluteUrl } from "@/lib/appUrl";
 import { exchangeCodeForProfile, isGoogleLoginConfigured } from "@/lib/google-oauth";
 import { resolverOuCriarUsuarioGoogle } from "@/lib/google-login";
 import { pushToAdmins } from "@/lib/push";
@@ -18,8 +19,10 @@ export async function GET(request: NextRequest) {
     store.delete("google_oauth_state");
     store.delete("google_oauth_mode");
 
+    // Endereço vem de APP_URL, nunca de request.url: dentro do container o
+    // servidor se enxerga como localhost:3000 e o navegador levaria pra lá.
     const back = (destino: string, erro?: string) =>
-        NextResponse.redirect(new URL(erro ? `${destino}?erro=${erro}` : destino, request.url));
+        NextResponse.redirect(absoluteUrl(erro ? `${destino}?erro=${erro}` : destino));
 
     const falhou = mode === "link" ? "/settings" : "/login";
 
@@ -48,7 +51,7 @@ export async function GET(request: NextRequest) {
             .set({ googleId: profile.sub, email: profile.email })
             .where(eq(users.id, meId));
 
-        return NextResponse.redirect(new URL("/settings?google=conectado", request.url));
+        return NextResponse.redirect(absoluteUrl("/settings?google=conectado"));
     }
 
     // --- Entrando (ou criando conta) com Google ---
@@ -62,14 +65,14 @@ export async function GET(request: NextRequest) {
 
     if (user.twoFactorEnabled && user.twoFactorSecret) {
         await setTwoFactorPendingCookie(user.id);
-        return NextResponse.redirect(new URL("/login/2fa", request.url));
+        return NextResponse.redirect(absoluteUrl("/login/2fa"));
     }
 
     await setSessionCookie(user.id);
 
     // Sem telefone ainda (conta recém-criada pelo Google): pede antes de usar o app.
     const destino = user.phone ? "/app" : "/completar-cadastro";
-    return NextResponse.redirect(new URL(destino, request.url));
+    return NextResponse.redirect(absoluteUrl(destino));
 }
 
 /** Registra no log do app e cutuca os administradores. Nunca derruba o login. */

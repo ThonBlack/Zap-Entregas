@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { absoluteUrl } from "@/lib/appUrl";
 import { buildAuthUrl, isGoogleLoginConfigured, newOauthState } from "@/lib/google-oauth";
 
 /**
@@ -7,7 +8,7 @@ import { buildAuthUrl, isGoogleLoginConfigured, newOauthState } from "@/lib/goog
  */
 export async function GET(request: NextRequest) {
     if (!isGoogleLoginConfigured()) {
-        return NextResponse.redirect(new URL("/login?erro=google_desligado", request.url));
+        return NextResponse.redirect(absoluteUrl("/login?erro=google_desligado"));
     }
 
     const state = newOauthState();
