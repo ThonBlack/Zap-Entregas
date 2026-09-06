@@ -1,3 +1,4 @@
+import { redirecionarSeJaLogado } from "@/lib/sessionRedirect";
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 import LoginForm from "./LoginForm";
 
@@ -20,6 +21,10 @@ export default async function LoginPage({
     searchParams: Promise<{ erro?: string }>;
 }) {
     const { erro } = await searchParams;
+
+    // Quem já está logado não tem o que fazer aqui. Conta desativada (ou apagada)
+    // continua vendo a tela de login, senão a pessoa fica presa num vai-e-volta.
+    await redirecionarSeJaLogado();
 
     return (
         <LoginForm

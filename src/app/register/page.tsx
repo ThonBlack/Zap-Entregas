@@ -1,5 +1,6 @@
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 import { conviteDeLojistaValido } from "@/lib/registerInvite";
+import { redirecionarSeJaLogado } from "@/lib/sessionRedirect";
 import RegisterForm from "./RegisterForm";
 
 // Sem isto o Next monta a página no BUILD, dentro da imagem, onde
@@ -13,6 +14,9 @@ export default async function RegisterPage({
     searchParams: Promise<{ convite_lojista?: string }>;
 }) {
     const { convite_lojista } = await searchParams;
+
+    // Já logado não cria outra conta: vai pro app (ou completar o cadastro).
+    await redirecionarSeJaLogado();
 
     // Só quem chega com o código da loja na URL enxerga a opção "Sou Lojista".
     const conviteLojista = conviteDeLojistaValido(convite_lojista) ? convite_lojista! : null;
