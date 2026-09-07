@@ -5,9 +5,16 @@ import { users } from "../../db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { authenticator } from "otplib";
 
 import { verifyPassword } from "../../lib/password";
+import {
+    aplicarLimite,
+    limparLimite,
+    ipDeQuemChamou,
+    mensagemDeEspera,
+} from "../../lib/rateLimit";
 import {
     setSessionCookie,
     setTwoFactorPendingCookie,
@@ -15,7 +22,7 @@ import {
     clearTwoFactorPendingCookie,
     getSessionUserId,
 } from "../../lib/session";
-import { phoneVariants, pickPhoneMatch } from "../../lib/phone";
+import { normalizePhone, phoneVariants, pickPhoneMatch } from "../../lib/phone";
 
 export async function loginAction(prevState: any, formData: FormData) {
     const phone = formData.get("phone") as string;
@@ -23,6 +30,20 @@ export async function loginAction(prevState: any, formData: FormData) {
 
     if (!phone || !password) {
         return { error: "Preencha todos os campos" };
+    }
+
+    // Limite de tentativas: sem isso um robô varre senhas à vontade. Contamos por
+    // IP (quem está tentando) E por celular (o alvo) — o primeiro segura o robô
+    // de um lugar só, o segundo segura o ataque distribuído contra uma conta.
+    const ip = ipDeQuemChamou(await headers());
+    const alvo = normalizePhone(phone);
+    const porIp = aplicarLimite("login", `ip:${ip}`);
+    if (!porIp.permitido) {
+        return { error: mensagemDeEspera(porIp.esperarSegundos) };
+    }
+    const porTelefone = aplicarLimite("login", `tel:${alvo}`);
+    if (!porTelefone.permitido) {
+        return { error: mensagemDeEspera(porTelefone.esperarSegundos) };
     }
 
     // O mesmo celular pode estar gravado com máscara, com 55 na frente ou sem o
@@ -38,14 +59,22 @@ export async function loginAction(prevState: any, formData: FormData) {
         return { error: "Credenciais inválidas" };
     }
 
-    if (user.isActive === false) {
-        return { error: "Conta desativada. Entre em contato com o suporte." };
-    }
-
     const passwordValid = await verifyPassword(password, user.password);
     if (!passwordValid) {
         return { error: "Credenciais inválidas" };
     }
+
+    // "Conta desativada" SÓ depois de conferir a senha. Antes vinha primeiro, e
+    // isso respondia "esse número existe aqui" pra quem só chutou o telefone —
+    // lista pronta de celulares de lojista e motoboy pra golpe no WhatsApp.
+    if (user.isActive === false) {
+        return { error: "Conta desativada. Entre em contato com o suporte." };
+    }
+
+    // Senha certa: o contador zera, senão quem erra 9 vezes e acerta na décima
+    // ficaria de castigo por 15 minutos.
+    limparLimite("login", `ip:${ip}`);
+    limparLimite("login", `tel:${alvo}`);
 
     if (user.twoFactorEnabled && user.twoFactorSecret) {
         await setTwoFactorPendingCookie(user.id);
@@ -64,6 +93,16 @@ export async function verifyTwoFactorAction(token: string) {
 
     if (!user || !user.twoFactorSecret) return { error: "Erro de autenticação." };
 
+    // O código tem 6 dígitos: sem limite, um robô varre o milhão de combinações
+    // enquanto o meio-login valer. Cinco erros e o meio-login é JOGADO FORA —
+    // quem errou tanto assim volta pro começo e digita senha de novo.
+    const limite = aplicarLimite("doisFatores", `user:${user.id}`);
+    if (!limite.permitido) {
+        await clearTwoFactorPendingCookie();
+        limparLimite("doisFatores", `user:${user.id}`);
+        return { error: "Muitas tentativas. Faça login novamente." };
+    }
+
     try {
         const isValid = authenticator.check(token, user.twoFactorSecret);
         if (!isValid) return { error: "Código inválido." };
@@ -71,6 +110,7 @@ export async function verifyTwoFactorAction(token: string) {
         return { error: "Erro ao validar código." };
     }
 
+    limparLimite("doisFatores", `user:${user.id}`);
     await clearTwoFactorPendingCookie();
     await setSessionCookie(user.id);
     redirect("/app");

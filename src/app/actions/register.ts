@@ -4,11 +4,24 @@ import { db } from "../../db";
 import { users } from "../../db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { hashPassword } from "../../lib/password";
 import { setSessionCookie } from "../../lib/session";
 import { defaultsDeContaNova } from "../../lib/signup";
 import { isPlausiblePhone, normalizePhone, phoneVariants } from "../../lib/phone";
 import { conviteDeLojistaValido } from "../../lib/registerInvite";
+import { aplicarLimite, ipDeQuemChamou, mensagemDeEspera } from "../../lib/rateLimit";
+
+/**
+ * Mesma resposta para "celular já existe" e "e-mail já existe".
+ *
+ * /register é público. Se a tela dissesse qual campo colidiu, dava pra varrer
+ * DDDs e montar a lista de celulares cadastrados no app — e o produto vive no
+ * WhatsApp, então essa lista é ouro pra golpista. A frase ainda diz o caminho
+ * de saída (entrar em vez de cadastrar) sem confirmar nada.
+ */
+const CONTA_JA_EXISTE =
+    "Não foi possível criar a conta com esses dados. Se você já tem conta, use a tela de Login — inclusive o botão 'Entrar com Google'.";
 
 /** O SQLite reclamou de valor repetido (índice único)? */
 function ehErroDeDuplicidade(e: unknown): boolean {
@@ -40,8 +53,18 @@ export async function registerAction(prevState: any, formData: FormData) {
 
     // Conta de lojista não sai por cadastro aberto: quem manda no app é ela
     // (vê endereço, telefone e dinheiro). Só com o código de convite da loja.
-    if (role === "shopkeeper" && !conviteDeLojistaValido(conviteLojista)) {
-        return { message: "Cadastro de lojista é só por convite. Fale com a loja." };
+    if (role === "shopkeeper") {
+        // O código é comparado com "===" simples: sem limite dava pra adivinhá-lo
+        // por força bruta e se auto-cadastrar como LOJISTA. Cinco chutes por hora
+        // por IP — quem tem o código de verdade acerta de primeira.
+        const ip = ipDeQuemChamou(await headers());
+        const limite = aplicarLimite("conviteLojista", `ip:${ip}`);
+        if (!limite.permitido) {
+            return { message: mensagemDeEspera(limite.esperarSegundos) };
+        }
+        if (!conviteDeLojistaValido(conviteLojista)) {
+            return { message: "Cadastro de lojista é só por convite. Fale com a loja." };
+        }
     }
 
     if (!isPlausiblePhone(phoneDigitado)) {
@@ -57,7 +80,7 @@ export async function registerAction(prevState: any, formData: FormData) {
         .where(inArray(users.phone, phoneVariants(phoneDigitado)))
         .get();
     if (existingUser) {
-        return { message: "Este número de celular já está cadastrado." };
+        return { message: CONTA_JA_EXISTE };
     }
 
     // E-mail sempre em minúsculas e sem espaços: é assim que o login pelo Google
@@ -73,9 +96,7 @@ export async function registerAction(prevState: any, formData: FormData) {
             .where(eq(users.email, email))
             .get();
         if (emailEmUso) {
-            return {
-                message: "Este e-mail já está cadastrado. Se você entrou pelo Google, use o botão 'Entrar com Google'.",
-            };
+            return { message: CONTA_JA_EXISTE };
         }
     }
 
@@ -102,7 +123,7 @@ export async function registerAction(prevState: any, formData: FormData) {
         }).returning().get();
     } catch (e) {
         if (ehErroDeDuplicidade(e)) {
-            return { message: "Celular ou e-mail já cadastrado." };
+            return { message: CONTA_JA_EXISTE };
         }
         console.error("[REGISTER] falha ao criar conta:", e);
         return { message: "Erro ao criar conta. Tente novamente." };

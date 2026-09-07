@@ -198,6 +198,7 @@ export default function DraftConfirmForm({
                     defaultState={defaultState ?? "MG"}
                     shopLat={shopLat}
                     shopLng={shopLng}
+                    confirmToken={confirmToken}
                     required
                 />
                 <p className="text-xs text-zinc-500 mt-2 flex items-center gap-1.5">

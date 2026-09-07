@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
+import { autorizarBuscaDeEndereco } from "@/lib/placesAuth";
+import { aplicarLimite } from "@/lib/rateLimit";
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const placeId = searchParams.get("place_id");
+
+    // Mesma tranca do autocomplete: a chave paga do Google não fica aberta.
+    const quem = await autorizarBuscaDeEndereco(searchParams.get("confirmToken"));
+    if (!quem.autorizado) {
+        return NextResponse.json({ error: "Faça login para buscar endereços." }, { status: 401 });
+    }
+    const limite = aplicarLimite("places", quem.chave);
+    if (!limite.permitido) {
+        return NextResponse.json(
+            { error: "Muitas buscas seguidas. Espere alguns segundos." },
+            { status: 429, headers: { "Retry-After": String(limite.esperarSegundos) } }
+        );
+    }
 
     if (!placeId) {
         return NextResponse.json({ error: "place_id é obrigatório" }, { status: 400 });
@@ -27,8 +42,9 @@ export async function GET(request: NextRequest) {
         if (data.status === "OK") {
             return NextResponse.json({ result: data.result });
         } else {
-            console.error("Google Places Details error:", data.status);
-            return NextResponse.json({ error: data.error_message || "Erro na API" }, { status: 400 });
+            // Detalhe do erro fica no log, não na resposta (ver autocomplete).
+            console.error("Google Places Details error:", data.status, data.error_message);
+            return NextResponse.json({ error: "Não foi possível buscar o endereço agora." }, { status: 400 });
         }
     } catch (error) {
         console.error("Erro ao buscar detalhes:", error);

@@ -3,14 +3,24 @@
 import { db } from "../../db";
 import { users, passwordResets } from "../../db/schema";
 import { eq, or, and, isNull } from "drizzle-orm";
+import { headers } from "next/headers";
 import { generateSecureToken, getTokenExpirationDate, isTokenExpired, hashPassword } from "../../lib/password";
 import { sendPasswordResetEmail } from "../../lib/email";
+import { aplicarLimite, ipDeQuemChamou, mensagemDeEspera } from "../../lib/rateLimit";
 
 /**
  * Solicita recuperação de senha via email ou telefone
  * Retorna sempre mensagem genérica por segurança (não revela se usuário existe)
  */
 export async function requestPasswordResetAction(identifier: string) {
+    // Sem limite, dá pra usar esta rota como despejo de e-mail (e como oráculo
+    // de tempo: conta que existe demora mais, porque manda e-mail de verdade).
+    const ipPedido = ipDeQuemChamou(await headers());
+    const limitePedido = aplicarLimite("senha", `pedido:${ipPedido}`);
+    if (!limitePedido.permitido) {
+        return { success: false, message: mensagemDeEspera(limitePedido.esperarSegundos) };
+    }
+
     // Busca usuário por telefone ou email
     const user = await db.select().from(users).where(
         or(
@@ -70,6 +80,13 @@ export async function requestPasswordResetAction(identifier: string) {
 export async function resetPasswordAction(token: string, newPassword: string) {
     if (!token || !newPassword) {
         return { error: "Token e nova senha são obrigatórios." };
+    }
+
+    // O token do link é o que autoriza trocar a senha: sem limite, dá pra chutar.
+    const ipUso = ipDeQuemChamou(await headers());
+    const limiteUso = aplicarLimite("senha", `uso:${ipUso}`);
+    if (!limiteUso.permitido) {
+        return { error: mensagemDeEspera(limiteUso.esperarSegundos) };
     }
 
     if (newPassword.length < 8) {

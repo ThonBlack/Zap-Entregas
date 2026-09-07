@@ -9,6 +9,7 @@ import { pushToDraftReviewers } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
 import { calcularTaxa, dependeDaDistancia } from "@/lib/fee";
 import { logServerError } from "@/lib/serverLog";
+import { aplicarLimite } from "@/lib/rateLimit";
 
 /**
  * API de Integração para PDV
@@ -208,6 +209,20 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 { success: false, error: "API Key inválida ou lojista não encontrado" },
                 { status: 401 }
+            );
+        }
+
+        // Teto por chave: cada corrida nova dispara uma busca de endereço PAGA no
+        // Google. Um PDV em laço (bug ou má-fé) queimaria a cota da operação toda.
+        // 120 por minuto é muito acima do movimento real de uma loja.
+        const ritmo = aplicarLimite("webhookPdv", `key:${user.id}`);
+        if (!ritmo.permitido) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: `Muitas chamadas seguidas. Tente de novo em ${ritmo.esperarSegundos} segundos.`,
+                },
+                { status: 429, headers: { "Retry-After": String(ritmo.esperarSegundos) } }
             );
         }
 

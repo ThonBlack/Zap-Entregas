@@ -1,10 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
+import { autorizarBuscaDeEndereco } from "@/lib/placesAuth";
+import { aplicarLimite } from "@/lib/rateLimit";
 
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY || "";
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("query");
+
+    // Esta rota gasta a chave paga do Google. Só quem está logado — ou o caixa
+    // com o código de conferência do PDV — pode chamar.
+    const quem = await autorizarBuscaDeEndereco(searchParams.get("confirmToken"));
+    if (!quem.autorizado) {
+        return NextResponse.json({ error: "Faça login para buscar endereços." }, { status: 401 });
+    }
+    const limite = aplicarLimite("places", quem.chave);
+    if (!limite.permitido) {
+        return NextResponse.json(
+            { error: "Muitas buscas seguidas. Espere alguns segundos." },
+            { status: 429, headers: { "Retry-After": String(limite.esperarSegundos) } }
+        );
+    }
 
     if (!query) {
         return NextResponse.json({ error: "Query é obrigatória" }, { status: 400 });
@@ -38,8 +54,11 @@ export async function GET(request: NextRequest) {
         if (data.status === "OK" || data.status === "ZERO_RESULTS") {
             return NextResponse.json({ predictions: data.predictions || [] });
         } else {
+            // O `error_message` do Google conta demais (estado da chave, cota,
+            // faturamento). Isso fica no log do servidor; pra quem chamou vai só
+            // "não deu" — o campo cai sozinho no OpenStreetMap.
             console.error("Google Places API error:", data.status, data.error_message);
-            return NextResponse.json({ error: data.error_message || "Erro na API" }, { status: 400 });
+            return NextResponse.json({ error: "Não foi possível buscar o endereço agora." }, { status: 400 });
         }
     } catch (error) {
         console.error("Erro ao buscar autocomplete:", error);

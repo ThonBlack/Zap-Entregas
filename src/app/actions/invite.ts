@@ -3,10 +3,12 @@
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 
 import { hashPassword } from "@/lib/password";
 import { setSessionCookie } from "@/lib/session";
 import { isInviteExpired } from "@/lib/invite";
+import { aplicarLimite, limparLimite, ipDeQuemChamou, mensagemDeEspera } from "@/lib/rateLimit";
 
 /**
  * Aceitar o convite: o motoboy cria a senha dele e já entra.
@@ -20,6 +22,14 @@ export async function acceptInviteAction(token: string, password: string) {
     }
     if (!password || password.length < 8) {
         return { error: "A senha precisa ter pelo menos 8 caracteres." };
+    }
+
+    // Rota pública: o código da URL é a única tranca. Sem limite de tentativas
+    // dava pra ficar chutando códigos até acertar um convite aberto.
+    const ip = ipDeQuemChamou(await headers());
+    const limite = aplicarLimite("convite", `ip:${ip}`);
+    if (!limite.permitido) {
+        return { error: mensagemDeEspera(limite.esperarSegundos) };
     }
 
     const user = await db.query.users.findFirst({
@@ -54,6 +64,7 @@ export async function acceptInviteAction(token: string, password: string) {
         .where(eq(users.id, user.id));
 
     // Acabou de provar que é dono do convite e definiu a senha: já entra logado.
+    limparLimite("convite", `ip:${ip}`);
     await setSessionCookie(user.id);
 
     return { success: true };
