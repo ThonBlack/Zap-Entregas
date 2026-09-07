@@ -1,9 +1,18 @@
+import { Fragment } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Clock, XCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ClipboardCheck, Clock, XCircle } from "lucide-react";
 import { KIND_LABEL, formatBRL, type Statement } from "@/lib/wallet";
-import { fmtShortDateTime, hojeBrasilia } from "@/lib/datetime";
+import { diaBrasiliaDe, fmtDiaLegivel, fmtShortDateTime, hojeBrasilia } from "@/lib/datetime";
+import { textoLiquido } from "@/lib/dailyClosing-shared";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+/** Dia já fechado com o motoboy — vira um marcador na lista, não um lançamento. */
+export type MarcadorFechamento = {
+    day: string;
+    net: number;
+    status: "confirmed" | "disputed";
+};
 
 type Props = {
     statement: Statement;
@@ -11,6 +20,8 @@ type Props = {
     basePath: string;
     /** "motoboy" = fala "você"; "loja" = fala "ele" */
     perspective: "motoboy" | "loja";
+    /** Fechamentos do dia já respondidos, pra marcar na lista. */
+    fechamentos?: MarcadorFechamento[];
 };
 
 export function BalanceHeadline({ balance, perspective }: { balance: number; perspective: "motoboy" | "loja" }) {
@@ -24,11 +35,12 @@ export function BalanceHeadline({ balance, perspective }: { balance: number; per
     return { label: "Saldo zerado", value: abs, tone: "zinc" as const };
 }
 
-export default function StatementView({ statement, basePath, perspective }: Props) {
+export default function StatementView({ statement, basePath, perspective, fechamentos = [] }: Props) {
     const { month, year, lines, totals, openingBalance, balance } = statement;
     const prev = month === 1 ? { m: 12, y: year - 1 } : { m: month - 1, y: year };
     const next = month === 12 ? { m: 1, y: year + 1 } : { m: month + 1, y: year };
     const head = BalanceHeadline({ balance, perspective });
+    const porDia = new Map(fechamentos.map(f => [f.day, f]));
 
     // Mês seguinte só existe se ainda não passou do mês corrente em Brasília.
     const hoje = hojeBrasilia();
@@ -83,11 +95,21 @@ export default function StatementView({ statement, basePath, perspective }: Prop
             <div className="bg-zinc-800 border border-zinc-700 rounded-xl divide-y divide-zinc-700">
                 {lines.length === 0 ? (
                     <p className="p-6 text-center text-zinc-400 text-sm">Nenhum lançamento neste mês.</p>
-                ) : lines.map(l => {
+                ) : lines.map((l, i) => {
                     const isCredit = l.type === "credit";
                     const confirmed = l.status === "confirmed";
+                    // A lista vem do mais novo pro mais velho. Quando começa um dia
+                    // novo, se aquele dia já foi fechado com o motoboy, entra o
+                    // marcador antes dos lançamentos dele.
+                    const dia = diaBrasiliaDe(l.createdAt);
+                    const diaAnterior = i === 0 ? null : diaBrasiliaDe(lines[i - 1].createdAt);
+                    const marcador = dia && dia !== diaAnterior
+                        ? porDia.get(dia)
+                        : undefined;
                     return (
-                        <div key={l.id} className={`p-3 flex items-center gap-3 ${confirmed ? "" : "opacity-60"}`}>
+                        <Fragment key={l.id}>
+                        {marcador && <MarcadorDia marcador={marcador} perspective={perspective} />}
+                        <div className={`p-3 flex items-center gap-3 ${confirmed ? "" : "opacity-60"}`}>
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                     <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-300">
@@ -115,9 +137,24 @@ export default function StatementView({ statement, basePath, perspective }: Prop
                                 )}
                             </div>
                         </div>
+                        </Fragment>
                     );
                 })}
             </div>
+        </div>
+    );
+}
+
+/** Linha que não é lançamento: só marca que aquele dia foi conferido pelos dois. */
+function MarcadorDia({ marcador, perspective }: { marcador: MarcadorFechamento; perspective: "motoboy" | "loja" }) {
+    const ok = marcador.status === "confirmed";
+    return (
+        <div className={`px-3 py-2 flex items-center gap-2 text-xs ${ok ? "bg-green-600/10 text-green-300" : "bg-red-600/10 text-red-300"}`}>
+            <ClipboardCheck size={14} className="shrink-0" />
+            <span className="flex-1 min-w-0">
+                {ok ? "Fechamento do dia confirmado" : "Fechamento do dia contestado"} — {fmtDiaLegivel(marcador.day)}
+            </span>
+            <span className="font-mono shrink-0">{textoLiquido(marcador.net, perspective)}</span>
         </div>
     );
 }

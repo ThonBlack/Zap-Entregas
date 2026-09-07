@@ -47,6 +47,8 @@ import { PendingConfirmations } from "@/components/dashboard/PendingConfirmation
 import TrialBanner from "@/components/billing/TrialBanner";
 import FirstRunWrapper from "@/components/shared/FirstRunWrapper";
 import DraftsBanner from "@/components/deliveries/DraftsBanner";
+import FecharODiaCard from "@/components/finance/FecharODiaCard";
+import FechamentoPendente from "@/components/finance/FechamentoPendente";
 import { getBalance } from "@/lib/wallet";
 
 const getUserBalance = getBalance;
@@ -366,6 +368,13 @@ export default async function Dashboard({
                 <FirstRunWrapper userId={user.id} semDigital={semDigital} />
                 <PendingConfirmations confirmations={pendingConfirmations} />
                 <DraftsBanner drafts={draftDeliveries} />
+
+                {/* Fechamento do dia: a loja fecha, o motoboy confere. */}
+                {isShopkeeperOrAdmin ? (
+                    <FecharODiaCard shopkeeperId={(user.role as string) === "admin" ? null : user.id} />
+                ) : (
+                    <FechamentoPendente motoboyId={user.id} />
+                )}
 
                 {isShopkeeperOrAdmin ? (
                     <ShopkeeperView

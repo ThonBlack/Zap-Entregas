@@ -2,13 +2,23 @@ import Link from "next/link";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import { requireMotoboy } from "@/lib/session";
 import { getStatement } from "@/lib/wallet";
-import StatementView from "@/components/finance/StatementView";
+import StatementView, { type MarcadorFechamento } from "@/components/finance/StatementView";
+import FechamentoPendente from "@/components/finance/FechamentoPendente";
+import { getRespondedClosingsByDay } from "@/lib/dailyClosing";
 import { parseMonth } from "@/lib/wallet-shared";
 
 export default async function ExtratoPage({ searchParams }: { searchParams: Promise<{ m?: string; y?: string }> }) {
     const user = await requireMotoboy();
     const { month, year } = parseMonth(await searchParams);
     const statement = await getStatement(user.id, month, year);
+
+    // Dias já conferidos com a loja viram um marcador na lista (não são lançamento).
+    const respondidos = await getRespondedClosingsByDay(user.id);
+    const fechamentos: MarcadorFechamento[] = [...respondidos.values()].map(c => ({
+        day: c.day,
+        net: c.net,
+        status: c.status as "confirmed" | "disputed",
+    }));
 
     return (
         <div className="min-h-screen bg-zinc-900 pb-20">
@@ -21,8 +31,14 @@ export default async function ExtratoPage({ searchParams }: { searchParams: Prom
                     <BarChart3 size={22} />
                 </Link>
             </header>
-            <main className="max-w-2xl mx-auto p-4">
-                <StatementView statement={statement} basePath="/finance/extrato" perspective="motoboy" />
+            <main className="max-w-2xl mx-auto p-4 space-y-4">
+                <FechamentoPendente motoboyId={user.id} />
+                <StatementView
+                    statement={statement}
+                    basePath="/finance/extrato"
+                    perspective="motoboy"
+                    fechamentos={fechamentos}
+                />
             </main>
         </div>
     );
