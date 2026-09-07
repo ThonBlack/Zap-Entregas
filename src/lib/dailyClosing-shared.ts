@@ -48,3 +48,40 @@ export function tomLiquido(net: number): "green" | "red" | "zinc" {
     if (net < 0) return "red";
     return "zinc";
 }
+
+/** Os totais que entram na comparação entre o congelado e o resumo vivo. */
+export type TotaisFechamento = {
+    deliveriesCount: number;
+    feesTotal: number;
+    cashTotal: number;
+    pixTotal: number;
+    cardTotal: number;
+    net: number;
+};
+
+/** Meio centavo de folga pra não acusar divergência por lixo de ponto flutuante. */
+const TOLERANCIA_CENTAVO = 0.005;
+
+function difereDinheiro(a: number, b: number): boolean {
+    return Math.abs(a - b) >= TOLERANCIA_CENTAVO;
+}
+
+/**
+ * Compara os totais CONGELADOS de um fechamento (o que foi enviado ou já
+ * confirmado) com o resumo VIVO (recalculado na hora) e diz quais campos
+ * mudaram desde então. É o que acende o aviso "os números mudaram" na tela
+ * da loja e a linha discreta no card do motoboy.
+ */
+export function fechamentoDivergente(
+    congelado: TotaisFechamento,
+    vivo: TotaisFechamento,
+): { divergente: boolean; campos: string[] } {
+    const campos: string[] = [];
+    if (congelado.deliveriesCount !== vivo.deliveriesCount) campos.push("deliveriesCount");
+    if (difereDinheiro(congelado.feesTotal, vivo.feesTotal)) campos.push("feesTotal");
+    if (difereDinheiro(congelado.cashTotal, vivo.cashTotal)) campos.push("cashTotal");
+    if (difereDinheiro(congelado.pixTotal, vivo.pixTotal)) campos.push("pixTotal");
+    if (difereDinheiro(congelado.cardTotal, vivo.cardTotal)) campos.push("cardTotal");
+    if (difereDinheiro(congelado.net, vivo.net)) campos.push("net");
+    return { divergente: campos.length > 0, campos };
+}
