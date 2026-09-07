@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -41,10 +41,11 @@ function ClickToMove({ onMove }: { onMove: (lat: number, lng: number) => void })
 
 /** Mapa de reserva: entra quando não há chave do Google ou o script dele falha. */
 export default function LeafletPinPicker({ lat, lng, onMove, recenterTrigger = 0, shopLat, shopLng }: PinPickerProps) {
-    const [isMounted, setIsMounted] = useState(false);
+    // Sem "isMounted": quem monta este componente já usa dynamic(ssr: false) com
+    // esqueleto de carregamento (PinPicker.tsx), então ele SÓ existe no navegador.
+    // O truque antigo obrigava a chamar setState dentro do efeito, o que provoca
+    // uma segunda renderização em cascata à toa.
     const markerRef = useRef<L.Marker>(null);
-
-    useEffect(() => { setIsMounted(true); }, []);
 
     const position: [number, number] = [lat, lng];
 
@@ -56,10 +57,6 @@ export default function LeafletPinPicker({ lat, lng, onMove, recenterTrigger = 0
             onMove(p.lat, p.lng);
         },
     }), [onMove]);
-
-    if (!isMounted) {
-        return <div className="h-[300px] w-full bg-zinc-100 rounded-xl animate-pulse flex items-center justify-center text-zinc-400 text-sm">Carregando mapa…</div>;
-    }
 
     return (
         <MapContainer center={position} zoom={16} scrollWheelZoom={false} className="h-[300px] w-full rounded-xl z-0">

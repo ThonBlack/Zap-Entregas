@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -34,14 +34,8 @@ function MapUpdater({ center }: { center: [number, number] }) {
 
 /** Mapa de reserva do rastreio: entra quando não há chave do Google ou ele falha. */
 export default function LeafletTrackingMap({ motoboyLocation }: TrackingMapProps) {
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-    }, []);
-
-    if (!isMounted) return <div className="h-64 bg-zinc-100 rounded-xl animate-pulse flex items-center justify-center text-zinc-400">Carregando Mapa...</div>;
-
+    // Sem "isMounted": TrackingMap.tsx já monta este componente com
+    // dynamic(ssr: false) e esqueleto próprio — ele nunca roda no servidor.
     const initialPosition: [number, number] = motoboyLocation
         ? [motoboyLocation.lat, motoboyLocation.lng]
         : [-22.9068, -43.1729]; // Default Rio de Janeiro

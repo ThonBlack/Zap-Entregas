@@ -1,6 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+
+/**
+ * "Esta janela está dentro de um iframe?" — pergunta que só o navegador responde.
+ *
+ * useSyncExternalStore com resposta separada pro servidor é o jeito certo de ler
+ * algo do navegador sem chamar setState dentro de um efeito (que provoca uma
+ * segunda renderização em cascata) e sem quebrar a hidratação.
+ */
+const nuncaMuda = () => () => { };
+const lerNoNavegador = () => window.parent !== window;
+const lerNoServidor = () => false;
 
 /**
  * O que o caixa vê quando o link de conferência não serve mais.
@@ -18,10 +29,9 @@ export default function RecadoConferencia({
     texto: string;
     resultado: "expirado" | "invalido" | "ja_liberada" | "cancelada";
 }) {
-    const [dentroDeIframe, setDentroDeIframe] = useState(false);
+    const dentroDeIframe = useSyncExternalStore(nuncaMuda, lerNoNavegador, lerNoServidor);
 
     useEffect(() => {
-        setDentroDeIframe(window.parent !== window);
         const recado = { tipo: "zap-entregas:conferencia", resultado };
         try {
             window.parent?.postMessage(recado, "*");
