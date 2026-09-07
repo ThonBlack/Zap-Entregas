@@ -8,6 +8,7 @@ import { geocodeAddress, optimizeRoute, type GeocodeOpts } from "@/lib/routeUtil
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
 import { newTrackingToken } from "@/lib/trackingToken";
 import { pushToMotoboys, pushToUser } from "@/lib/push";
+import { validarRecebimento, type DeliveryReceipt, type RecebimentoValidado } from "@/lib/receipt";
 
 async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
     const s = await db.query.shopSettings.findFirst({
@@ -275,16 +276,6 @@ export async function pickupDeliveryAction(id: number) {
     }
 }
 
-export interface DeliveryReceipt {
-    status: "recebido" | "valor_diferente" | "nao_recebido" | "nada_a_receber";
-    amount?: number; // quanto recebeu (recebido/valor_diferente)
-    method?: "dinheiro" | "pix" | "cartao";
-    note?: string;
-}
-
-const RECEIPT_STATUSES = ["recebido", "valor_diferente", "nao_recebido", "nada_a_receber"] as const;
-const RECEIPT_METHODS = ["dinheiro", "pix", "cartao"] as const;
-
 export async function completeDeliveryAction(id: number, receipt?: DeliveryReceipt) {
     const auth = await getAuthUserWithRole(["motoboy", "shopkeeper", "admin"]);
     if ("error" in auth) return auth;
@@ -292,26 +283,19 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
 
     if (!Number.isInteger(id) || id <= 0) return { error: "ID inválido" };
 
-    // Validar recebimento (opcional — entrega pode ser finalizada sem informar)
+    // Validar recebimento (opcional — entrega pode ser finalizada sem informar).
+    // A regra mora em src/lib/receipt.ts, a mesma que a tela usa.
     let receivedAmount: number | null = null;
-    let receivedMethod: (typeof RECEIPT_METHODS)[number] | null = null;
+    let receivedMethod: RecebimentoValidado["method"] = null;
     let receiptNote: string | null = null;
-    let receiptStatus: (typeof RECEIPT_STATUSES)[number] | null = null;
+    let receiptStatus: RecebimentoValidado["status"] | null = null;
     if (receipt) {
-        if (!RECEIPT_STATUSES.includes(receipt.status)) return { error: "Status de recebimento inválido." };
-        receiptStatus = receipt.status;
-        receiptNote = typeof receipt.note === "string" && receipt.note.trim() ? receipt.note.trim().slice(0, 500) : null;
-        if (receipt.status === "recebido" || receipt.status === "valor_diferente") {
-            const amt = Number(receipt.amount);
-            if (!Number.isFinite(amt) || amt < 0 || amt > 100000) return { error: "Valor recebido inválido." };
-            receivedAmount = Math.round(amt * 100) / 100;
-            if (!receipt.method || !RECEIPT_METHODS.includes(receipt.method)) {
-                return { error: "Informe como recebeu (dinheiro, PIX ou cartão)." };
-            }
-            receivedMethod = receipt.method;
-        } else {
-            receivedAmount = 0;
-        }
+        const conferido = validarRecebimento(receipt);
+        if ("error" in conferido) return conferido;
+        receiptStatus = conferido.status;
+        receivedAmount = conferido.amount;
+        receivedMethod = conferido.method;
+        receiptNote = conferido.note;
     }
 
     try {

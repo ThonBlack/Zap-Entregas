@@ -9,10 +9,25 @@ node_modules
 .claude
 
 # Local DB / uploads
-sqlite.db
-sqlite.db-journal
+sqlite.db*
 uploads
 data
+
+# App Android: a chave que assina o APK e a senha dela NÃO entram na imagem.
+# A imagem viaja pela rede no deploy (docker save | ssh | docker load); quem
+# recebesse ela saía com a chave de assinatura do app publicado.
+android
+# Padrão sem "**" no Docker só pega a raiz — por isso os dois de cada.
+*.keystore
+*.jks
+*.apk
+*.aab
+keystore-password.txt
+**/*.keystore
+**/*.jks
+**/*.apk
+**/*.aab
+**/keystore-password.txt
 
 # Build artifacts / logs
 build_error.log
@@ -27,7 +42,11 @@ RECEBER_ALTERACOES.bat
 promote_admin.sql
 README.md
 RELATORIO_STATUS.md
+*.md
+**/*.md
 docs
+# Testes rodam na máquina do dev, não dentro da imagem.
+scripts/test
 
 # Env
 .env

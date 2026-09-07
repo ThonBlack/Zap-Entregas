@@ -2,7 +2,8 @@
 
 import { X, CheckCircle2, Banknote, QrCode, CreditCard } from "lucide-react";
 import { useState } from "react";
-import type { DeliveryReceipt } from "@/app/actions/logistics";
+import { AVISO_VALOR_VAZIO, type DeliveryReceipt } from "@/lib/receipt";
+import { parseMoney } from "@/lib/money";
 
 interface CompleteDeliveryModalProps {
     isOpen: boolean;
@@ -37,9 +38,11 @@ export default function CompleteDeliveryModal({ isOpen, onClose, onConfirm, orde
         if (status === "recebido") {
             receipt.amount = orderValue ?? 0;
         } else if (status === "valor_diferente") {
-            const amt = Number(amount.replace(",", "."));
-            if (!Number.isFinite(amt) || amt < 0) {
-                setError("Informe o valor recebido.");
+            // Campo em branco dava Number("") === 0 e passava: a corrida era
+            // finalizada com R$ 0,00 e o dinheiro no bolso do motoboy sumia da conta.
+            const amt = parseMoney(amount);
+            if (amt === null || amt <= 0) {
+                setError(AVISO_VALOR_VAZIO);
                 return;
             }
             receipt.amount = amt;

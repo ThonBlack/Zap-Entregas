@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { Play, Trash2, Phone, Pencil } from "lucide-react";
 import Link from "next/link";
-import { optimizeSelectedRouteAction, type DeliveryReceipt } from "@/app/actions/logistics";
+import { optimizeSelectedRouteAction } from "@/app/actions/logistics";
+import type { DeliveryReceipt } from "@/lib/receipt";
 import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import CompleteDeliveryModal from "@/components/deliveries/CompleteDeliveryModal";
 import RefreshButton from "@/components/shared/RefreshButton";

@@ -1,8 +1,9 @@
 import { db } from "@/db";
 import { deliveries, users, shopSettings } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
+import { eq, and, ne, inArray, desc, sql } from "drizzle-orm";
+import { NextRequest, NextResponse, after } from "next/server";
 import { geocodeAddress } from "@/lib/routeUtils";
+import type { ParsedAddress } from "@/lib/addressParser";
 import { newTrackingToken, newConfirmToken, confirmTokenExpiry } from "@/lib/trackingToken";
 import { pushToDraftReviewers } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
@@ -16,6 +17,176 @@ import { parseMoney } from "@/lib/money";
 /** Campo de texto do corpo da requisição, aparado e limitado. */
 function str(v: unknown): string | null {
     return typeof v === "string" && v.trim() ? v.trim().slice(0, 200) : null;
+}
+
+/** Quanto tempo duas chamadas parecidas, sem número de pedido, são a mesma corrida. */
+const JANELA_DUPLICATA_MIN = 10;
+
+/**
+ * Número do pedido no PDV. É o que impede que um reenvio (o caixa clica duas
+ * vezes, ou o EpicStore repete por timeout) vire duas corridas e duas taxas.
+ *
+ * TRANSIÇÃO: o EpicStore ainda não manda `externalId` em todas as versões em uso.
+ * Enquanto isso, deduzimos do começo da observação, que hoje sai sempre como
+ * "Pedido #1234 - 2x Produto..." (ver sendToZapEntregas em EpicStore
+ * src/app/actions/delivery.js). O número deduzido é o MESMO id do pedido que a
+ * versão nova manda em `externalId`, então as duas versões conversam sem sustos.
+ * Quando todos os PDVs estiverem atualizados, esta dedução pode sair.
+ */
+function extrairExternalId(body: any): string | null {
+    if (typeof body.externalId === "string" && body.externalId.trim()) {
+        return body.externalId.trim().slice(0, 64);
+    }
+    if (typeof body.externalId === "number" && Number.isFinite(body.externalId)) {
+        return String(body.externalId);
+    }
+    const obs = typeof body.observation === "string" ? body.observation : "";
+    const m = obs.match(/^\s*Pedido\s*#\s*(\d{1,40})\b/i);
+    return m ? m[1] : null;
+}
+
+function appBaseUrl(): string {
+    return process.env.APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
+}
+
+/** O banco reclamou que já existe uma corrida com esse número de pedido? */
+function ehViolacaoDeUnico(e: unknown): boolean {
+    const msg = String((e as any)?.message ?? e ?? "");
+    const code = String((e as any)?.code ?? "");
+    return code.includes("SQLITE_CONSTRAINT") || /UNIQUE constraint failed/i.test(msg);
+}
+
+type CorridaExistente = {
+    id: number;
+    status: string;
+    publicToken: string | null;
+    confirmToken: string | null;
+};
+
+/**
+ * Acha a corrida que este mesmo pedido já criou, se houver.
+ *
+ * 1º: pelo número do pedido (`external_id`) — é a garantia de verdade.
+ * 2º: sem número de pedido, uma rede de segurança: mesma loja, mesmo telefone
+ *     (ou mesmo endereço, quando não veio telefone), ainda por liberar/aceitar,
+ *     criada nos últimos 10 minutos.
+ *
+ * Corrida cancelada não conta: se o pedido foi refeito depois de cancelar, é
+ * pra criar de novo mesmo.
+ */
+async function acharDuplicata(
+    shopkeeperId: number,
+    externalId: string | null,
+    customerPhone: string | null,
+    address: string
+): Promise<CorridaExistente | null> {
+    const colunas = { id: true, status: true, publicToken: true, confirmToken: true } as const;
+
+    if (externalId) {
+        const achada = await db.query.deliveries.findFirst({
+            where: and(
+                eq(deliveries.shopkeeperId, shopkeeperId),
+                eq(deliveries.externalId, externalId),
+                ne(deliveries.status, "canceled")
+            ),
+            columns: colunas,
+            orderBy: desc(deliveries.id),
+        });
+        return achada ?? null;
+    }
+
+    const telefone = customerPhone && customerPhone.trim() ? customerPhone.trim() : null;
+    const achada = await db.query.deliveries.findFirst({
+        where: and(
+            eq(deliveries.shopkeeperId, shopkeeperId),
+            inArray(deliveries.status, ["draft", "pending"]),
+            telefone ? eq(deliveries.customerPhone, telefone) : eq(deliveries.address, address),
+            // datetime() no SQL porque o created_at do banco veio em dois formatos
+            // ("2026-09-07 13:00:00" das linhas antigas, ISO com T e Z das novas).
+            // Comparar como texto daria errado entre os dois.
+            sql`datetime(${deliveries.createdAt}) >= datetime('now', ${`-${JANELA_DUPLICATA_MIN} minutes`})`
+        ),
+        columns: colunas,
+        orderBy: desc(deliveries.id),
+    });
+    return achada ?? null;
+}
+
+/**
+ * Resposta de "esse pedido já virou corrida". 200 e `success: true` de propósito:
+ * pro PDV deu certo — a corrida existe, é só não criar outra.
+ * Se ela ainda está esperando conferência, renova o link do caixa (que vale uma
+ * vez só e por 2h), senão o operador reenvia e fica sem por onde conferir.
+ */
+async function respostaDuplicata(existente: CorridaExistente, feeIgnored: boolean) {
+    const baseUrl = appBaseUrl();
+    let confirmToken = existente.confirmToken;
+
+    if (existente.status === "draft") {
+        confirmToken = newConfirmToken();
+        await db.update(deliveries)
+            .set({
+                confirmToken,
+                confirmTokenExpiresAt: confirmTokenExpiry(),
+                updatedAt: new Date().toISOString(),
+            })
+            .where(eq(deliveries.id, existente.id));
+    }
+
+    return {
+        success: true,
+        duplicate: true,
+        deliveryId: existente.id,
+        ...(feeIgnored ? { feeIgnored: true } : {}),
+        ...(existente.publicToken ? { trackingUrl: `${baseUrl}/tracking/${existente.publicToken}` } : {}),
+        ...(existente.status === "draft" && confirmToken
+            ? { confirmUrl: `${baseUrl}/confirmar/${confirmToken}` }
+            : {}),
+        status: existente.status,
+        message: "Esse pedido já tinha corrida no Zap Entregas — não criamos outra.",
+    };
+}
+
+/**
+ * Procura o endereço no mapa DEPOIS de responder ao PDV e guarda o pino.
+ * Usa o `after()` do Next quando ele existe; se não, solta a promessa mesmo
+ * (com catch), que é o comportamento antigo de "não trava a resposta".
+ */
+function agendarGeocode(
+    deliveryId: number,
+    shopkeeperId: number,
+    address: string,
+    partes: Partial<ParsedAddress> | null
+) {
+    const trabalho = async () => {
+        try {
+            const s = await db.query.shopSettings.findFirst({
+                where: eq(shopSettings.userId, shopkeeperId),
+                columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
+            });
+            const coords = await geocodeAddress(address, {
+                defaultCity: s?.defaultCity ?? null,
+                defaultState: s?.defaultState ?? null,
+                shopLat: s?.shopLat ?? null,
+                shopLng: s?.shopLng ?? null,
+            }, partes);
+            if (!coords) return;
+            await db.update(deliveries)
+                .set({ lat: coords.lat, lng: coords.lng, geoPrecision: coords.precision })
+                .where(eq(deliveries.id, deliveryId));
+        } catch (e) {
+            // Sem pino a corrida continua válida: a tela de conferência avisa
+            // "não achei esse endereço" e o caixa arrasta o pino na mão.
+            console.error("[INTEGRATION] geocode falhou:", e);
+        }
+    };
+
+    if (typeof after === "function") {
+        // Passa a FUNÇÃO, não a promessa: assim ela só roda depois da resposta sair.
+        after(trabalho);
+        return;
+    }
+    void trabalho();
 }
 
 async function authenticateApiKey(apiKey: string | null) {
@@ -88,36 +259,19 @@ export async function POST(request: NextRequest) {
         // define (ver abaixo) — então avisamos na resposta em vez de ignorar calado.
         const feeIgnored = body.fee !== undefined && body.fee !== null && body.fee !== "";
 
-        // Geocodificar já na criação (senão a entrega entra sem pin no mapa e sem geofence)
-        let lat = 0, lng = 0;
-        let geoPrecision: string | null = null;
-        try {
-            const s = await db.query.shopSettings.findFirst({
-                where: eq(shopSettings.userId, user.id),
-                columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
-            });
-            // O PDV pode mandar o endereço já separado (street, number, ...) — quando
-            // manda, o ponto sai bem mais preciso do que interpretando a frase.
-            const partes = typeof body.addressParts === "object" && body.addressParts
-                ? {
-                    street: str(body.addressParts.street),
-                    number: str(body.addressParts.number),
-                    neighborhood: str(body.addressParts.neighborhood),
-                    city: str(body.addressParts.city),
-                    state: str(body.addressParts.state),
-                    cep: str(body.addressParts.cep),
-                }
-                : null;
+        const customerName = typeof body.customerName === "string" ? body.customerName.slice(0, 200) : null;
+        const customerPhone = typeof body.customerPhone === "string" ? body.customerPhone.slice(0, 30) : null;
+        const observation = typeof body.observation === "string" ? body.observation.slice(0, 1000) : null;
+        const externalId = extrairExternalId(body);
 
-            const coords = await geocodeAddress(address, {
-                defaultCity: s?.defaultCity ?? null,
-                defaultState: s?.defaultState ?? null,
-                shopLat: s?.shopLat ?? null,
-                shopLng: s?.shopLng ?? null,
-            }, partes);
-            if (coords) { lat = coords.lat; lng = coords.lng; geoPrecision = coords.precision; }
-        } catch (e) {
-            console.error("[INTEGRATION] geocode falhou:", e);
+        // ── Idempotência ────────────────────────────────────────────────────
+        // Antes daqui era só INSERT: reenviar o mesmo pedido criava uma segunda
+        // corrida, dois motoboys aceitavam e a loja pagava duas taxas.
+        const jaExiste = await acharDuplicata(user.id, externalId, customerPhone, address);
+        if (jaExiste) {
+            return NextResponse.json(
+                await respostaDuplicata(jaExiste, feeIgnored)
+            );
         }
 
         // "fee" aqui é o que o MOTOBOY ganha (contrato da tela de conferência), não o
@@ -134,23 +288,39 @@ export async function POST(request: NextRequest) {
             }
         } catch { /* sem regra, taxa fica 0 e o lojista preenche na conferência */ }
 
-        const newDelivery = await db.insert(deliveries).values({
-            shopkeeperId: user.id,
-            customerName: typeof body.customerName === "string" ? body.customerName.slice(0, 200) : null,
-            customerPhone: typeof body.customerPhone === "string" ? body.customerPhone.slice(0, 30) : null,
-            address,
-            lat,
-            lng,
-            value,
-            fee,
-            observation: typeof body.observation === "string" ? body.observation.slice(0, 1000) : null,
-            geoPrecision,
-            // Nasce rascunho: o lojista/admin confere endereço no mapa e libera pros motoboys.
-            status: "draft",
-            publicToken: newTrackingToken(),
-            confirmToken: newConfirmToken(),
-            confirmTokenExpiresAt: confirmTokenExpiry(),
-        }).returning().get();
+        // O endereço no mapa fica pra depois da resposta (ver `after` lá embaixo):
+        // achar o ponto pode levar segundos e o caixa não pode ficar esperando.
+        let newDelivery;
+        try {
+            newDelivery = await db.insert(deliveries).values({
+                shopkeeperId: user.id,
+                customerName,
+                customerPhone,
+                address,
+                lat: null,
+                lng: null,
+                value,
+                fee,
+                observation,
+                geoPrecision: null,
+                externalId,
+                // Nasce rascunho: o lojista/admin confere endereço no mapa e libera pros motoboys.
+                status: "draft",
+                publicToken: newTrackingToken(),
+                confirmToken: newConfirmToken(),
+                confirmTokenExpiresAt: confirmTokenExpiry(),
+            }).returning().get();
+        } catch (e: any) {
+            // Duas chamadas do mesmo pedido ao mesmo tempo: o índice único barra a
+            // segunda. Isso é duplicata, não erro — devolve a corrida que venceu.
+            if (externalId && ehViolacaoDeUnico(e)) {
+                const vencedora = await acharDuplicata(user.id, externalId, null, address);
+                if (vencedora) {
+                    return NextResponse.json(await respostaDuplicata(vencedora, feeIgnored));
+                }
+            }
+            throw e;
+        }
 
         // Quem é avisado agora é quem libera, não o motoboy.
         pushToDraftReviewers(user.id, {
@@ -160,7 +330,22 @@ export async function POST(request: NextRequest) {
             tag: `confirmar-${newDelivery.id}`,
         }).catch(() => { });
 
-        const baseUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
+        // Procurar o endereço no mapa depois de responder ao PDV. A tela de
+        // conferência já sabe abrir sem pino ("não achei esse endereço") e o
+        // pino chega sozinho quando esta parte termina.
+        const partes = typeof body.addressParts === "object" && body.addressParts
+            ? {
+                street: str(body.addressParts.street),
+                number: str(body.addressParts.number),
+                neighborhood: str(body.addressParts.neighborhood),
+                city: str(body.addressParts.city),
+                state: str(body.addressParts.state),
+                cep: str(body.addressParts.cep),
+            }
+            : null;
+        agendarGeocode(newDelivery.id, user.id, address, partes);
+
+        const baseUrl = appBaseUrl();
 
         return NextResponse.json({
             success: true,
