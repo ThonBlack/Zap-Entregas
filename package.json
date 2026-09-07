@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --import ./scripts/test/register.mjs --test scripts/test/session-token.test.mjs",
+    "test": "node --experimental-strip-types --import ./scripts/test/register.mjs --test scripts/test/session-token.test.mjs scripts/test/receipt.test.mjs",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "script:create-admin": "npx tsx scripts/utils/create_admin.ts",
