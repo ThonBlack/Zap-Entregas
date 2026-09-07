@@ -15,6 +15,7 @@ import { fmtTime, fmtDateTime } from "@/lib/datetime";
 import {
     RECEIPT_METHOD_LABEL,
     RECEIPT_STATUS_LABEL,
+    fechamentoDivergente,
     textoLiquido,
     tomLiquido,
     type ClosingStatus,
@@ -27,6 +28,13 @@ export type ClosingResumo = {
     motoboyNote: string | null;
     sentAt: string | null;
     respondedAt: string | null;
+    /** Totais CONGELADOS no envio (ou na última confirmação) — a régua que o motoboy está vendo. */
+    deliveriesCount: number;
+    feesTotal: number;
+    cashTotal: number;
+    pixTotal: number;
+    cardTotal: number;
+    net: number;
 } | null;
 
 type Props = {
@@ -50,9 +58,34 @@ export default function ResumoDoDia({ motoboyId, motoboyName, summary, closing, 
     const [erro, setErro] = useState<string | null>(null);
     const [editando, setEditando] = useState<number | null>(null);
     const [recado, setRecado] = useState(closing?.note ?? "");
+    const [avisoCorrecao, setAvisoCorrecao] = useState(false);
 
     const confirmado = closing?.status === "confirmed";
     const travado = confirmado || !podeEditar;
+
+    // Fechamento já enviado (ou confirmado) com totais que não batem mais com
+    // o resumo vivo: a loja corrigiu alguma corrida depois e não reenviou.
+    const divergencia = closing
+        ? fechamentoDivergente(
+            {
+                deliveriesCount: closing.deliveriesCount,
+                feesTotal: closing.feesTotal,
+                cashTotal: closing.cashTotal,
+                pixTotal: closing.pixTotal,
+                cardTotal: closing.cardTotal,
+                net: closing.net,
+            },
+            {
+                deliveriesCount: summary.deliveriesCount,
+                feesTotal: summary.feesTotal,
+                cashTotal: summary.cashTotal,
+                pixTotal: summary.pixTotal,
+                cardTotal: summary.cardTotal,
+                net: summary.net,
+            },
+        )
+        : null;
+    const divergente = divergencia?.divergente ?? false;
 
     function enviar() {
         setErro(null);
@@ -131,7 +164,11 @@ export default function ResumoDoDia({ motoboyId, motoboyName, summary, closing, 
                                 key={linha.id}
                                 linha={linha}
                                 onCancelar={() => setEditando(null)}
-                                onSalvo={() => { setEditando(null); router.refresh(); }}
+                                onSalvo={(fechamentoDesatualizado) => {
+                                    setEditando(null);
+                                    if (fechamentoDesatualizado) setAvisoCorrecao(true);
+                                    router.refresh();
+                                }}
                             />
                         ) : (
                             <LinhaLeitura
@@ -162,6 +199,42 @@ export default function ResumoDoDia({ motoboyId, motoboyName, summary, closing, 
                         className="w-full p-3 bg-zinc-700 border border-zinc-600 rounded-lg text-white placeholder-zinc-400 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
                     />
 
+                    {avisoCorrecao && (
+                        <div className="bg-yellow-500/10 border border-yellow-500/40 text-yellow-200 p-3 rounded-xl flex items-start justify-between gap-2 text-sm">
+                            <span>Corrigido. Lembre de reenviar o resumo pro motoboy.</span>
+                            <button
+                                type="button"
+                                onClick={() => setAvisoCorrecao(false)}
+                                className="shrink-0 text-yellow-200/70 hover:text-yellow-100"
+                                aria-label="Fechar aviso"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    )}
+
+                    {closing && divergente && !confirmado && (
+                        <div className="rounded-xl border border-yellow-500/40 bg-yellow-500/10 text-yellow-200 p-3 text-sm flex items-start gap-2">
+                            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                            <span>
+                                Os números mudaram depois do envio (era {closing.deliveriesCount}{" "}
+                                {closing.deliveriesCount === 1 ? "corrida" : "corridas"} / {formatBRL(closing.feesTotal)} de
+                                taxa / {formatBRL(closing.cashTotal)} em dinheiro). O motoboy ainda está vendo os valores
+                                antigos — reenvie.
+                            </span>
+                        </div>
+                    )}
+
+                    {closing && divergente && confirmado && (
+                        <div className="rounded-xl border border-red-600/50 bg-red-600/10 text-red-300 p-3 text-sm flex items-start gap-2">
+                            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+                            <span>
+                                O motoboy confirmou {formatBRL(Math.abs(closing.net))}, mas as corridas mudaram depois.
+                                Reabra e reenvie.
+                            </span>
+                        </div>
+                    )}
+
                     {confirmado ? (
                         <>
                             <p className="text-xs text-zinc-400">
@@ -186,7 +259,7 @@ export default function ResumoDoDia({ motoboyId, motoboyName, summary, closing, 
                         >
                             {pendente ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                             {closing?.status === "sent" || closing?.status === "disputed"
-                                ? "Reenviar pro motoboy confirmar"
+                                ? (divergente ? "Reenviar com os valores atualizados" : "Reenviar pro motoboy confirmar")
                                 : "Enviar pro motoboy confirmar"}
                         </button>
                     )}
@@ -296,7 +369,8 @@ function LinhaEdicao({
 }: {
     linha: DailySummaryLine;
     onCancelar: () => void;
-    onSalvo: () => void;
+    /** `fechamentoDesatualizado`: o dia já tinha um resumo enviado e ficou desatualizado com esta correção. */
+    onSalvo: (fechamentoDesatualizado: boolean) => void;
 }) {
     const [pendente, iniciar] = useTransition();
     const [erro, setErro] = useState<string | null>(null);
@@ -318,7 +392,7 @@ function LinhaEdicao({
                 receivedMethod: pediuValor ? (metodo as "dinheiro" | "pix" | "cartao") : "",
             });
             if ("error" in r) { setErro(r.error); return; }
-            onSalvo();
+            onSalvo(r.fechamentoDesatualizado === true);
         });
     }
 
