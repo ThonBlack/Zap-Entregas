@@ -42,7 +42,14 @@ export type AdjustReceiptInput = {
     receivedMethod?: ReceiptMethod | "";
 };
 
-export type ActionResult = { success: true; closingId?: number } | { error: string };
+export type ActionResult =
+    | {
+          success: true;
+          closingId?: number;
+          /** O dia já tinha um resumo `sent` e ficou desatualizado com esta correção — avise a loja pra reenviar. */
+          fechamentoDesatualizado?: boolean;
+      }
+    | { error: string };
 
 /** O dia de Brasília (YYYY-MM-DD) em que a corrida foi entregue. */
 async function diaDaCorrida(deliveryId: number): Promise<string | null> {
@@ -95,20 +102,32 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
 
     // Fechamento já confirmado não muda escondido: a loja precisa reabrir antes.
     const dia = await diaDaCorrida(id);
-    if (dia && delivery.motoboyId) {
-        const fechamento = await db.query.dailyClosings.findFirst({
-            where: and(eq(dailyClosings.motoboyId, delivery.motoboyId), eq(dailyClosings.day, dia)),
-        });
-        if (fechamento?.status === "confirmed") {
-            return { error: "O motoboy já confirmou este dia. Clique em “Reabrir” antes de editar." };
-        }
+    const fechamento =
+        dia && delivery.motoboyId
+            ? await db.query.dailyClosings.findFirst({
+                  where: and(eq(dailyClosings.motoboyId, delivery.motoboyId), eq(dailyClosings.day, dia)),
+              })
+            : null;
+    if (fechamento?.status === "confirmed") {
+        return { error: "O motoboy já confirmou este dia. Clique em “Reabrir” antes de editar." };
     }
 
     const agora = new Date().toISOString();
     const motoboyId = delivery.motoboyId;
+    // Fechamento já enviado (aguardando o motoboy): a correção NÃO reenvia
+    // sozinha — a loja decide quando reenviar — mas marcamos que os totais
+    // congelados ficaram pra trás, pra UI avisar.
+    const fechamentoDesatualizado = fechamento?.status === "sent";
 
     try {
         db.transaction((tx) => {
+            if (fechamentoDesatualizado && fechamento) {
+                tx.update(dailyClosings)
+                    .set({ updatedAt: agora })
+                    .where(eq(dailyClosings.id, fechamento.id))
+                    .run();
+            }
+
             tx.update(deliveries)
                 .set({
                     fee,
@@ -208,7 +227,7 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
     revalidatePath("/finance/extrato");
     revalidatePath("/deliveries/history");
     revalidatePath("/app");
-    return { success: true };
+    return { success: true, fechamentoDesatualizado };
 }
 
 /**
