@@ -18,6 +18,16 @@ const MAX_METADATA = 4000;
 const EVENTOS = ["signup", "login", "purchase", "cancel", "refund", "error", "custom"] as const;
 type TipoDeEvento = (typeof EVENTOS)[number];
 
+/** Lê o metadata guardado; linha antiga com JSON quebrado vira null, não erro. */
+function lerMetadata(bruto: string | null): unknown {
+    if (!bruto) return null;
+    try {
+        return JSON.parse(bruto);
+    } catch {
+        return null;
+    }
+}
+
 /** Texto do corpo da requisição, aparado e com teto. */
 function corte(v: unknown, max: number): string | null {
     if (typeof v === "string") { const t = v.trim(); return t ? t.slice(0, max) : null; }
@@ -67,7 +77,16 @@ export async function POST(request: NextRequest) {
         }
         const evento = eventoDigitado as TipoDeEvento;
 
-        const metadata = body.metadata ? JSON.stringify(body.metadata).slice(0, MAX_METADATA) : null;
+        // Metadata grande é RECUSADO, não cortado: JSON picado no meio não volta
+        // a ser lido, e aí o GET quebra pra sempre por causa de uma linha ruim.
+        // Melhor o produto que chamou saber na hora que mandou coisa demais.
+        const metadata = body.metadata ? JSON.stringify(body.metadata) : null;
+        if (metadata && metadata.length > MAX_METADATA) {
+            return NextResponse.json(
+                { success: false, error: `metadata grande demais (máximo ${MAX_METADATA} caracteres).` },
+                { status: 413 }
+            );
+        }
         const valor = typeof body.amount === "number" && Number.isFinite(body.amount) ? body.amount : null;
 
         const newEvent = await db.insert(masterEvents).values({
@@ -136,9 +155,12 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({
             success: true,
             product: { id: product.id, name: product.name },
+            // Uma linha antiga com metadata quebrado não pode derrubar a listagem
+            // inteira (era o que acontecia: um JSON.parse ruim virava erro 500 e
+            // nenhum evento saía mais).
             events: events.map(e => ({
                 ...e,
-                metadata: e.metadata ? JSON.parse(e.metadata) : null
+                metadata: lerMetadata(e.metadata),
             })),
         });
 
