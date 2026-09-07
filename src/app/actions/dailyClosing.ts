@@ -12,6 +12,7 @@ import { parseMoney } from "@/lib/money";
 import { pushToUser } from "@/lib/push";
 import { ehDiaISO, fmtDiaCurto } from "@/lib/datetime";
 import { formatBRL } from "@/lib/wallet-shared";
+import { logServerError } from "@/lib/serverLog";
 
 /**
  * Ações do "Resumo do dia" — o fechamento diário entre a loja e o motoboy.
@@ -150,6 +151,7 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
                             relatedDeliveryId: id,
                             creatorId: me.id,
                             status: "confirmed",
+                            createdAt: agora,
                         })
                         .run();
                 }
@@ -184,6 +186,7 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
                             relatedDeliveryId: id,
                             creatorId: me.id,
                             status: "confirmed",
+                            createdAt: agora,
                         })
                         .run();
                 }
@@ -193,6 +196,7 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
         });
     } catch (e) {
         console.error("[FECHAMENTO] erro ao corrigir recibo", e);
+        await logServerError("corrigir_recibo", e, { userId: me.id, page: "/motoboys/fechamento", deliveryId: id });
         return { error: "Não deu pra salvar a correção. Tente de novo." };
     }
 

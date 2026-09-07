@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
             ip,
             metadata: metadata ? JSON.stringify(metadata).slice(0, 4000) : null,
             stack: typeof stack === "string" ? stack.slice(0, 4000) : null,
+            createdAt: new Date().toISOString(),
         });
 
         return NextResponse.json({ success: true });

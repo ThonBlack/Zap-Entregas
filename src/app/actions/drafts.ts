@@ -7,6 +7,9 @@ import { revalidatePath } from "next/cache";
 import { geocodeAddress, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUserWithRole } from "@/lib/session";
 import { pushToMotoboys } from "@/lib/push";
+import { parseMoney } from "@/lib/money";
+import { logServerError } from "@/lib/serverLog";
+import { avisoDeCorridaNova } from "@/lib/deliveryPrivacy";
 
 type ActionResult = { error: string } | { success: true };
 
@@ -69,40 +72,77 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
     const address = (formData.get("address") as string)?.trim();
     if (!address) return { error: "Endereço obrigatório." };
 
-    const parseMoney = (raw: FormDataEntryValue | null) => {
-        const n = Number(String(raw ?? "").replace(",", "."));
-        return Number.isFinite(n) && n >= 0 ? n : 0;
+    /**
+     * Dinheiro digitado na tela. Vazio é zero; texto ilegível é `null` e vira
+     * erro — o conversor antigo lia "1.850,00" como R$ 1,85 sem reclamar.
+     */
+    const lerDinheiro = (raw: FormDataEntryValue | null): number | null => {
+        const texto = String(raw ?? "").trim();
+        if (!texto) return 0;
+        const n = parseMoney(texto);
+        return n === null || n < 0 ? null : n;
     };
 
     // "É pra receber" desligado zera o valor: é assim que o motoboy sabe que já está pago
     // (o modal de finalizar usa value > 0 como régua).
     const shouldCollect = formData.get("collect") === "on";
-    const value = shouldCollect ? parseMoney(formData.get("value")) : 0;
-    const fee = parseMoney(formData.get("fee"));
+    const value = shouldCollect ? lerDinheiro(formData.get("value")) : 0;
+    const fee = lerDinheiro(formData.get("fee"));
+    if (value === null) return { error: "Valor a receber inválido. Escreva assim: 12,50" };
+    if (fee === null) return { error: "Taxa da corrida inválida. Escreva assim: 12,50" };
 
     // O pino do mapa manda coordenadas; se vierem vazias, tenta geocodificar o endereço editado.
+    // `pinTouched` diz se ALGUÉM de fato mexeu no pino. Sem isso o formulário
+    // mandava as coordenadas da loja (o ponto de partida quando o geocode falha)
+    // e a corrida era gravada como "exata" — o motoboy chegava na casa do cliente
+    // e o botão "Entregue" ficava bloqueado, porque a cerca media a distância até a LOJA.
+    const pinTouched = formData.get("pinTouched") === "1";
     let lat = Number(formData.get("lat"));
     let lng = Number(formData.get("lng"));
     const pinValid = Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0;
+    const semPinoDeOrigem = !draft.lat || draft.lat === 0;
 
-    let recalculado: Awaited<ReturnType<typeof geocodeAddress>> = null;
-    if (!pinValid) {
-        lat = 0; lng = 0;
-        try {
-            const s = await db.query.shopSettings.findFirst({
-                where: eq(shopSettings.userId, draft.shopkeeperId ?? -1),
-                columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
-            });
-            const opts: GeocodeOpts = {
-                defaultCity: s?.defaultCity ?? null,
-                defaultState: s?.defaultState ?? null,
-                shopLat: s?.shopLat ?? null,
-                shopLng: s?.shopLng ?? null,
-            };
-            const coords = await geocodeAddress(address, opts);
-            if (coords) { lat = coords.lat; lng = coords.lng; recalculado = coords; }
-        } catch (e) {
-            console.error("[DRAFT] geocode na confirmação falhou:", e);
+    // Endereço que nunca foi localizado no mapa só pode ser liberado com o pino
+    // colocado na mão — senão a corrida sai com as coordenadas da loja.
+    if (semPinoDeOrigem && !pinTouched) {
+        return {
+            error: "Esse endereço não foi encontrado no mapa. Arraste o pino até o lugar da entrega antes de liberar.",
+        };
+    }
+
+    const enderecoMudou = address !== draft.address;
+    // Só é "exata" quando uma pessoa colocou o pino no lugar. Sem isso vale a
+    // precisão que o geocode achou (ou nada) — e a tela do lojista continua
+    // avisando que o ponto é chute.
+    let geoPrecision: string | null = draft.geoPrecision ?? null;
+
+    if (pinTouched && pinValid) {
+        geoPrecision = "exata";
+    } else {
+        // Ninguém mexeu no pino: o ponto que vale é o do geocode. Se o endereço
+        // foi editado, o ponto antigo não serve mais — procura de novo.
+        lat = draft.lat ?? 0;
+        lng = draft.lng ?? 0;
+        if (enderecoMudou || lat === 0 || lng === 0) {
+            lat = 0; lng = 0;
+            geoPrecision = null;
+            try {
+                const s = await db.query.shopSettings.findFirst({
+                    where: eq(shopSettings.userId, draft.shopkeeperId ?? -1),
+                    columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
+                });
+                const opts: GeocodeOpts = {
+                    defaultCity: s?.defaultCity ?? null,
+                    defaultState: s?.defaultState ?? null,
+                    shopLat: s?.shopLat ?? null,
+                    shopLng: s?.shopLng ?? null,
+                };
+                const coords = await geocodeAddress(address, opts);
+                if (coords) { lat = coords.lat; lng = coords.lng; geoPrecision = coords.precision; }
+            } catch (e) {
+                console.error("[DRAFT] geocode na confirmação falhou:", e);
+                await logServerError("draft_geocode_falhou", e, { deliveryId: draft.id, page: "/confirmar" });
+            }
         }
     }
 
@@ -118,8 +158,7 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
             confirmToken: null,
             confirmTokenExpiresAt: null,
             address, lat, lng, value, fee, customerName, customerPhone, observation,
-            // Uma pessoa olhou o mapa e liberou: o ponto deixa de ser um chute.
-            geoPrecision: pinValid ? "exata" : (recalculado?.precision ?? null),
+            geoPrecision,
             status: "pending",
             updatedAt: new Date().toISOString(),
         })
@@ -128,9 +167,12 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
 
     if (!updated.length) return { error: "Essa corrida já foi liberada." };
 
+    // O aviso vai pro celular de TODO motoboy cadastrado, inclusive os de
+    // outra loja. Endereço com número aí é dado pessoal do cliente saindo do
+    // app pra um aparelho que a loja não controla — vai só o bairro.
     pushToMotoboys({
         title: "🏍️ Nova Corrida Disponível!",
-        body: address,
+        body: avisoDeCorridaNova(address),
         url: "/app",
         tag: "nova-corrida",
     }).catch(() => { });

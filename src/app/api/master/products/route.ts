@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
             packageName: body.packageName || null,
             webhookUrl: body.webhookUrl || null,
             apiKey,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
         }).returning().get();
 
         return NextResponse.json({

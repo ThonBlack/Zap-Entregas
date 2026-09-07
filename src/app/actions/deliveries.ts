@@ -6,12 +6,20 @@ import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { geocodeAddress, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUserWithRole } from "@/lib/session";
+import { parseMoney } from "@/lib/money";
 
 type ActionResult = { error: string } | { success: true };
 
-const parseMoney = (raw: FormDataEntryValue | null) => {
-    const n = Number(String(raw ?? "").trim().replace(",", "."));
-    return Number.isFinite(n) && n >= 0 ? n : 0;
+/**
+ * Dinheiro digitado na tela. Campo vazio é zero; texto que não dá pra ler é
+ * `null` e vira erro na tela — nunca zero calado (o conversor antigo lia
+ * "1.850,00" como R$ 1,85).
+ */
+const lerDinheiro = (raw: FormDataEntryValue | null): number | null => {
+    const texto = String(raw ?? "").trim();
+    if (!texto) return 0;
+    const n = parseMoney(texto);
+    return n === null || n < 0 ? null : n;
 };
 
 /**
@@ -45,8 +53,10 @@ export async function updatePendingDeliveryAction(formData: FormData): Promise<A
     if (!address) return { error: "Endereço obrigatório." };
 
     const shouldCollect = formData.get("collect") === "on";
-    const value = shouldCollect ? parseMoney(formData.get("value")) : 0;
-    const fee = parseMoney(formData.get("fee"));
+    const value = shouldCollect ? lerDinheiro(formData.get("value")) : 0;
+    const fee = lerDinheiro(formData.get("fee"));
+    if (value === null) return { error: "Valor a receber inválido. Escreva assim: 12,50" };
+    if (fee === null) return { error: "Taxa da corrida inválida. Escreva assim: 12,50" };
 
     const customerName = (formData.get("customerName") as string)?.trim() || null;
     const customerPhone = (formData.get("customerPhone") as string)?.trim() || null;

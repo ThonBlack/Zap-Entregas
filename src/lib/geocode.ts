@@ -1,4 +1,5 @@
 import { parseBrazilianAddress, normalizeStreet, type ParsedAddress } from "@/lib/addressParser";
+import { logServerError } from "@/lib/serverLog";
 
 /**
  * Descobrir o ponto no mapa a partir do endereço escrito.
@@ -205,6 +206,7 @@ async function geocodeGoogle(
         };
     } catch (e) {
         console.error("[GEOCODE] Google falhou:", e);
+        void logServerError("geocode_google", e, { page: "lib/geocode", endereco: original });
         return null;
     }
 }
@@ -267,6 +269,7 @@ async function chamarNominatim(params: URLSearchParams): Promise<GeocodeResult |
         };
     } catch (e) {
         console.error("[GEOCODE] OpenStreetMap falhou:", e);
+        void logServerError("geocode_osm", e, { page: "lib/geocode" });
         return null;
     }
 }

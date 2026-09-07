@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { deliveries } from "@/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/session";
 
@@ -15,13 +15,23 @@ export async function GET(request: NextRequest) {
     const lastCheck = searchParams.get("lastCheck");
 
     const notifications: { title: string; body: string; icon?: string }[] = [];
-    const lastCheckTime = lastCheck ? new Date(Number(lastCheck)) : new Date(Date.now() - 30000);
+
+    // `lastCheck=abc` virava NaN → `new Date(NaN).toISOString()` lança e a rota
+    // devolvia 500, matando as notificações do motoboy em silêncio. Valor que
+    // não for número cai no padrão de 30 segundos.
+    const marca = Number(lastCheck);
+    const lastCheckTime = Number.isFinite(marca) && marca > 0
+        ? new Date(marca)
+        : new Date(Date.now() - 30000);
+    // As comparações passam por `datetime()` no SQL: as datas do banco convivem
+    // em dois formatos e comparar texto direto nunca dava verdadeiro.
+    const desdeIso = lastCheckTime.toISOString();
 
     if (user.role === "motoboy") {
         const newDeliveries = await db.query.deliveries.findMany({
             where: and(
                 eq(deliveries.status, "pending"),
-                gt(deliveries.createdAt, lastCheckTime.toISOString())
+                sql`datetime(${deliveries.createdAt}) > datetime(${desdeIso})`
             ),
             with: { shopkeeper: true },
             limit: 10,
@@ -64,7 +74,7 @@ export async function GET(request: NextRequest) {
             where: and(
                 eq(deliveries.shopkeeperId, user.id),
                 eq(deliveries.status, "delivered"),
-                gt(deliveries.updatedAt, lastCheckTime.toISOString())
+                sql`datetime(${deliveries.updatedAt}) > datetime(${desdeIso})`
             ),
             with: { motoboy: true },
             limit: 5,
@@ -81,7 +91,7 @@ export async function GET(request: NextRequest) {
             where: and(
                 eq(deliveries.shopkeeperId, user.id),
                 eq(deliveries.status, "assigned"),
-                gt(deliveries.updatedAt, lastCheckTime.toISOString())
+                sql`datetime(${deliveries.updatedAt}) > datetime(${desdeIso})`
             ),
             with: { motoboy: true },
             limit: 5,
@@ -98,7 +108,7 @@ export async function GET(request: NextRequest) {
             where: and(
                 eq(deliveries.shopkeeperId, user.id),
                 eq(deliveries.status, "picked_up"),
-                gt(deliveries.updatedAt, lastCheckTime.toISOString())
+                sql`datetime(${deliveries.updatedAt}) > datetime(${desdeIso})`
             ),
             with: { motoboy: true },
             limit: 5,

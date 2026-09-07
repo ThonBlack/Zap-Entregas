@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { invalidarLinksDeSenha } from "@/lib/passwordResets";
 import { getAuthUser } from "@/lib/session";
 
 export type TrocarSenhaState = {
@@ -58,6 +59,9 @@ export async function changePasswordAction(
     await db.update(users)
         .set({ password: await hashPassword(nova) })
         .where(eq(users.id, user.id));
+
+    // Trocou a senha aqui? Link de recuperação pendente perde a validade.
+    await invalidarLinksDeSenha(user.id);
 
     revalidatePath("/settings");
     revalidatePath("/settings/motoboy");

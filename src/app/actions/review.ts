@@ -52,15 +52,27 @@ export async function submitReviewAction(data: ReviewData) {
         const feedback = typeof data.feedback === "string" ? data.feedback.slice(0, 1000) : null;
         const customerName = typeof data.customerName === "string" ? data.customerName.slice(0, 100) : "";
 
-        await db.insert(reviews).values({
-            deliveryId: delivery.id,
-            motoboyId: delivery.motoboyId,
-            shopkeeperId: delivery.shopkeeperId,
-            customerName,
-            ratingGeneral,
-            ratingDelivery: ratingDeliveryVal,
-            feedback,
-        });
+        // O `existing` acima é lido-e-escrito: dois cliques no mesmo segundo
+        // passavam pelos dois. Quem barra de verdade é o índice único
+        // reviews(delivery_id) — e a violação dele é "já avaliada", não erro.
+        try {
+            await db.insert(reviews).values({
+                deliveryId: delivery.id,
+                motoboyId: delivery.motoboyId,
+                shopkeeperId: delivery.shopkeeperId,
+                customerName,
+                ratingGeneral,
+                ratingDelivery: ratingDeliveryVal,
+                feedback,
+                createdAt: new Date().toISOString(),
+            });
+        } catch (e) {
+            const msg = String((e as { message?: string })?.message ?? e ?? "");
+            if (/UNIQUE constraint failed/i.test(msg)) {
+                return { error: "Esta entrega já foi avaliada." };
+            }
+            throw e;
+        }
 
         const motoboy = await db.query.users.findFirst({
             where: eq(users.id, delivery.motoboyId),

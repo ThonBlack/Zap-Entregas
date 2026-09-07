@@ -5,6 +5,7 @@ import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { hashPassword } from "@/lib/password";
+import { invalidarLinksDeSenha } from "@/lib/passwordResets";
 import { getAuthUserWithRole } from "@/lib/session";
 
 export async function updateUserPlanAction(targetUserId: number, newPlan: string) {
@@ -65,6 +66,9 @@ export async function adminResetUserPasswordAction(targetUserId: number, newPass
     await db.update(users)
         .set({ password: hashedPassword })
         .where(eq(users.id, targetUserId));
+
+    // Link de recuperação pendente da pessoa morre junto.
+    await invalidarLinksDeSenha(targetUserId);
 
     revalidatePath("/admin");
     return { success: true, message: "Senha alterada com sucesso" };

@@ -15,6 +15,12 @@ interface AddressAutocompleteProps {
     /** Onde fica a loja: puxa as sugestões pra perto em vez de espalhar pelo Brasil. */
     shopLat?: number | null;
     shopLng?: number | null;
+    /**
+     * Código de conferência do PDV. A tela `/confirmar/<código>` é aberta pelo
+     * caixa, que NÃO tem login — as rotas /api/places pedem sessão ou este
+     * código, senão a chave paga do Google ficaria aberta pra internet.
+     */
+    confirmToken?: string | null;
 }
 
 interface Suggestion {
@@ -39,6 +45,7 @@ export default function AddressAutocomplete({
     required = false,
     shopLat = null,
     shopLng = null,
+    confirmToken = null,
 }: AddressAutocompleteProps) {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -66,6 +73,7 @@ export default function AddressAutocomplete({
                 params.set("lat", String(shopLat));
                 params.set("lng", String(shopLng));
             }
+            if (confirmToken) params.set("confirmToken", confirmToken);
             const g = await fetch(`/api/places/autocomplete?${params}`);
             if (g.ok) {
                 const data = await g.json();
@@ -109,7 +117,7 @@ export default function AddressAutocomplete({
         } finally {
             setIsLoading(false);
         }
-    }, [defaultCity, defaultState, shopLat, shopLng]);
+    }, [defaultCity, defaultState, shopLat, shopLng, confirmToken]);
 
     // Debounce input
     useEffect(() => {
@@ -141,7 +149,9 @@ export default function AddressAutocomplete({
         // O Google só devolve o ponto num segundo pedido, pelo id do lugar.
         if (suggestion.source === "google") {
             try {
-                const res = await fetch(`/api/places/details?place_id=${encodeURIComponent(suggestion.place_id)}`);
+                const detalhe = new URLSearchParams({ place_id: suggestion.place_id });
+                if (confirmToken) detalhe.set("confirmToken", confirmToken);
+                const res = await fetch(`/api/places/details?${detalhe}`);
                 const data = await res.json();
                 const loc = data?.result?.geometry?.location;
                 if (loc) { lat = loc.lat; lng = loc.lng; }

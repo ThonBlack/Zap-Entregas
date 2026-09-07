@@ -7,6 +7,9 @@ import type { ParsedAddress } from "@/lib/addressParser";
 import { newTrackingToken, newConfirmToken, confirmTokenExpiry } from "@/lib/trackingToken";
 import { pushToDraftReviewers } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
+import { calcularTaxa, dependeDaDistancia } from "@/lib/fee";
+import { logServerError } from "@/lib/serverLog";
+import { aplicarLimite } from "@/lib/rateLimit";
 
 /**
  * API de Integração para PDV
@@ -178,6 +181,7 @@ function agendarGeocode(
             // Sem pino a corrida continua válida: a tela de conferência avisa
             // "não achei esse endereço" e o caixa arrasta o pino na mão.
             console.error("[INTEGRATION] geocode falhou:", e);
+            await logServerError("geocode_pdv", e, { userId: shopkeeperId, page: "/api/integration/delivery", deliveryId, address });
         }
     };
 
@@ -205,6 +209,20 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 { success: false, error: "API Key inválida ou lojista não encontrado" },
                 { status: 401 }
+            );
+        }
+
+        // Teto por chave: cada corrida nova dispara uma busca de endereço PAGA no
+        // Google. Um PDV em laço (bug ou má-fé) queimaria a cota da operação toda.
+        // 120 por minuto é muito acima do movimento real de uma loja.
+        const ritmo = aplicarLimite("webhookPdv", `key:${user.id}`);
+        if (!ritmo.permitido) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: `Muitas chamadas seguidas. Tente de novo em ${ritmo.esperarSegundos} segundos.`,
+                },
+                { status: 429, headers: { "Retry-After": String(ritmo.esperarSegundos) } }
             );
         }
 
@@ -274,17 +292,44 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // ── Limite do plano ─────────────────────────────────────────────────
+        // O caminho que mais gera corrida — o PDV — não passava por nenhuma
+        // verificação: o limite comercial não segurava nada na prática.
+        // 403 com mensagem pronta pro caixa ler na tela do PDV.
+        const { canCreateDelivery } = await import("@/lib/planLimits");
+        const limite = await canCreateDelivery(user.id);
+        if (!limite.allowed) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: limite.reason || "Limite de entregas do plano atingido.",
+                    limitReached: true,
+                    message: "O plano do Zap Entregas chegou ao limite de corridas do mês. A entrega NÃO foi registrada — avise a loja.",
+                },
+                { status: 403 }
+            );
+        }
+
         // "fee" aqui é o que o MOTOBOY ganha (contrato da tela de conferência), não o
         // frete que o PDV cobra do cliente — por isso body.fee é ignorado. Nasce da
         // regra da loja e o lojista pode ajustar na conferência.
+        //
+        // A corrida do PDV ainda NÃO tem pino no mapa (o geocode roda depois de
+        // responder), então aqui não dá pra medir a distância. Loja que paga por
+        // km (ou fixo + km) nasce com taxa 0 DE PROPÓSITO: quem calcula é o
+        // completeDeliveryAction, na entrega, quando o pino já existe. Loja de
+        // taxa fixa já sai com o valor certo. O lojista pode ajustar na conferência.
         let fee = 0;
         try {
             const remu = await db.query.shopSettings.findFirst({
                 where: eq(shopSettings.userId, user.id),
-                columns: { remunerationModel: true, fixedValue: true },
+                columns: {
+                    remunerationModel: true, fixedValue: true,
+                    valuePerKm: true, guaranteedMinimum: true,
+                },
             });
-            if (remu && (remu.remunerationModel === "fixed" || remu.remunerationModel === "hybrid")) {
-                fee = remu.fixedValue || 0;
+            if (remu && !dependeDaDistancia(remu.remunerationModel)) {
+                fee = calcularTaxa(remu, null);
             }
         } catch { /* sem regra, taxa fica 0 e o lojista preenche na conferência */ }
 
@@ -309,6 +354,9 @@ export async function POST(request: NextRequest) {
                 publicToken: newTrackingToken(),
                 confirmToken: newConfirmToken(),
                 confirmTokenExpiresAt: confirmTokenExpiry(),
+                // ISO explícito: o CURRENT_TIMESTAMP do banco grava noutro formato.
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
             }).returning().get();
         } catch (e: any) {
             // Duas chamadas do mesmo pedido ao mesmo tempo: o índice único barra a
@@ -360,6 +408,7 @@ export async function POST(request: NextRequest) {
         });
     } catch (error: any) {
         console.error("Erro na API de integração:", error);
+        await logServerError("webhook_pdv", error, { page: "/api/integration/delivery" });
         return NextResponse.json(
             { success: false, error: "Erro interno do servidor" },
             { status: 500 }

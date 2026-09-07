@@ -5,6 +5,7 @@ import { financialRecords } from "@/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getAuthUserWithRole } from "@/lib/session";
+import { parseMoney } from "@/lib/money";
 
 function monthRange(year: number, month: number) {
     const start = new Date(Date.UTC(year, month - 1, 1));
@@ -60,8 +61,9 @@ export async function createFinancialRecordAction(formData: FormData) {
     if (type !== "income" && type !== "expense") return { error: "Tipo inválido." };
     if (!["pending", "paid", "overdue"].includes(status)) return { error: "Status inválido." };
 
-    const amount = parseFloat(amountStr.replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) return { error: "Valor inválido." };
+    // `parseMoney` entende milhar: "1.850,00" virava R$ 1,85 no conversor antigo.
+    const amount = parseMoney(amountStr);
+    if (amount === null || amount <= 0) return { error: "Valor inválido. Escreva assim: 1.850,00" };
 
     try {
         await db.insert(financialRecords).values({
@@ -72,6 +74,7 @@ export async function createFinancialRecordAction(formData: FormData) {
             category,
             dueDate,
             status: status as "pending" | "paid" | "overdue",
+            createdAt: new Date().toISOString(),
         });
 
         revalidatePath("/finance/manager");

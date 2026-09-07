@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { users, plans, deliveries } from "@/db/schema";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 export interface PlanLimits {
     maxDeliveries: number;
@@ -38,16 +38,16 @@ export async function getUserPlanLimits(userId: number): Promise<PlanLimits> {
     };
 }
 
-// Conta entregas do mês atual do lojista
+// Conta entregas do mês atual do lojista.
+// O mês é o de BRASÍLIA (UTC−3) e a comparação passa por `datetime()`: created_at
+// convive em dois formatos no banco ("2026-09-01 10:00:00" das linhas antigas e
+// ISO com T/Z das novas) e comparar como texto excluía todas as corridas do dia 1.
 export async function countMonthlyDeliveries(shopkeeperId: number): Promise<number> {
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
     const result = await db.select({ count: sql<number>`count(*)` })
         .from(deliveries)
         .where(and(
             eq(deliveries.shopkeeperId, shopkeeperId),
-            gte(deliveries.createdAt, firstDayOfMonth.toISOString())
+            sql`date(datetime(${deliveries.createdAt}, '-3 hours'), 'start of month') = date('now', '-3 hours', 'start of month')`
         ));
 
     return result[0]?.count ?? 0;

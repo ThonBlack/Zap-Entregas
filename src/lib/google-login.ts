@@ -59,6 +59,7 @@ export async function resolverOuCriarUsuarioGoogle(
             password: null, // entra pelo Google; pode cadastrar senha depois
             avatarUrl: null,
             ...padroes,
+            createdAt: new Date().toISOString(),
         }).returning().get();
     } catch {
         // Duas abas ao mesmo tempo: o índice único barrou a segunda. Busca a que ficou.
