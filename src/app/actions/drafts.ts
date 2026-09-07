@@ -9,6 +9,7 @@ import { getAuthUserWithRole } from "@/lib/session";
 import { pushToMotoboys } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
 import { logServerError } from "@/lib/serverLog";
+import { avisoDeCorridaNova } from "@/lib/deliveryPrivacy";
 
 type ActionResult = { error: string } | { success: true };
 
@@ -166,9 +167,12 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
 
     if (!updated.length) return { error: "Essa corrida já foi liberada." };
 
+    // O aviso vai pro celular de TODO motoboy cadastrado, inclusive os de
+    // outra loja. Endereço com número aí é dado pessoal do cliente saindo do
+    // app pra um aparelho que a loja não controla — vai só o bairro.
     pushToMotoboys({
         title: "🏍️ Nova Corrida Disponível!",
-        body: address,
+        body: avisoDeCorridaNova(address),
         url: "/app",
         tag: "nova-corrida",
     }).catch(() => { });

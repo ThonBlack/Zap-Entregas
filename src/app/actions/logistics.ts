@@ -14,6 +14,7 @@ import { parseMoney } from "@/lib/money";
 import { calcularTaxa, distanciaDaLoja } from "@/lib/fee";
 import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
 import { logServerError } from "@/lib/serverLog";
+import { avisoDeCorridaNova } from "@/lib/deliveryPrivacy";
 
 async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
     const s = await db.query.shopSettings.findFirst({
@@ -90,9 +91,12 @@ export async function addDeliveryAction(formData: FormData) {
     });
 
     // Fire-and-forget: push fora do ar não pode travar o cadastro
+    // O aviso vai pro celular de TODO motoboy cadastrado, inclusive os de
+    // outra loja. Endereço com número aí é dado pessoal do cliente saindo do
+    // app pra um aparelho que a loja não controla — vai só o bairro.
     pushToMotoboys({
         title: "🏍️ Nova Corrida Disponível!",
-        body: address,
+        body: avisoDeCorridaNova(address),
         url: "/app",
         tag: "nova-corrida",
     }).catch(() => { });
@@ -115,11 +119,20 @@ export async function optimizeSelectedRouteAction(selectedIds: number[]) {
 
     const targets = await db.select().from(deliveries).where(inArray(deliveries.id, cleanIds));
 
+    // Motoboy só reordena o que JÁ É DELE. Antes valia qualquer corrida com
+    // status "pending", de qualquer loja: bastava mandar [1,2,3,...,500] e a
+    // action devolvia os endereços completos de todas — e ainda renumerava a
+    // ordem de parada da loja dos outros. Otimizar rota só faz sentido nas
+    // corridas que a pessoa aceitou.
     const visible = targets.filter(d =>
         me.role === "admin" ||
         (me.role === "shopkeeper" && d.shopkeeperId === me.id) ||
-        (me.role === "motoboy" && (d.motoboyId === me.id || d.status === "pending"))
+        (me.role === "motoboy" && d.motoboyId === me.id)
     );
+
+    if (!visible.length && me.role === "motoboy") {
+        return { error: "Aceite as corridas primeiro — a rota é montada com as suas." };
+    }
 
     if (!visible.length) return { error: "Nenhuma entrega autorizada para você." };
 

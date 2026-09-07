@@ -7,6 +7,7 @@ import { requireUser, clearSessionCookie } from "@/lib/session";
 import { LogOut, ShieldCheck, Settings, Store, Bike, Crown } from "lucide-react";
 import { isAddressSuspicious } from "@/lib/routeUtils";
 import { ehAdmin, idsDaEquipe, type Ator } from "@/lib/team";
+import { mascararParaOutraLoja } from "@/lib/deliveryPrivacy";
 
 type VisibilityFlags = {
     showCustomerName: boolean;
@@ -288,6 +289,34 @@ export default async function Dashboard({
             }
         }
         pendingDeliveries = applyVisibility(pendingDeliveries, visibilityByShop);
+
+        // Corrida ainda não aceita, de uma loja que não é a dele: mostra só
+        // bairro, cidade e o nome da loja. Nome, telefone e endereço com número
+        // do cliente aparecem quando ele aceitar e virar responsável — antes
+        // disso é dado pessoal de terceiro na tela de quem não tem nada com
+        // aquela loja. O pool segue aberto: ele continua podendo pegar.
+        // Admin (inclusive vendo "como motoboy") continua enxergando tudo.
+        if (user.role === "motoboy") {
+            const deOutraLoja = pendingDeliveries.filter(d =>
+                d.status === "pending"
+                && d.motoboyId == null
+                && d.shopkeeperId != null
+                && d.shopkeeperId !== user.shopkeeperId
+            );
+            const nomesDeLoja = new Map<number, string>();
+            if (deOutraLoja.length) {
+                const ids = Array.from(new Set(deOutraLoja.map(d => d.shopkeeperId as number)));
+                const lojas = await db.select({ id: users.id, name: users.name })
+                    .from(users).where(inArray(users.id, ids));
+                for (const l of lojas) nomesDeLoja.set(l.id, l.name);
+            }
+            pendingDeliveries = pendingDeliveries.map(d =>
+                deOutraLoja.includes(d)
+                    ? mascararParaOutraLoja(d, nomesDeLoja.get(d.shopkeeperId as number) ?? null)
+                    : d
+            );
+        }
+
         myDeliveries = pendingDeliveries.filter(d => d.motoboyId === user.id);
 
         const todayDelivered = await db.select({ count: sql<number>`count(*)` })

@@ -23,6 +23,13 @@ interface Delivery {
     status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'canceled';
     motoboyId: number | null;
     isSuspectAddress?: boolean;
+    /**
+     * Corrida de outra loja, ainda sem dono: o servidor já tirou nome, telefone
+     * e o endereço com número. Aqui só mudamos o jeito de mostrar.
+     */
+    masked?: boolean;
+    /** De que loja veio — é o que sobra pra decidir se vale a pena pegar. */
+    shopName?: string | null;
 }
 
 interface PendingDeliveriesFormProps {
@@ -372,10 +379,21 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                     />
                                     <div className="flex-1">
                                         <div className="flex justify-between items-start mb-1">
-                                            <h4 className="font-bold text-white text-sm">{delivery.customerName || "Cliente"}</h4>
+                                            <h4 className="font-bold text-white text-sm">
+                                                {delivery.masked
+                                                    ? (delivery.shopName || "Outra loja")
+                                                    : (delivery.customerName || "Cliente")}
+                                            </h4>
                                             <span className="text-zinc-400 text-xs font-mono mr-12 md:mr-32">#{delivery.id}</span>
                                         </div>
-                                        <p className="text-zinc-300 text-sm mb-1">{delivery.address}</p>
+                                        <p className="text-zinc-300 text-sm mb-1">
+                                            {delivery.masked && "📍 "}{delivery.address}
+                                        </p>
+                                        {delivery.masked && (
+                                            <p className="text-xs text-zinc-400 bg-zinc-800/60 border border-zinc-700 rounded px-2 py-1 mb-1 inline-block">
+                                                Corrida de outra loja — endereço e contato do cliente aparecem quando você aceitar.
+                                            </p>
+                                        )}
                                         {delivery.isSuspectAddress && (
                                             <p className="text-xs text-amber-300 bg-amber-900/30 border border-amber-700/40 rounded px-2 py-1 mb-1 inline-flex items-center gap-1" title="Endereço caiu a mais de 100km da sua loja — pode estar geocodificado errado">
                                                 ⚠️ Endereço fora do raio da loja — verifique
