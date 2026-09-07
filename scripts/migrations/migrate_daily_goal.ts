@@ -4,8 +4,10 @@ const db = new Database('sqlite.db');
 
 try {
     // Check if column exists
-    const columns = db.pragma("table_info(users)");
-    const hasColumn = columns.some((col: any) => col.name === 'daily_goal');
+    // db.pragma devolve "unknown" na tipagem do better-sqlite3; aqui sabemos
+    // que é a lista de colunas de PRAGMA table_info.
+    const columns = db.pragma("table_info(users)") as { name: string }[];
+    const hasColumn = columns.some((col) => col.name === 'daily_goal');
 
     if (!hasColumn) {
         console.log("Adding daily_goal column...");

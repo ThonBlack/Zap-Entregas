@@ -1,39 +1,123 @@
+# Zap Entregas — produção.
+#
+# Este arquivo é a CÓPIA DE REFERÊNCIA do que roda na VPS em
+# /opt/zap-entregas/docker-compose.yml. Os dois têm que ser iguais: quando
+# mudar aqui, copie pra lá (o deploy.sh não copia sozinho, de propósito —
+# mexer em compose é decisão consciente).
+#
+# Ao lado dele, na VPS, mora o `.env` com os valores de verdade. As chaves
+# esperadas estão em .env.example, com explicação de cada uma.
+#
+# A imagem NÃO é construída aqui: ela chega pronta da máquina do Thon
+# (docker save | gzip | ssh | docker load). Por isso `image:` e não `build:`.
 version: '3'
+
 services:
   zap-entregas:
-    build: .
+    image: zap-entregas:prod
     container_name: zap-entregas
     restart: always
+
     ports:
-      - "4000:3000" # Map Host 4000 -> Container 3000
+      # 127.0.0.1 na frente NÃO é enfeite: sem isso o Docker escreve direto no
+      # iptables, fura o firewall (ufw) e a porta 4000 fica aberta pra internet
+      # sem HTTPS. Quem fala com o app é só o nginx, que roda na própria VPS.
+      - "127.0.0.1:4000:3000"
+
     volumes:
-      - ./sqlite.db:/app/sqlite.db # Persist database
-      - ./uploads:/app/uploads # Persist uploads if any
+      # O banco (arquivo único) e as fotos enviadas. Tudo o mais é descartável:
+      # o container pode ser recriado a qualquer momento sem perder nada.
+      - ./sqlite.db:/app/sqlite.db
+      - ./uploads:/app/uploads
+
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/app/sqlite.db
+
+      # --- segredos (obrigatórios) --------------------------------------
+      # Sem SESSION_SECRET ninguém consegue entrar: é ele que assina o cookie.
       - SESSION_SECRET=${SESSION_SECRET}
       - MASTER_ADMIN_KEY=${MASTER_ADMIN_KEY}
+
+      # --- endereços ------------------------------------------------------
       - NEXT_PUBLIC_BASE_URL=${NEXT_PUBLIC_BASE_URL}
       - APP_URL=${APP_URL}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://zapentregas.duckdns.org}
+
+      # --- cadastro de lojista --------------------------------------------
+      # Código que libera a opção "Sou Lojista" em /register (a tela só mostra
+      # com ?convite_lojista=<este código>). Vazio = ninguém se cadastra como
+      # lojista; quem cria é o admin, pelo painel. Lido a cada requisição.
+      - REGISTER_SHOPKEEPER_CODE=${REGISTER_SHOPKEEPER_CODE:-}
+
+      # --- e-mail (hoje vazio; o fluxo de "esqueci a senha" manda falar com a
+      #     loja em vez de prometer um e-mail que não sairia) ---------------
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM=${SMTP_FROM:-}
-      # Chave do SERVIDOR (geocode + autocomplete de endereço). Não vai pro navegador.
+
+      # --- mapas (duas chaves diferentes do Google, não se misturam) -------
+      # Do SERVIDOR: achar o endereço no mapa (geocode) e sugerir endereço.
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY:-}
-      # Chave do NAVEGADOR pro mapa da conferência (Maps JavaScript API).
-      # Tem que ser outra chave, restrita por site no console do Google.
-      # Vazia = o mapa cai no OpenStreetMap sozinho.
+      # Do NAVEGADOR: desenhar o mapa da conferência e do rastreio. Precisa ser
+      # outra chave, restrita por site. Vazia = o mapa cai no OpenStreetMap.
       - GOOGLE_MAPS_BROWSER_KEY=${GOOGLE_MAPS_BROWSER_KEY:-}
-      # Login com Google (vazio = botão nem aparece). OAUTH_BASE_URL opcional:
-      # sobrescreve APP_URL na hora de montar o endereço de retorno do Google.
+
+      # --- login com Google (vazio = o botão nem aparece) ------------------
+      # OAUTH_BASE_URL é opcional: sobrescreve APP_URL só na hora de montar o
+      # endereço de retorno do Google. Serve pra testar fora do domínio real.
       - OAUTH_BASE_URL=${OAUTH_BASE_URL:-}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
-      - CORS_ORIGIN=${CORS_ORIGIN:-https://zapentregas.duckdns.org}
-      # Código que libera o cadastro de LOJISTA em /register (a tela só mostra a
-      # opção com ?convite_lojista=<este código>). Vazio = ninguém se cadastra
-      # como lojista; quem cria é o admin, pelo painel. Lido em tempo de execução.
-      - REGISTER_SHOPKEEPER_CODE=${REGISTER_SHOPKEEPER_CODE:-}
+
+      # --- notificação no celular do motoboy (push) ------------------------
+      # A chave PÚBLICA também entra no build da imagem (build-arg
+      # NEXT_PUBLIC_VAPID_PUBLIC_KEY) — as duas têm que ser a MESMA. Se
+      # divergirem, o navegador se inscreve com uma chave e o servidor assina
+      # com outra: a notificação some sem erro nenhum aparecer.
+      - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY:-}
+      - VAPID_PRIVATE_KEY=${VAPID_PRIVATE_KEY:-}
+      - VAPID_SUBJECT=${VAPID_SUBJECT:-}
+
+      # --- iframe do caixa (PDV do EpicStore) -------------------------------
+      # Domínios, separados por espaço, que podem embutir /confirmar/<token>.
+      # Vazio = só o próprio site; o caixa do EpicStore para de conferir.
+      - PDV_FRAME_ANCESTORS=${PDV_FRAME_ANCESTORS:-}
+
+      # --- aplicativo Android (TWA) -----------------------------------------
+      # Alimentam /.well-known/assetlinks.json, que é o que faz o app abrir sem
+      # a barra de endereço do Chrome à mostra. Lidos em tempo de execução: pra
+      # acrescentar o fingerprint do Play App Signing basta editar o .env e
+      # reiniciar o container — não precisa reconstruir a imagem.
+      - ANDROID_PACKAGE_NAME=${ANDROID_PACKAGE_NAME:-}
+      - ANDROID_CERT_FINGERPRINTS=${ANDROID_CERT_FINGERPRINTS:-}
+
+    # Teto de memória e de CPU. A VPS tem 3,8 GB e 14 containers; todos os
+    # vizinhos (EpicStore, EpicGestor, EpicHub) já têm teto — o Zap era o único
+    # sem. Sem teto, um vazamento de memória aqui faz o kernel escolher a vítima
+    # do OOM entre TODOS os containers, e quem morre pode ser o banco de outro
+    # cliente. O app usa ~140 MB em uso normal; 768 MB dá folga larga.
+    mem_limit: 768m
+    cpus: "1.0"
+
+    # Batida de porta a cada minuto. `docker ps` passa a mostrar "healthy" /
+    # "unhealthy", e é isso que o deploy.sh espera antes de dizer que deu certo.
+    # start_period de 90s: o Next demora pra subir e as migrações rodam antes.
+    # A imagem node:20 completa já tem curl — não precisa instalar nada.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/login >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+    # Sem isto o Docker guarda log pra sempre. Um erro em laço escreve MBs por
+    # minuto até encher o disco — e aí param os 14 containers, não só este.
+    # Já aconteceu nesta VPS (21/07/2026). 3 arquivos de 10 MB = teto de 30 MB.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -62,7 +62,18 @@ export default async function PlansPage() {
                             </div>
 
                             <div className="p-6 flex-1">
-                                <form action={updatePlanAction.bind(null, plan.id)} className="space-y-4">
+                                {/* O formulário do React não aceita uma action
+                                    que devolva alguma coisa (ela tem que ser
+                                    "void"), e updatePlanAction devolve
+                                    {error} ou {success}. Envolver numa action
+                                    de servidor que ignora a resposta resolve —
+                                    o mesmo jeito já usado no botão Ativo/Inativo
+                                    logo acima. A tela recarrega sozinha porque
+                                    a action chama revalidatePath. */}
+                                <form action={async (formData: FormData) => {
+                                    "use server";
+                                    await updatePlanAction(plan.id, formData);
+                                }} className="space-y-4">
                                     {/* Price */}
                                     <div>
                                         <label className="text-xs text-zinc-500 uppercase font-bold tracking-wider">Preço (R$)</label>

@@ -20,8 +20,12 @@ export default function FinancialDashboard() {
     const fetchData = () => {
         startTransition(async () => {
             const result = await getFinancialStatsAction(month, year);
-            if (!result.error) {
-                setStats(result as any);
+            // A action devolve OU {error} OU os números. Perguntar por "error"
+            // dentro do objeto é o que faz o TypeScript entender qual dos dois
+            // veio — com `result.error` ele reclama, porque o caso de sucesso
+            // não tem esse campo.
+            if (!("error" in result)) {
+                setStats(result);
             }
         });
     };
