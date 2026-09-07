@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Minhas configurações · Zap Entregas" };
+
 import { db } from "@/db";
 import { users, webauthnCredentials } from "@/db/schema";
 import { eq } from "drizzle-orm";

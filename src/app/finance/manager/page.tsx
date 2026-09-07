@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Contas a pagar · Zap Entregas" };
+
 import { getFinancialRecordsAction, deleteFinancialRecordAction, markAsPaidAction } from "@/app/actions/financial-records";
 import Link from "next/link";
 import { requireShopkeeper } from "@/lib/session";

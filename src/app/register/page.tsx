@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Criar conta · Zap Entregas" };
+
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 import { conviteDeLojistaValido } from "@/lib/registerInvite";
 import { redirecionarSeJaLogado } from "@/lib/sessionRedirect";

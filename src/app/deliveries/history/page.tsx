@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Histórico · Zap Entregas" };
+
 import { db } from "@/db";
 import { deliveries, users } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";

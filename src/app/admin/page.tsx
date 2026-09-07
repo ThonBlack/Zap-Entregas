@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Painel admin · Zap Entregas" };
+
 import { db } from "@/db";
 import { users, plans, deliveries, transactions } from "@/db/schema";
 import { desc, eq, gte, and, count, sql } from "drizzle-orm";

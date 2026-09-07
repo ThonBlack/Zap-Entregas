@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Motoboys · Zap Entregas" };
+
 import Link from "next/link";
 import { db } from "@/db";
 import { users, deliveries, transactions, reviews } from "@/db/schema";

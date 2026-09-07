@@ -7,6 +7,13 @@ import Link from "next/link";
 import { getMotoboyLocationAction } from "@/app/actions/tracking";
 import TrackingMapWrapper from "@/components/map/TrackingMapWrapper";
 import { getBrowserMapsKey } from "@/lib/mapsKey";
+import AutoRefresh from "@/components/shared/AutoRefresh";
+
+export const metadata = { title: "Rastreio do pedido · Zap Entregas" };
+
+// A página do cliente não pode congelar: o HTML do servidor vale 15s e o
+// AutoRefresh abaixo pede dados novos a cada 20s enquanto a tela está à vista.
+export const revalidate = 15;
 
 // O cliente enxerga essa página: nada de status cru em inglês.
 const STATUS_LABEL: Record<string, string> = {
@@ -44,11 +51,16 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
         }
     }
 
+    // Enquanto o pedido está andando vale atualizar sozinho; entregue/cancelado
+    // é estado final e ficar batendo no servidor só gasta dado do cliente.
+    const emAndamento = delivery.status !== "delivered" && delivery.status !== "canceled";
+
     return (
-        <div className="min-h-screen bg-zinc-50">
+        <div className="min-h-screen bg-zinc-50 text-zinc-900">
+            {emAndamento && <AutoRefresh segundos={20} />}
             <header className="bg-white p-4 shadow-sm flex items-center gap-4">
                 <div className="font-bold text-lg text-green-600">Zap Entregas</div>
-                <div className="text-sm text-zinc-500">Rastreio de Pedido #{delivery.id}</div>
+                <div className="text-sm text-zinc-600">Rastreio de Pedido #{delivery.id}</div>
             </header>
 
             <main className="max-w-lg mx-auto p-4 space-y-4">
@@ -63,12 +75,19 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                                 {delivery.status === 'delivered' && "Entregue"}
                                 {delivery.status === 'canceled' && "Cancelado"}
                             </h1>
-                            <p className="text-zinc-500 text-sm">
+                            {/* Previsão só depois que o motoboy PEGOU o pedido: antes disso
+                                ninguém saiu da loja, e prometer "15-20 min" numa corrida que
+                                nem foi aceita faz o cliente cobrar atraso que não existe. */}
+                            <p className="text-zinc-600 text-sm">
                                 {delivery.status === 'delivered'
                                     ? "Pedido entregue. Obrigado!"
                                     : delivery.status === 'canceled'
                                         ? "Esse pedido foi cancelado. Fale com a loja."
-                                        : "Previsão: 15-20 min"}
+                                        : delivery.status === 'picked_up'
+                                            ? "Previsão: 15-20 min"
+                                            : delivery.status === 'assigned'
+                                                ? "Um motoboy já pegou seu pedido e está indo buscar na loja."
+                                                : "A loja está preparando e logo um motoboy pega seu pedido."}
                             </p>
                         </div>
                         <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase
@@ -86,8 +105,10 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                                 🏪
                             </div>
                             <div>
-                                <div className="text-xs text-zinc-500">Loja</div>
-                                <div className="font-medium">{delivery.shopkeeper?.name || "Loja Parceira"}</div>
+                                <div className="text-xs text-zinc-600">Loja</div>
+                                {/* text-zinc-900 explícito: sem cor própria, no celular com tema
+                                    escuro esse texto herdava #ededed e sumia no fundo branco. */}
+                                <div className="font-medium text-zinc-900">{delivery.shopkeeper?.name || "Loja Parceira"}</div>
                             </div>
                         </div>
 
@@ -96,8 +117,8 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                                 📍
                             </div>
                             <div>
-                                <div className="text-xs text-zinc-500">Destino</div>
-                                <div className="font-medium">{delivery.address}</div>
+                                <div className="text-xs text-zinc-600">Destino</div>
+                                <div className="font-medium text-zinc-900">{delivery.address}</div>
                             </div>
                         </div>
                     </div>
@@ -106,7 +127,7 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                         {delivery.motoboyId && motoboyLocation && delivery.status !== 'canceled' && delivery.status !== 'delivered' ? (
                             <TrackingMapWrapper motoboyLocation={motoboyLocation} googleMapsKey={getBrowserMapsKey()} />
                         ) : (
-                            <div className="h-[200px] bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-400 text-sm text-center p-4">
+                            <div className="h-[200px] bg-zinc-100 rounded-xl flex items-center justify-center text-zinc-600 text-sm text-center p-4">
                                 {delivery.status === 'canceled'
                                     ? "Pedido cancelado — não há entrega em andamento."
                                     : delivery.status === 'delivered'
@@ -122,13 +143,17 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                 {delivery.motoboy && (
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-zinc-200 flex items-center gap-4">
                         {delivery.motoboy.avatarUrl ? (
-                            <img src={delivery.motoboy.avatarUrl} className="w-12 h-12 rounded-full object-cover" />
+                            <img
+                                src={delivery.motoboy.avatarUrl}
+                                alt={`Foto de ${delivery.motoboy.name}`}
+                                className="w-12 h-12 rounded-full object-cover"
+                            />
                         ) : (
                             <div className="w-12 h-12 bg-zinc-200 rounded-full"></div>
                         )}
                         <div>
                             <div className="font-bold text-zinc-900">{delivery.motoboy.name}</div>
-                            <div className="text-sm text-zinc-500">Seu entregador</div>
+                            <div className="text-sm text-zinc-600">Seu entregador</div>
                         </div>
                     </div>
                 )}

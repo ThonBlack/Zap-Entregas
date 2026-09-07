@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Entrar · Zap Entregas" };
+
 import { redirecionarSeJaLogado } from "@/lib/sessionRedirect";
 import { isGoogleLoginConfigured } from "@/lib/google-oauth";
 import LoginForm from "./LoginForm";
