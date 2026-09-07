@@ -1,10 +1,10 @@
-import { ClipboardCheck } from "lucide-react";
+import { AlertTriangle, ClipboardCheck } from "lucide-react";
 
 import { getPendingClosingsForMotoboy } from "@/lib/dailyClosing";
 import { getDailySummary } from "@/lib/dailySummary";
 import { formatBRL } from "@/lib/wallet-shared";
 import { fmtDiaLegivel, fmtTime } from "@/lib/datetime";
-import { textoLiquido, tomLiquido } from "@/lib/dailyClosing-shared";
+import { fechamentoDivergente, textoLiquido, tomLiquido } from "@/lib/dailyClosing-shared";
 import FechamentoRespostaBotoes from "./FechamentoRespostaBotoes";
 
 /**
@@ -32,7 +32,26 @@ export default async function FechamentoPendente({ motoboyId }: { motoboyId: num
                     zinc: "border-zinc-600 bg-zinc-800",
                 }[tom];
                 const corrida = c.deliveriesCount === 1 ? "corrida" : "corridas";
-                const linhas = resumos[i].lines;
+                const vivo = resumos[i];
+                const linhas = vivo.lines;
+                const { divergente } = fechamentoDivergente(
+                    {
+                        deliveriesCount: c.deliveriesCount,
+                        feesTotal: c.feesTotal,
+                        cashTotal: c.cashTotal,
+                        pixTotal: c.pixTotal,
+                        cardTotal: c.cardTotal,
+                        net: c.net,
+                    },
+                    {
+                        deliveriesCount: vivo.deliveriesCount,
+                        feesTotal: vivo.feesTotal,
+                        cashTotal: vivo.cashTotal,
+                        pixTotal: vivo.pixTotal,
+                        cardTotal: vivo.cardTotal,
+                        net: vivo.net,
+                    },
+                );
 
                 return (
                     <div key={c.id} className={`rounded-2xl border p-4 space-y-3 ${cor}`}>
@@ -53,6 +72,14 @@ export default async function FechamentoPendente({ motoboyId }: { motoboyId: num
                         {c.note && (
                             <p className="text-sm text-zinc-300 bg-zinc-900/50 rounded-lg p-3">
                                 Recado da loja: “{c.note}”
+                            </p>
+                        )}
+
+                        {divergente && (
+                            <p className="text-xs text-yellow-300/90 bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-2.5 flex items-start gap-1.5">
+                                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                                A loja alterou alguma corrida depois de enviar este resumo. Se os números não
+                                batem, toque em “Está errado”.
                             </p>
                         )}
 

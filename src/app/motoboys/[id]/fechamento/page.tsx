@@ -109,6 +109,12 @@ export default async function FechamentoPage({
                         motoboyNote: closing.motoboyNote,
                         sentAt: closing.sentAt,
                         respondedAt: closing.respondedAt,
+                        deliveriesCount: closing.deliveriesCount,
+                        feesTotal: closing.feesTotal,
+                        cashTotal: closing.cashTotal,
+                        pixTotal: closing.pixTotal,
+                        cardTotal: closing.cardTotal,
+                        net: closing.net,
                     }}
                     podeEditar
                 />
