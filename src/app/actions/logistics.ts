@@ -13,6 +13,7 @@ import { fecharCorridaNoBanco } from "@/lib/deliveryLedger";
 import { parseMoney } from "@/lib/money";
 import { calcularTaxa, distanciaDaLoja } from "@/lib/fee";
 import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
+import { logServerError } from "@/lib/serverLog";
 
 async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
     const s = await db.query.shopSettings.findFirst({
@@ -59,6 +60,7 @@ export async function addDeliveryAction(formData: FormData) {
         if (coords) { lat = coords.lat; lng = coords.lng; geoPrecision = coords.precision; }
     } catch (e) {
         console.error("Geocode form failed", e);
+        await logServerError("geocode_cadastro_corrida", e, { userId: me.id, page: "/app", address });
     }
 
     const { canCreateDelivery } = await import("@/lib/planLimits");
@@ -199,6 +201,7 @@ export async function deleteDeliveryAction(id: number) {
         return { success: true };
     } catch (e) {
         console.error("[DELETE ERROR]", e);
+        await logServerError("excluir_corrida", e, { userId: me.id, page: "/app", deliveryId: id });
         return { error: "Erro ao excluir. Verifique se existem registros associados." };
     }
 }
@@ -253,6 +256,7 @@ export async function acceptDeliveryAction(id: number) {
         return { success: true };
     } catch (e) {
         console.error("[ACCEPT ERROR]", e);
+        await logServerError("aceitar_corrida", e, { userId: me.id, page: "/app", deliveryId: id });
         return { error: "Erro ao aceitar entrega." };
     }
 }
@@ -296,6 +300,7 @@ export async function pickupDeliveryAction(id: number) {
         return { success: true };
     } catch (e) {
         console.error("[PICKUP ERROR]", e);
+        await logServerError("coletar_corrida", e, { userId: me.id, page: "/app", deliveryId: id });
         return { error: "Erro ao marcar coleta." };
     }
 }
@@ -420,6 +425,7 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
         };
     } catch (e) {
         console.error("[COMPLETE ERROR]", e);
+        await logServerError("finalizar_corrida", e, { userId: me.id, page: "/app", deliveryId: id });
         return { error: "Erro ao finalizar" };
     }
 }

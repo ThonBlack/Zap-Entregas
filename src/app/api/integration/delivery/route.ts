@@ -8,6 +8,7 @@ import { newTrackingToken, newConfirmToken, confirmTokenExpiry } from "@/lib/tra
 import { pushToDraftReviewers } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
 import { calcularTaxa, dependeDaDistancia } from "@/lib/fee";
+import { logServerError } from "@/lib/serverLog";
 
 /**
  * API de Integração para PDV
@@ -179,6 +180,7 @@ function agendarGeocode(
             // Sem pino a corrida continua válida: a tela de conferência avisa
             // "não achei esse endereço" e o caixa arrasta o pino na mão.
             console.error("[INTEGRATION] geocode falhou:", e);
+            await logServerError("geocode_pdv", e, { userId: shopkeeperId, page: "/api/integration/delivery", deliveryId, address });
         }
     };
 
@@ -272,6 +274,24 @@ export async function POST(request: NextRequest) {
         if (jaExiste) {
             return NextResponse.json(
                 await respostaDuplicata(jaExiste, feeIgnored)
+            );
+        }
+
+        // ── Limite do plano ─────────────────────────────────────────────────
+        // O caminho que mais gera corrida — o PDV — não passava por nenhuma
+        // verificação: o limite comercial não segurava nada na prática.
+        // 403 com mensagem pronta pro caixa ler na tela do PDV.
+        const { canCreateDelivery } = await import("@/lib/planLimits");
+        const limite = await canCreateDelivery(user.id);
+        if (!limite.allowed) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: limite.reason || "Limite de entregas do plano atingido.",
+                    limitReached: true,
+                    message: "O plano do Zap Entregas chegou ao limite de corridas do mês. A entrega NÃO foi registrada — avise a loja.",
+                },
+                { status: 403 }
             );
         }
 
@@ -373,6 +393,7 @@ export async function POST(request: NextRequest) {
         });
     } catch (error: any) {
         console.error("Erro na API de integração:", error);
+        await logServerError("webhook_pdv", error, { page: "/api/integration/delivery" });
         return NextResponse.json(
             { success: false, error: "Erro interno do servidor" },
             { status: 500 }
