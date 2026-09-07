@@ -15,6 +15,7 @@ import { redirect } from "next/navigation";
 import { saveFile } from "@/lib/upload";
 import { revalidatePath } from "next/cache";
 import { hashPassword } from "@/lib/password";
+import { invalidarLinksDeSenha } from "@/lib/passwordResets";
 import { getAuthUserWithRole } from "@/lib/session";
 import { generateInviteToken, getInviteExpiration } from "@/lib/invite";
 import { isPlausiblePhone, normalizePhone, phoneVariants } from "@/lib/phone";
@@ -178,6 +179,9 @@ export async function resetMotoboyAccessAction(formData: FormData): Promise<void
             inviteTokenExpiresAt: getInviteExpiration(),
         })
         .where(eq(users.id, alvo.id));
+
+    // A senha foi zerada: link de recuperação antigo não pode ressuscitar a conta.
+    await invalidarLinksDeSenha(alvo.id);
 
     revalidatePath("/motoboys");
     redirect(`/motoboys/${alvo.id}/convite`);

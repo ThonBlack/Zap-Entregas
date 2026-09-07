@@ -9,6 +9,7 @@ import { hashPassword } from "@/lib/password";
 import { setSessionCookie } from "@/lib/session";
 import { isInviteExpired } from "@/lib/invite";
 import { aplicarLimite, limparLimite, ipDeQuemChamou, mensagemDeEspera } from "@/lib/rateLimit";
+import { invalidarLinksDeSenha } from "@/lib/passwordResets";
 
 /**
  * Aceitar o convite: o motoboy cria a senha dele e já entra.
@@ -62,6 +63,9 @@ export async function acceptInviteAction(token: string, password: string) {
             inviteTokenExpiresAt: null,
         })
         .where(eq(users.id, user.id));
+
+    // Senha nova pelo convite: link de recuperação pendente perde a validade.
+    await invalidarLinksDeSenha(user.id);
 
     // Acabou de provar que é dono do convite e definiu a senha: já entra logado.
     limparLimite("convite", `ip:${ip}`);

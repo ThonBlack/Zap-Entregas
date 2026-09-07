@@ -47,6 +47,18 @@ export async function GET(request: NextRequest) {
         const jaVinculado = await db.query.users.findFirst({ where: eq(users.googleId, profile.sub) });
         if (jaVinculado && jaVinculado.id !== meId) return back("/settings", "google_em_uso");
 
+        // O e-mail tem índice único no banco. Sem esta conferência, conectar uma
+        // conta Google cujo e-mail já é de OUTRA pessoa estourava o índice e caía
+        // numa tela de erro do Next — em vez de dizer o que aconteceu. É a mesma
+        // regra que o caminho de login já aplica (src/lib/google-login.ts).
+        const emailEmUso = await db.query.users.findFirst({
+            where: eq(users.email, profile.email),
+            columns: { id: true },
+        });
+        if (emailEmUso && emailEmUso.id !== meId) {
+            return NextResponse.redirect(absoluteUrl("/settings?erro=google_email_em_uso"));
+        }
+
         await db.update(users)
             .set({ googleId: profile.sub, email: profile.email })
             .where(eq(users.id, meId));

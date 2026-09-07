@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { generateSecureToken, getTokenExpirationDate, isTokenExpired, hashPassword } from "../../lib/password";
 import { sendPasswordResetEmail } from "../../lib/email";
 import { aplicarLimite, ipDeQuemChamou, mensagemDeEspera } from "../../lib/rateLimit";
+import { invalidarLinksDeSenha } from "../../lib/passwordResets";
 
 /**
  * Solicita recuperação de senha via email ou telefone
@@ -38,6 +39,10 @@ export async function requestPasswordResetAction(identifier: string) {
             message: "Se esse telefone/email estiver cadastrado, você receberá um link de recuperação."
         };
     }
+
+    // Link novo aposenta os anteriores: senão o pedido de ontem continua valendo
+    // por 15 minutos junto com o de agora.
+    await invalidarLinksDeSenha(user.id);
 
     // Gera token seguro
     const token = generateSecureToken();
@@ -125,10 +130,9 @@ export async function resetPasswordAction(token: string, newPassword: string) {
         .set({ password: hashedPassword })
         .where(eq(users.id, resetRequest.userId));
 
-    // Marca token como usado
-    await db.update(passwordResets)
-        .set({ usedAt: new Date().toISOString() })
-        .where(eq(passwordResets.id, resetRequest.id));
+    // Senha trocada: TODO link pendente desta pessoa morre junto, não só o que
+    // acabou de ser usado.
+    await invalidarLinksDeSenha(resetRequest.userId);
 
     console.log(`[Password Reset] Senha atualizada para usuário ID ${resetRequest.userId}`);
 

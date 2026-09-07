@@ -16,6 +16,7 @@ import { webauthnCredentials } from "@/db/schema";
 
 const AVISOS_GOOGLE: Record<string, string> = {
     google_em_uso: "Essa conta Google já está ligada a outro usuário.",
+    google_email_em_uso: "O e-mail dessa conta Google já está cadastrado aqui por outra pessoa. Entre com ele ou use outra conta Google.",
     google_cancelado: "Conexão com o Google cancelada.",
     google_state: "A tentativa expirou. Tente de novo.",
     google_falhou: "Não consegui falar com o Google. Tente de novo.",

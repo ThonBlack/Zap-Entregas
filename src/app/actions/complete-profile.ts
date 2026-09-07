@@ -6,6 +6,7 @@ import { eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { hashPassword } from "@/lib/password";
+import { invalidarLinksDeSenha } from "@/lib/passwordResets";
 import { getAuthUser } from "@/lib/session";
 import { isPlausiblePhone, normalizePhone, phoneVariants } from "@/lib/phone";
 
@@ -52,6 +53,9 @@ export async function completarCadastroAction(
     } catch {
         return { message: "Não consegui salvar. Confira o celular e tente de novo." };
     }
+
+    // Definiu senha aqui: link de recuperação pendente perde a validade.
+    if (senha) await invalidarLinksDeSenha(auth.user.id);
 
     revalidatePath("/app");
     redirect("/app");
