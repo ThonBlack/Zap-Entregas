@@ -84,8 +84,12 @@ export default function NewRoutePage() {
                                     <div className="md:col-span-2 relative">
                                         <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">Telefone do Cliente (Opcional)</label>
                                         <div className="relative">
+                                            {/* Teclado de número no celular: é telefone, não texto. */}
                                             <input
                                                 name="customerPhone"
+                                                type="tel"
+                                                inputMode="numeric"
+                                                autoComplete="tel"
                                                 placeholder="21999999999"
                                                 className="w-full px-4 py-2.5 rounded-lg border border-zinc-600 bg-zinc-700 text-white placeholder-zinc-500 focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
                                             />

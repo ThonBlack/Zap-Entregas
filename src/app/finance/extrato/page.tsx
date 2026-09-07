@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Meu extrato · Zap Entregas" };
+
 import Link from "next/link";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 import { requireMotoboy } from "@/lib/session";

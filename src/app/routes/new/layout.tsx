@@ -1,5 +1,8 @@
 import { requireShopkeeper } from "@/lib/session";
 
+// A página é "use client" e não pode exportar metadata — então o título mora aqui.
+export const metadata = { title: "Nova corrida · Zap Entregas" };
+
 /**
  * Guarda da tela "Nova Rota de Entrega".
  *

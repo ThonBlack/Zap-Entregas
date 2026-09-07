@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function LandingNavMenu() {
     const [scrolled, setScrolled] = useState(false);
@@ -41,12 +42,15 @@ export default function LandingNavMenu() {
         <>
             <nav className={`nav ${scrolled ? "scrolled" : ""}`}>
                 <div className="container nav-inner">
-                    <a href="/" className="nav-logo">
+                    {/* Link (e não <a>) pra rota do próprio app: navega sem recarregar
+                        a página inteira. Os âncoras "#features" abaixo continuam <a>
+                        porque são rolagem dentro da mesma página. */}
+                    <Link href="/" className="nav-logo">
                         <img src="/zap-logo.png" alt="Zap Entregas" />
                         <span>
                             Zap <span className="text-gradient">Entregas</span>
                         </span>
-                    </a>
+                    </Link>
                     <ul className="nav-links">
                         <li><a href="#features">Funcionalidades</a></li>
                         <li><a href="#how">Como Funciona</a></li>

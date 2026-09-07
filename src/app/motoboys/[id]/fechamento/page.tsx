@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Fechamento do dia · Zap Entregas" };
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronLeft, ChevronRight, User, Wallet } from "lucide-react";

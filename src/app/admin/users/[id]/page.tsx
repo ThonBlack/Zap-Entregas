@@ -6,7 +6,8 @@ import { getSessionUserId } from "@/lib/session";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { fmtDateTime } from "@/lib/datetime";
+import { fmtDate, fmtDateTime } from "@/lib/datetime";
+import { formatBRL } from "@/lib/wallet-shared";
 import {
     ArrowLeft, User, Phone, Calendar, CreditCard, Package,
     DollarSign, Star, Clock, Settings, Ban, CheckCircle, Edit
@@ -119,12 +120,14 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                         </div>
                         <div className="flex items-center gap-3 text-zinc-400">
                             <Calendar size={18} />
-                            <span>Cadastro: {user.createdAt ? new Date(user.createdAt).toLocaleDateString('pt-BR') : '-'}</span>
+                            {/* fmtDate: o banco grava "2026-08-21 16:08:38" sem dizer que é UTC — o
+                                new Date() do navegador lia como hora local e deslocava 3h. */}
+                            <span>Cadastro: {fmtDate(user.createdAt, "-")}</span>
                         </div>
                         {user.trialEndsAt && (
                             <div className="flex items-center gap-3 text-amber-400">
                                 <Clock size={18} />
-                                <span>Trial até: {new Date(user.trialEndsAt).toLocaleDateString('pt-BR')}</span>
+                                <span>Trial até: {fmtDate(user.trialEndsAt, "-")}</span>
                             </div>
                         )}
                         {user.rating && user.rating > 0 && (
@@ -233,7 +236,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                                         <p className="text-zinc-500 text-xs">{fmtDateTime(t.createdAt, '-')}</p>
                                     </div>
                                     <span className={`font-bold ${t.type === 'credit' ? 'text-green-400' : 'text-red-400'}`}>
-                                        {t.type === 'credit' ? '+' : '-'}R$ {t.amount?.toFixed(2)}
+                                        {t.type === 'credit' ? '+' : '−'} {formatBRL(t.amount ?? 0)}
                                     </span>
                                 </div>
                             ))}

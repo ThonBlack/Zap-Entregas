@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { PackageCheck } from "lucide-react";
 import { isAddressSuspicious } from "@/lib/routeUtils";
 import DraftConfirmForm from "@/components/deliveries/DraftConfirmForm";
+import RecadoConferencia from "@/components/deliveries/RecadoConferencia";
 import { getBrowserMapsKey } from "@/lib/mapsKey";
 
 /**
@@ -26,7 +27,13 @@ export default async function ConfirmarPeloPdvPage({ params }: { params: Promise
 
     if (!draft || draft.status !== "draft" || expirado) {
         return (
-            <Recado
+            <RecadoConferencia
+                resultado={
+                    !draft ? "invalido"
+                        : expirado ? "expirado"
+                            : draft.status === "canceled" ? "cancelada"
+                                : "ja_liberada"
+                }
                 titulo={
                     !draft ? "Link inválido"
                         : expirado ? "Link expirado"
@@ -83,18 +90,6 @@ export default async function ConfirmarPeloPdvPage({ params }: { params: Promise
                     confirmToken={token}
                 />
             </main>
-        </div>
-    );
-}
-
-function Recado({ titulo, texto }: { titulo: string; texto: string }) {
-    return (
-        <div className="min-h-screen bg-zinc-900 text-white flex items-center justify-center p-6">
-            <div className="max-w-sm text-center space-y-3">
-                <h1 className="text-xl font-bold">{titulo}</h1>
-                <p className="text-zinc-400 text-sm">{texto}</p>
-                <p className="text-zinc-500 text-xs">Pode fechar esta janela.</p>
-            </div>
         </div>
     );
 }

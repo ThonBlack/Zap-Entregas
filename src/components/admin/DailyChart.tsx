@@ -18,6 +18,28 @@ interface DailyChartProps {
     color?: string;
 }
 
+/**
+ * A caixinha que aparece ao passar o dedo/mouse numa barra.
+ *
+ * Fica FORA do componente de propósito: definida lá dentro, ela virava um
+ * componente novo a cada render — o React remontava a caixinha do zero toda vez
+ * (perde estado e pisca), e é o que o lint chama de "Cannot create components
+ * during render".
+ */
+function CustomTooltip({ active, payload, label }: any) {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-white p-3 border border-zinc-200 shadow-lg rounded-xl">
+                <p className="text-sm font-bold text-zinc-900">Dia {label}</p>
+                <p className="text-sm text-zinc-600">
+                    {payload[0].value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </p>
+            </div>
+        );
+    }
+    return null;
+}
+
 export default function DailyChart({ data, totalDays, color = "#2563eb" }: DailyChartProps) {
     // Fill missing days with 0
     const chartData = useMemo(() => {
@@ -32,20 +54,6 @@ export default function DailyChart({ data, totalDays, color = "#2563eb" }: Daily
         }
         return filledData;
     }, [data, totalDays]);
-
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-white p-3 border border-zinc-200 shadow-lg rounded-xl">
-                    <p className="text-sm font-bold text-zinc-900">Dia {label}</p>
-                    <p className="text-sm text-zinc-600">
-                        {payload[0].value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </p>
-                </div>
-            );
-        }
-        return null;
-    };
 
     return (
         <div className="h-[300px] w-full">

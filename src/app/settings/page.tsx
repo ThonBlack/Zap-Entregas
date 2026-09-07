@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Configurações da loja · Zap Entregas" };
+
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import SettingsForm from "@/components/admin/SettingsForm";

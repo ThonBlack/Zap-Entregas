@@ -30,6 +30,39 @@ export function formatBRL(n: number) {
     return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+/**
+ * O que este lançamento faz com o saldo, escrito por extenso.
+ *
+ * O saldo é sempre do ponto de vista do MOTOBOY: crédito (+, verde) aumenta o
+ * que a loja deve a ele; débito (−, vermelho) diminui. As duas telas que mostram
+ * lançamento (extrato e confirmações pendentes) discordavam no sinal e na cor —
+ * o mesmo "paguei R$ 300" aparecia "+300 verde" numa e "−300 vermelho" na outra.
+ * Daqui pra frente as duas leem daqui.
+ */
+export function efeitoNoSaldo(
+    type: "credit" | "debit",
+    amount: number,
+    quem: "motoboy" | "loja" = "motoboy",
+): { sinal: "+" | "−"; cor: "green" | "red"; frase: string } {
+    const valor = formatBRL(Math.abs(amount));
+    if (type === "credit") {
+        return {
+            sinal: "+",
+            cor: "green",
+            frase: quem === "motoboy"
+                ? `Aumenta ${valor} no que a loja te deve`
+                : `Aumenta ${valor} no que você deve ao motoboy`,
+        };
+    }
+    return {
+        sinal: "−",
+        cor: "red",
+        frase: quem === "motoboy"
+            ? `Abate ${valor} do que a loja te deve`
+            : `Abate ${valor} do que você deve ao motoboy`,
+    };
+}
+
 /** Mês/ano pedidos na URL, com o padrão sendo o mês ATUAL em Brasília (o servidor roda em UTC). */
 export function parseMonth(sp: { m?: string; y?: string }) {
     const nowBrt = new Date(Date.now() - 3 * 3600 * 1000); // UTC−3, sem horário de verão

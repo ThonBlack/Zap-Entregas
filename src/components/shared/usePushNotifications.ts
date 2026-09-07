@@ -44,7 +44,10 @@ export function usePushNotifications(userId: number) {
     const [adiado, setAdiado] = useState(adiadoAinda);
     const [pedindo, setPedindo] = useState(false);
     const [erroInscricao, setErroInscricao] = useState("");
-    const ultimaChecagem = useRef(0);
+    // Começa AGORA, não em 1970. Com 0, a primeira checagem pedia "tudo desde o
+    // começo dos tempos" e o celular tocava 7 vezes seguidas com as corridas que
+    // o motoboy já estava olhando na tela.
+    const ultimaChecagem = useRef(Date.now());
     const audio = useRef<HTMLAudioElement | null>(null);
 
     useEffect(() => {
@@ -52,7 +55,7 @@ export function usePushNotifications(userId: number) {
         audio.current.volume = 0.5;
     }, []);
 
-    const mostrarNotificacao = useCallback((titulo: string, corpo: string, icone?: string) => {
+    const mostrarNotificacao = useCallback((titulo: string, corpo: string, icone?: string, marca?: string) => {
         if (permissaoAtual() !== "granted") return;
 
         audio.current?.play().catch(() => { });
@@ -64,8 +67,11 @@ export function usePushNotifications(userId: number) {
             // badge = iconezinho da barra de status: o Android usa só o recorte e pinta
             // de branco, então precisa ser a silhueta monocromática (senão vira quadrado).
             badge: "/badge-96.png",
-            tag: `zap-${Date.now()}`,
-            requireInteraction: true,
+            // Marca fixa por corrida: dois avisos da MESMA corrida se substituem em
+            // vez de empilhar. Com `zap-${Date.now()}` cada checagem virava um aviso
+            // novo. E sem requireInteraction o aviso some sozinho — antes ficava
+            // grudado na tela até o motoboy dispensar um por um.
+            tag: marca || "zap-aviso",
         });
         n.onclick = () => { window.focus(); n.close(); };
     }, []);
@@ -125,7 +131,7 @@ export function usePushNotifications(userId: number) {
             try {
                 const r = await fetch(`/api/notifications/check?userId=${userId}&lastCheck=${ultimaChecagem.current}`);
                 const data = await r.json();
-                for (const n of data.notifications ?? []) mostrarNotificacao(n.title, n.body, n.icon);
+                for (const n of data.notifications ?? []) mostrarNotificacao(n.title, n.body, n.icon, n.tag);
                 ultimaChecagem.current = Date.now();
             } catch (e) {
                 console.error("Erro ao checar notificações:", e);

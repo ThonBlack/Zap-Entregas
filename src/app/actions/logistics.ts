@@ -15,6 +15,9 @@ import { calcularTaxa, distanciaDaLoja } from "@/lib/fee";
 import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
 import { logServerError } from "@/lib/serverLog";
 import { avisoDeCorridaNova } from "@/lib/deliveryPrivacy";
+import { linkRota as montarLinkRota } from "@/lib/mapsLink";
+import { montarNotaJustificada, motivoValido, AVISO_MOTIVO_CURTO } from "@/lib/geofence";
+import { absoluteUrl } from "@/lib/appUrl";
 
 async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
     const s = await db.query.shopSettings.findFirst({
@@ -183,9 +186,10 @@ export async function optimizeSelectedRouteAction(selectedIds: number[]) {
     revalidatePath("/app");
 
     if (finalOrder.length > 0) {
-        const destination = finalOrder[finalOrder.length - 1].address;
-        const waypoints = finalOrder.slice(0, -1).map(p => p.address).join("|");
-        const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&waypoints=${encodeURIComponent(waypoints)}`;
+        // Montada com lat/lng quando existe (montarLinkRota decide ponto a ponto):
+        // com o texto do endereço o Google geocodificava de novo e ignorava o pino
+        // que o caixa tinha arrastado na tela de conferência.
+        const url = montarLinkRota(finalOrder.map(p => ({ lat: p.lat, lng: p.lng, address: p.address })));
         return { success: true, url };
     }
 
@@ -318,7 +322,22 @@ export async function pickupDeliveryAction(id: number) {
     }
 }
 
-export async function completeDeliveryAction(id: number, receipt?: DeliveryReceipt) {
+/**
+ * Quando o motoboy finaliza LONGE do endereço (ou sem GPS), a tela manda junto o
+ * motivo escrito e a distância medida. Isso vira um carimbo na observação da
+ * corrida — sem coluna nova no banco — pra loja conferir depois.
+ */
+export type ContextoDeEntrega = {
+    foraDoRaio?: boolean;
+    motivo?: string;
+    distanciaMetros?: number | null;
+};
+
+export async function completeDeliveryAction(
+    id: number,
+    receipt?: DeliveryReceipt,
+    contexto?: ContextoDeEntrega,
+) {
     const auth = await getAuthUserWithRole(["motoboy", "shopkeeper", "admin"]);
     if ("error" in auth) return auth;
     const me = auth.user;
@@ -338,6 +357,13 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
         receivedAmount = conferido.amount;
         receivedMethod = conferido.method;
         receiptNote = conferido.note;
+    }
+
+    // Finalizou fora do raio: o motivo é obrigatório, e a mesma regra da tela
+    // vale aqui (a tela é só a primeira barreira; quem manda é o servidor).
+    if (contexto?.foraDoRaio) {
+        if (!motivoValido(contexto.motivo)) return { error: AVISO_MOTIVO_CURTO };
+        receiptNote = montarNotaJustificada(receiptNote, contexto.motivo!, contexto.distanciaMetros);
     }
 
     try {
@@ -426,13 +452,14 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
 
         revalidatePath("/app");
 
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://zapentregas.duckdns.org";
         return {
             success: true,
             // Pelo token público, nunca pelo id: com /review/<id> o cliente trocava
             // o número e lia as entregas dos outros. Entrega antiga sem token não
             // ganha link (é raro e some no próximo cadastro).
-            reviewUrl: delivery.publicToken ? `${baseUrl}/review/${delivery.publicToken}` : null,
+            // absoluteUrl (e não NEXT_PUBLIC_BASE_URL): a imagem é construída na
+            // máquina do Thon, então NEXT_PUBLIC_* já vem congelado do build.
+            reviewUrl: delivery.publicToken ? absoluteUrl(`/review/${delivery.publicToken}`).toString() : null,
             customerPhone: delivery.customerPhone,
             customerName: delivery.customerName || "Cliente",
         };

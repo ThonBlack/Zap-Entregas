@@ -1,3 +1,6 @@
+// Título da aba: sem isso toda tela do app se chama "Zap Entregas".
+export const metadata = { title: "Painel admin · Zap Entregas" };
+
 import { db } from "@/db";
 import { users, plans, deliveries, transactions } from "@/db/schema";
 import { desc, eq, gte, and, count, sql } from "drizzle-orm";
@@ -7,6 +10,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { fmtDate } from "@/lib/datetime";
+import { formatBRL } from "@/lib/wallet-shared";
 import {
     Users, CreditCard, TrendingUp, Settings, DollarSign,
     Package, AlertTriangle, Clock, UserPlus, ArrowUpRight,
@@ -320,7 +324,7 @@ export default async function AdminDashboardPage() {
                                     </Badge>
                                 </div>
                                 <p className="text-2xl font-bold text-green-400 mb-3">
-                                    {plan.price === 0 ? 'Grátis' : `R$ ${plan.price?.toFixed(2)}`}
+                                    {plan.price === 0 ? 'Grátis' : formatBRL(plan.price ?? 0)}
                                     {plan.price !== 0 && <span className="text-sm text-zinc-500">/mês</span>}
                                 </p>
                                 <div className="text-xs text-zinc-500 space-y-1">

@@ -44,39 +44,6 @@ export default function ReviewForm({ token, customerName }: ReviewFormProps) {
         );
     }
 
-    const StarRating = ({
-        value,
-        onChange,
-        hover,
-        onHover
-    }: {
-        value: number;
-        onChange: (v: number) => void;
-        hover: number;
-        onHover: (v: number) => void;
-    }) => (
-        <div className="flex gap-1">
-            {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                    key={star}
-                    type="button"
-                    onClick={() => onChange(star)}
-                    onMouseEnter={() => onHover(star)}
-                    onMouseLeave={() => onHover(0)}
-                    className="p-1 transition-transform hover:scale-110"
-                >
-                    <Star
-                        size={36}
-                        className={`transition-colors ${star <= (hover || value)
-                                ? "fill-yellow-400 text-yellow-400"
-                                : "text-zinc-600"
-                            }`}
-                    />
-                </button>
-            ))}
-        </div>
-    );
-
     return (
         <div className="space-y-4">
             {/* Avaliação Geral */}
@@ -150,6 +117,47 @@ export default function ReviewForm({ token, customerName }: ReviewFormProps) {
                     </>
                 )}
             </button>
+        </div>
+    );
+}
+
+/**
+ * As 5 estrelinhas. Fica FORA do componente de propósito: definida lá dentro,
+ * virava um componente novo a cada render — o React remontava as estrelas do
+ * zero (perde o estado do "passar por cima") toda vez que o pai renderizava.
+ */
+function StarRating({
+    value,
+    onChange,
+    hover,
+    onHover
+}: {
+    value: number;
+    onChange: (v: number) => void;
+    hover: number;
+    onHover: (v: number) => void;
+}) {
+    return (
+        <div className="flex gap-1">
+            {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                    key={star}
+                    type="button"
+                    onClick={() => onChange(star)}
+                    onMouseEnter={() => onHover(star)}
+                    onMouseLeave={() => onHover(0)}
+                    aria-label={`Dar ${star} estrela${star > 1 ? "s" : ""}`}
+                    className="p-1 transition-transform hover:scale-110"
+                >
+                    <Star
+                        size={36}
+                        className={`transition-colors ${star <= (hover || value)
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-zinc-600"
+                            }`}
+                    />
+                </button>
+            ))}
         </div>
     );
 }

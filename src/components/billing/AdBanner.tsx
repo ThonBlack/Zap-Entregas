@@ -56,32 +56,3 @@ export default function AdBanner({ plan = "free", position = "bottom" }: AdBanne
         </div>
     );
 }
-
-// Inline ad for between deliveries or in lists
-export function InlineAd({ plan = "free" }: { plan?: string }) {
-    if (plan !== "free") return null;
-
-    const ads = [
-        { text: "Patrocinado: Capacetes com 20% OFF!", link: "#", sponsor: "MotoShop" },
-        { text: "Seguro para Motoboys - Contrate agora!", link: "#", sponsor: "SeguroExpress" },
-        { text: "Ganhe cashback em combustível!", link: "#", sponsor: "PostoVIP" },
-    ];
-
-    const randomAd = ads[Math.floor(Math.random() * ads.length)];
-
-    return (
-        <div className="bg-zinc-100 border border-zinc-200 rounded-lg p-3 my-2 flex items-center justify-between">
-            <div>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Patrocinado</span>
-                <p className="text-sm text-zinc-700 font-medium">{randomAd.text}</p>
-                <span className="text-xs text-zinc-500">por {randomAd.sponsor}</span>
-            </div>
-            <a
-                href={randomAd.link}
-                className="bg-zinc-800 text-white px-3 py-1 rounded text-xs font-bold hover:bg-zinc-700"
-            >
-                Ver
-            </a>
-        </div>
-    );
-}

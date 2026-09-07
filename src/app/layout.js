@@ -17,17 +17,19 @@ export const metadata = {
   manifest: "/manifest.json",
 };
 
+// themeColor mora AQUI (export viewport) — dentro de `metadata` o Next 15+ ignora.
+// maximumScale/userScalable saíram: travavam o pinça-pra-zoom, e o motoboy no sol
+// precisa poder ampliar um endereço em letra miúda.
 export const viewport = {
   themeColor: "#16a34a",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: "cover",
 };
 
 import InstallPrompt from "@/components/shared/InstallPrompt";
 import LoggerInitializer from "@/components/shared/LoggerInitializer";
+import ServiceWorkerRegistrar from "@/components/shared/ServiceWorkerRegistrar";
 
 export default function RootLayout({ children }) {
   return (
@@ -36,6 +38,10 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <LoggerInitializer />
+        {/* O service worker é registrado em TODA página, independente de o
+            usuário ter aceitado avisos: é ele que faz o app abrir sem rede e
+            que deixa o Chrome oferecer "instalar na tela inicial". */}
+        <ServiceWorkerRegistrar />
         <InstallPrompt />
         {children}
       </body>

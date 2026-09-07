@@ -167,12 +167,18 @@ export default function DraftConfirmForm({
     };
 
     if (concluido) {
+        // Dentro do iframe do PDV, window.close() é no-op: quem fecha é o PDV,
+        // reagindo ao postMessage. Só prometer "fecha sozinha" quando esta janela
+        // realmente puder fechar (aberta por script, não embutida).
+        const dentroDeIframe = typeof window !== "undefined" && window.parent !== window;
         return (
             <div className="p-6 rounded-2xl bg-zinc-800 border border-zinc-700 text-center space-y-2">
                 <p className="text-lg font-semibold text-white">
                     {concluido === "liberada" ? "✅ Corrida liberada pros motoboys" : "Corrida cancelada"}
                 </p>
-                <p className="text-sm text-zinc-400">Pode voltar pra venda — esta janela fecha sozinha.</p>
+                <p className="text-sm text-zinc-400">
+                    {dentroDeIframe ? "Pode voltar pra venda." : "Pode fechar esta janela."}
+                </p>
             </div>
         );
     }

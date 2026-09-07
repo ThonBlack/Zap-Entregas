@@ -219,7 +219,7 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                     <div>
                         <h2 className="text-lg font-bold text-white">Localização da Loja</h2>
                         <p className="text-sm text-zinc-400">
-                            Quando um endereço chegar sem cidade/UF (ex.: "Rua dos Bobos, 123"), o sistema completa automaticamente com sua cidade pra evitar geocodificar em estado errado.
+                            Quando um endereço chegar sem cidade/UF (ex.: &quot;Rua dos Bobos, 123&quot;), o sistema completa automaticamente com sua cidade pra evitar geocodificar em estado errado.
                         </p>
                     </div>
                 </div>
