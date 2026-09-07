@@ -57,6 +57,11 @@ export const deliveries = sqliteTable("deliveries", {
     observation: text("observation"),
     // Quão confiável é o pino: exata | rua | bairro | cidade (avisa na tela de conferência)
     geoPrecision: text("geo_precision"),
+    // Número do pedido no PDV que originou a corrida. Índice único parcial
+    // (shopkeeper_id, external_id) — criado em scripts/utils/add_external_id_column.js —
+    // impede que o mesmo pedido reenviado vire duas corridas (e duas taxas).
+    // Fica NULL nas corridas criadas na mão, que podem repetir à vontade.
+    externalId: text("external_id"),
     publicToken: text("public_token").unique(), // Token aleatório do link público de rastreio (IDs sequenciais vazam dados)
     // Conferência a partir do PDV, sem login: código de uso único e com prazo.
     // O caixa não tem conta no Zap, então é isto que autoriza ele a ajustar ESTA corrida.
