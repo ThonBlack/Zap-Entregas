@@ -50,6 +50,7 @@
     "drizzle-kit": "^0.31.8",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
+    "puppeteer-core": "^25.10.0",
     "tailwindcss": "^4",
     "typescript": "^5.9.3"
   }

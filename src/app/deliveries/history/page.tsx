@@ -64,7 +64,13 @@ export default async function HistoryPage({
     const temProximo = next.y < hoje.year || (next.y === hoje.year && next.m <= hoje.month);
 
     // A data que vale é a da entrega; corrida antiga sem deliveredAt cai no updatedAt.
-    const doMes = sql`(${noMes(deliveries.deliveredAt, inicio, fim)}) OR (${deliveries.deliveredAt} IS NULL AND (${noMes(deliveries.updatedAt, inicio, fim)}))`;
+    //
+    // O parêntese de FORA não é decoração: sem ele o SQL vira
+    //   motoboy_id = 3 AND status = 'delivered' AND (A) OR (B)
+    // e o OR, que amarra mais frouxo que o AND, joga o filtro de dono e de status
+    // fora do jogo — a tela mostrava corrida pendente de qualquer um como
+    // "ENTREGUE". Achado no smoke de navegador.
+    const doMes = sql`((${noMes(deliveries.deliveredAt, inicio, fim)}) OR (${deliveries.deliveredAt} IS NULL AND (${noMes(deliveries.updatedAt, inicio, fim)})))`;
 
     const escopo =
         user.role === "admin" ? eq(deliveries.status, "delivered") :

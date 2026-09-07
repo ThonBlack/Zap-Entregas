@@ -258,7 +258,10 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
         // Longe do endereço (ou sem GPS): não trava o botão, pede o motivo.
         if (precisaJustificar(situacao)) {
             setJustificativa({ id: completingId, receipt, situacao });
-            setMotivo(situacao.tipo === "sem-gps" ? "sem GPS: " : "");
+            // Campo VAZIO de propósito: quem carimba "[sem GPS]" / "[fora do raio
+            // 1,4 km]" é o servidor. Se a tela já viesse escrita, o texto saía
+            // duplicado na observação e a regra dos 5 caracteres não pegava nada.
+            setMotivo("");
             setErroMotivo("");
             return;
         }
