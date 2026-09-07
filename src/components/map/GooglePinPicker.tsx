@@ -55,7 +55,10 @@ export default function GooglePinPicker({
                     disableDefaultUI: true,
                     zoomControl: true,
                     clickableIcons: false,
-                    gestureHandling: "greedy",
+                    // "cooperative": um dedo rola a PÁGINA, dois dedos mexem no mapa.
+                    // Com "greedy" o mapa capturava o arrasto de um dedo só e o caixa
+                    // ficava preso nele, sem conseguir chegar nos campos de baixo.
+                    gestureHandling: "cooperative",
                 });
 
                 const pino = new maps.Marker({

@@ -14,6 +14,7 @@ export default function ApiKeyForm({ userId, currentApiKey }: ApiKeyFormProps) {
     const [isPending, startTransition] = useTransition();
     const [copied, setCopied] = useState(false);
     const [showConfirm, setShowConfirm] = useState(false);
+    const [erro, setErro] = useState("");
 
     const handleGenerate = () => {
         if (apiKey && !showConfirm) {
@@ -21,12 +22,18 @@ export default function ApiKeyForm({ userId, currentApiKey }: ApiKeyFormProps) {
             return;
         }
 
+        setErro("");
         startTransition(async () => {
             const result = await generateApiKeyAction();
             if (result.success && result.apiKey) {
                 setApiKey(result.apiKey);
                 setShowConfirm(false);
+                return;
             }
+            // Antes não havia `else`: quando a action falhava, o spinner sumia e
+            // NADA aparecia na tela. O lojista tocava de novo, de novo, e achava
+            // que o app estava quebrado.
+            setErro(("error" in result && result.error) || "Não deu pra gerar a chave agora. Tente de novo.");
         });
     };
 
@@ -49,6 +56,13 @@ export default function ApiKeyForm({ userId, currentApiKey }: ApiKeyFormProps) {
                     <p className="text-sm text-zinc-400">Chave de API para conectar seu PDV</p>
                 </div>
             </div>
+
+            {erro && (
+                <div className="mb-4 bg-red-950/70 border border-red-500/60 rounded-xl p-3 flex items-start gap-2">
+                    <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-sm text-red-200">{erro}</p>
+                </div>
+            )}
 
             {apiKey ? (
                 <div className="space-y-4">

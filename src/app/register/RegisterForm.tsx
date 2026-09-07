@@ -79,6 +79,7 @@ function RegisterInner({ googleEnabled, conviteLojista }: RegisterFormProps) {
                             <input
                                 name="name"
                                 type="text"
+                                autoComplete="name"
                                 required
                                 placeholder="Seu nome ou da Loja"
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
@@ -89,7 +90,9 @@ function RegisterInner({ googleEnabled, conviteLojista }: RegisterFormProps) {
                             <label className="block text-sm font-medium text-zinc-300 mb-1">Celular (Login)</label>
                             <input
                                 name="phone"
-                                type="text"
+                                type="tel"
+                                inputMode="numeric"
+                                autoComplete="tel"
                                 required
                                 placeholder="21999999999"
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
@@ -103,6 +106,8 @@ function RegisterInner({ googleEnabled, conviteLojista }: RegisterFormProps) {
                             <input
                                 name="email"
                                 type="email"
+                                autoComplete="email"
+                                inputMode="email"
                                 placeholder="seu@email.com"
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"
                             />
@@ -113,6 +118,7 @@ function RegisterInner({ googleEnabled, conviteLojista }: RegisterFormProps) {
                             <input
                                 name="password"
                                 type="password"
+                                autoComplete="new-password"
                                 required
                                 placeholder="••••••••"
                                 className="w-full bg-zinc-900 border border-zinc-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all"

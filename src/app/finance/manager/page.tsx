@@ -4,6 +4,7 @@ export const metadata = { title: "Contas a pagar · Zap Entregas" };
 import { getFinancialRecordsAction, deleteFinancialRecordAction, markAsPaidAction } from "@/app/actions/financial-records";
 import Link from "next/link";
 import { requireShopkeeper } from "@/lib/session";
+import { fmtDate } from "@/lib/datetime";
 import { ArrowLeft, Plus, Trash2, CheckCircle, AlertCircle, DollarSign } from "lucide-react";
 
 export default async function FinanceManagerPage(props: { searchParams: Promise<{ month?: string, year?: string }> }) {
@@ -115,7 +116,9 @@ export default async function FinanceManagerPage(props: { searchParams: Promise<
                                     <div>
                                         <p className="font-medium text-gray-800">{record.description}</p>
                                         <div className="flex items-center gap-2 text-sm text-gray-500">
-                                            <span>{new Date(record.dueDate).toLocaleDateString('pt-BR')}</span>
+                                            {/* fmtDate: due_date é texto "2026-09-10"; o new Date() lia como meia-noite
+                                            UTC e mostrava 09/09 pra quem está em Brasília. */}
+                                            <span>{fmtDate(record.dueDate, "-")}</span>
                                             <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
                                             <span>{record.category}</span>
                                             {record.status === 'paid' && (

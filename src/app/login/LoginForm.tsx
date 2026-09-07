@@ -103,10 +103,15 @@ export default function LoginForm({ googleEnabled, avisoExterno }: LoginFormProp
 
                         <div>
                             <label htmlFor="phone" className="block text-sm font-medium mb-2 text-zinc-300">Celular</label>
+                            {/* type=tel + inputMode=numeric: o Android abre o teclado de
+                                número em vez do QWERTY. autoComplete deixa o gerenciador
+                                de senhas do Chrome reconhecer o par celular/senha. */}
                             <input
                                 id="phone"
                                 name="phone"
-                                type="text"
+                                type="tel"
+                                inputMode="numeric"
+                                autoComplete="tel"
                                 placeholder="21999999999"
                                 className="w-full rounded-xl border border-zinc-700 bg-zinc-800 p-4 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                             />
@@ -118,6 +123,7 @@ export default function LoginForm({ googleEnabled, avisoExterno }: LoginFormProp
                                 id="password"
                                 name="password"
                                 type="password"
+                                autoComplete="current-password"
                                 placeholder="••••••"
                                 className="w-full rounded-xl border border-zinc-700 bg-zinc-800 p-4 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                             />
