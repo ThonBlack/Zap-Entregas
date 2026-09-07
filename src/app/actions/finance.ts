@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
 import { MANUAL_ENTRY_OPTIONS, safeReturnTo, type ManualEntryKey } from "@/lib/wallet";
 import { carregarMotoboyGerenciado } from "@/lib/team";
+import { parseMoney } from "@/lib/money";
 
 export type ManualEntryState = { error?: string } | null;
 
@@ -31,9 +32,11 @@ export async function createTransactionAction(_prev: ManualEntryState, formData:
         return { error: "Não dá pra lançar na sua própria carteira." };
     }
 
-    const amount = parseFloat(amountStr.replace(",", "."));
-    if (!Number.isFinite(amount) || amount <= 0) {
-        return { error: "Valor inválido." };
+    // `parseMoney` entende "1.850,00" (o conversor antigo lia R$ 1,85 e o acerto
+    // do mês virava centavos). Texto ilegível é erro na tela, nunca zero.
+    const amount = parseMoney(amountStr);
+    if (amount === null || amount <= 0) {
+        return { error: "Valor inválido. Escreva assim: 1.850,00" };
     }
 
     // Lançar dinheiro na carteira de um motoboy de OUTRA loja mexeria na dívida
@@ -70,6 +73,8 @@ export async function createTransactionAction(_prev: ManualEntryState, formData:
         kind: entry.kind,
         description: description || entry.label,
         status: needsConfirmation ? "pending" : "confirmed",
+        // ISO explícito: o CURRENT_TIMESTAMP do banco grava noutro formato.
+        createdAt: new Date().toISOString(),
     });
 
     revalidatePath("/app");
@@ -141,8 +146,8 @@ export async function getFinancialStatsAction(month: number, year: number) {
                 eq(transactions.userId, user.id),
                 eq(transactions.type, "credit"),
                 eq(transactions.status, "confirmed"),
-                sql`${transactions.createdAt} >= ${startDate}`,
-                sql`${transactions.createdAt} <= ${endDate}`
+                sql`datetime(${transactions.createdAt}) >= datetime(${startDate})`,
+                sql`datetime(${transactions.createdAt}) <= datetime(${endDate})`
             ))
             .groupBy(sql`strftime('%d', ${transactions.createdAt})`)
             .orderBy(sql`strftime('%d', ${transactions.createdAt})`);
@@ -156,8 +161,8 @@ export async function getFinancialStatsAction(month: number, year: number) {
                 eq(transactions.creatorId, user.id),
                 eq(transactions.type, "credit"),
                 eq(transactions.status, "confirmed"),
-                sql`${transactions.createdAt} >= ${startDate}`,
-                sql`${transactions.createdAt} <= ${endDate}`
+                sql`datetime(${transactions.createdAt}) >= datetime(${startDate})`,
+                sql`datetime(${transactions.createdAt}) <= datetime(${endDate})`
             ))
             .groupBy(sql`strftime('%d', ${transactions.createdAt})`)
             .orderBy(sql`strftime('%d', ${transactions.createdAt})`);

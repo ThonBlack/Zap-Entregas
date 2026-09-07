@@ -150,6 +150,7 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
                             relatedDeliveryId: id,
                             creatorId: me.id,
                             status: "confirmed",
+                            createdAt: agora,
                         })
                         .run();
                 }
@@ -184,6 +185,7 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
                             relatedDeliveryId: id,
                             creatorId: me.id,
                             status: "confirmed",
+                            createdAt: agora,
                         })
                         .run();
                 }

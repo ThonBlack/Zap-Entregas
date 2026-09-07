@@ -121,9 +121,20 @@ export default function DraftConfirmForm({
         }
     }, []);
 
+    // Endereço que nem o Google nem o OpenStreetMap acharam: o pino começa no
+    // meio da loja. Liberar sem mexer nele gravava a LOJA como destino "exato" —
+    // e o motoboy ficava sem conseguir fechar a entrega na casa do cliente.
+    // (Só na conferência do rascunho — ao EDITAR uma corrida já liberada o
+    // servidor refaz a busca do endereço sozinho, sem carimbar "exata".)
+    const precisaColocarPino = !editando && hadNoPin && !pinTouched;
+
     const submit = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError("");
+        if (precisaColocarPino) {
+            setError("Arraste o pino até o lugar da entrega antes de liberar — esse endereço não foi encontrado no mapa.");
+            return;
+        }
         const fd = new FormData(e.currentTarget);
         fd.set("lat", String(lat));
         fd.set("lng", String(lng));
@@ -312,8 +323,9 @@ export default function DraftConfirmForm({
                 )}
                 <button
                     type="submit"
-                    disabled={isPending}
-                    className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold transition-colors disabled:opacity-50"
+                    disabled={isPending || precisaColocarPino}
+                    title={precisaColocarPino ? "Coloque o pino no lugar da entrega primeiro" : undefined}
+                    className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isPending ? <Loader2 size={18} className="animate-spin" /> : <Bike size={18} />}
                     {editando ? "Salvar alterações" : "Liberar pros motoboys"}

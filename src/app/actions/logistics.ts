@@ -1,14 +1,18 @@
 "use server";
 
 import { db } from "@/db";
-import { deliveries, transactions, shopSettings } from "@/db/schema";
-import { eq, inArray, and, gt } from "drizzle-orm";
+import { deliveries, shopSettings } from "@/db/schema";
+import { eq, inArray, and, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { geocodeAddress, optimizeRoute, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
 import { newTrackingToken } from "@/lib/trackingToken";
 import { pushToMotoboys, pushToUser } from "@/lib/push";
 import { validarRecebimento, type DeliveryReceipt, type RecebimentoValidado } from "@/lib/receipt";
+import { fecharCorridaNoBanco } from "@/lib/deliveryLedger";
+import { parseMoney } from "@/lib/money";
+import { calcularTaxa, distanciaDaLoja } from "@/lib/fee";
+import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
 
 async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
     const s = await db.query.shopSettings.findFirst({
@@ -30,20 +34,22 @@ export async function addDeliveryAction(formData: FormData) {
 
     const address = (formData.get("address") as string)?.trim();
     const customerName = formData.get("customerName") as string;
-    const value = parseFloat((formData.get("value") as string)?.replace(",", ".") || "0");
     const observation = formData.get("observation") as string;
 
     if (!address) return { error: "Endereço obrigatório" };
 
-    const recent = await db.query.deliveries.findFirst({
-        where: and(
-            eq(deliveries.shopkeeperId, me.id),
-            eq(deliveries.address, address),
-            gt(deliveries.createdAt, new Date(Date.now() - 300000).toISOString())
-        ),
-    });
+    // "1.850,00" digitado à mão virava R$ 1,85 no conversor antigo. `parseMoney`
+    // entende milhar e devolve null quando não dá pra ler — aí é erro na tela,
+    // nunca zero calado.
+    const valueRaw = String(formData.get("value") ?? "").trim();
+    const value = valueRaw ? parseMoney(valueRaw) : 0;
+    if (value === null || value < 0) {
+        return { error: "Valor do pedido inválido. Escreva assim: 12,50" };
+    }
 
-    if (recent) return { error: "Entrega já adicionada recentemente." };
+    if (await existeCorridaIgualRecente(me.id, address, 5)) {
+        return { error: "Entrega já adicionada recentemente." };
+    }
 
     const geoOpts = await loadGeocodeOpts(me.id);
     let lat = 0, lng = 0;
@@ -62,11 +68,12 @@ export async function addDeliveryAction(formData: FormData) {
         return { error: limitCheck.reason || "Limite de entregas atingido." };
     }
 
+    const agora = new Date().toISOString();
     await db.insert(deliveries).values({
         shopkeeperId: me.id,
         address,
         customerName,
-        value: Number.isFinite(value) ? value : 0,
+        value,
         observation,
         lat,
         lng,
@@ -74,6 +81,10 @@ export async function addDeliveryAction(formData: FormData) {
         status: "pending",
         stopOrder: 999,
         publicToken: newTrackingToken(),
+        // Data sempre em ISO: o CURRENT_TIMESTAMP do banco grava noutro formato
+        // e as duas formas juntas quebravam comparação e ordenação.
+        createdAt: agora,
+        updatedAt: agora,
     });
 
     // Fire-and-forget: push fora do ar não pode travar o cadastro
@@ -207,14 +218,27 @@ export async function acceptDeliveryAction(id: number) {
         if (!delivery) return { error: "Entrega não disponível ou já foi aceita." };
         if (delivery.motoboyId) return { error: "Esta entrega já foi aceita por outro motoboy." };
 
-        await db.update(deliveries)
+        // `.returning()` + `motoboy_id IS NULL`: se outro motoboy pegou primeiro,
+        // o UPDATE não muda nada e quem perdeu precisa SABER disso. Antes a tela
+        // recarregava sem erro e ele saía atrás de um pedido que não era dele.
+        const pegou = await db.update(deliveries)
             .set({
                 motoboyId: me.id,
                 status: "assigned",
                 acceptedAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             })
-            .where(and(eq(deliveries.id, id), eq(deliveries.status, "pending")));
+            .where(and(
+                eq(deliveries.id, id),
+                eq(deliveries.status, "pending"),
+                isNull(deliveries.motoboyId),
+            ))
+            .returning({ id: deliveries.id });
+
+        if (!pegou.length) {
+            revalidatePath("/app");
+            return { error: "Outro motoboy pegou essa corrida." };
+        }
 
         if (delivery.shopkeeperId) {
             pushToUser(delivery.shopkeeperId, {
@@ -337,63 +361,35 @@ export async function completeDeliveryAction(id: number, receipt?: DeliveryRecei
         if (fee === 0 && shopId) {
             const settings = await db.query.shopSettings.findFirst({
                 where: eq(shopSettings.userId, shopId),
+                columns: {
+                    remunerationModel: true, fixedValue: true, valuePerKm: true,
+                    guaranteedMinimum: true, shopLat: true, shopLng: true,
+                },
             });
 
-            if (settings) {
-                if (settings.remunerationModel === "fixed" || settings.remunerationModel === "hybrid") {
-                    fee = settings.fixedValue || 0;
-                }
-            }
+            // É aqui que a corrida por km fecha: na entrega o pino já existe, então
+            // dá pra medir loja → cliente. (No webhook do PDV ainda não dá.)
+            fee = calcularTaxa(
+                settings ?? null,
+                distanciaDaLoja(settings?.shopLat, settings?.shopLng, delivery.lat, delivery.lng),
+            );
         }
 
-        const existingByType = await db.query.transactions.findMany({
-            where: eq(transactions.relatedDeliveryId, id),
-            columns: { type: true },
+        // Marcar "entregue" e lançar o dinheiro acontece numa transação só
+        // (src/lib/deliveryLedger.ts). Dois cliques ao mesmo tempo não creditam
+        // duas vezes: a transação fecha a janela e o índice único é a tranca.
+        const fechado = fecharCorridaNoBanco({
+            deliveryId: id,
+            motoboyId: delivery.motoboyId,
+            shopkeeperId: shopId,
+            customerName: delivery.customerName,
+            fee,
+            recibo: { receiptStatus, receivedAmount, receivedMethod, receiptNote },
+            statusAbertos: openStatuses,
         });
-        const hasCredit = existingByType.some(t => t.type === "credit");
-        const hasDebit = existingByType.some(t => t.type === "debit");
 
-        // Crédito vai pro motoboy da entrega (não pra quem clicou) e só se houver um.
-        if (!hasCredit && fee > 0 && delivery.motoboyId) {
-            await db.insert(transactions).values({
-                userId: delivery.motoboyId,
-                amount: fee,
-                type: "credit",
-                kind: "corrida",
-                description: `Corrida #${id} - ${delivery.customerName || "Cliente"}`,
-                relatedDeliveryId: id,
-                creatorId: shopId,
-                status: "confirmed",
-            });
-        }
-
-        // Dinheiro recebido fica com o motoboy → débito na carteira dele (abate o que a loja lhe deve).
-        // PIX/cartão vão direto pra loja, não geram débito.
-        if (!hasDebit && receivedMethod === "dinheiro" && receivedAmount && receivedAmount > 0 && delivery.motoboyId) {
-            await db.insert(transactions).values({
-                userId: delivery.motoboyId,
-                amount: receivedAmount,
-                type: "debit",
-                kind: "dinheiro",
-                description: `Recebido do cliente em dinheiro - Corrida #${id}`,
-                relatedDeliveryId: id,
-                creatorId: shopId,
-                status: "confirmed",
-            });
-        }
-
-        await db.update(deliveries)
-            .set({
-                status: "delivered",
-                fee,
-                receiptStatus,
-                receivedAmount,
-                receivedMethod,
-                receiptNote,
-                deliveredAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            })
-            .where(eq(deliveries.id, id));
+        if (!fechado.ok) return { error: fechado.erro };
+        if (fechado.jaEntregue) return { success: true, alreadyDelivered: true };
 
         if (delivery.shopkeeperId && delivery.shopkeeperId !== me.id) {
             const recebido =

@@ -101,6 +101,7 @@ export async function finishPasskeyRegistration(
             counter: credential.counter,
             transports: credential.transports?.join(",") ?? null,
             deviceName: guessDeviceName(userAgent),
+            createdAt: new Date().toISOString(),
         });
     } catch {
         return { error: "Essa digital já está cadastrada." };

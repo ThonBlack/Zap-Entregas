@@ -60,6 +60,7 @@ export async function submitReviewAction(data: ReviewData) {
             ratingGeneral,
             ratingDelivery: ratingDeliveryVal,
             feedback,
+            createdAt: new Date().toISOString(),
         });
 
         const motoboy = await db.query.users.findFirst({

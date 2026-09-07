@@ -7,6 +7,7 @@ import type { ParsedAddress } from "@/lib/addressParser";
 import { newTrackingToken, newConfirmToken, confirmTokenExpiry } from "@/lib/trackingToken";
 import { pushToDraftReviewers } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
+import { calcularTaxa, dependeDaDistancia } from "@/lib/fee";
 
 /**
  * API de Integração para PDV
@@ -277,14 +278,23 @@ export async function POST(request: NextRequest) {
         // "fee" aqui é o que o MOTOBOY ganha (contrato da tela de conferência), não o
         // frete que o PDV cobra do cliente — por isso body.fee é ignorado. Nasce da
         // regra da loja e o lojista pode ajustar na conferência.
+        //
+        // A corrida do PDV ainda NÃO tem pino no mapa (o geocode roda depois de
+        // responder), então aqui não dá pra medir a distância. Loja que paga por
+        // km (ou fixo + km) nasce com taxa 0 DE PROPÓSITO: quem calcula é o
+        // completeDeliveryAction, na entrega, quando o pino já existe. Loja de
+        // taxa fixa já sai com o valor certo. O lojista pode ajustar na conferência.
         let fee = 0;
         try {
             const remu = await db.query.shopSettings.findFirst({
                 where: eq(shopSettings.userId, user.id),
-                columns: { remunerationModel: true, fixedValue: true },
+                columns: {
+                    remunerationModel: true, fixedValue: true,
+                    valuePerKm: true, guaranteedMinimum: true,
+                },
             });
-            if (remu && (remu.remunerationModel === "fixed" || remu.remunerationModel === "hybrid")) {
-                fee = remu.fixedValue || 0;
+            if (remu && !dependeDaDistancia(remu.remunerationModel)) {
+                fee = calcularTaxa(remu, null);
             }
         } catch { /* sem regra, taxa fica 0 e o lojista preenche na conferência */ }
 
@@ -309,6 +319,9 @@ export async function POST(request: NextRequest) {
                 publicToken: newTrackingToken(),
                 confirmToken: newConfirmToken(),
                 confirmTokenExpiresAt: confirmTokenExpiry(),
+                // ISO explícito: o CURRENT_TIMESTAMP do banco grava noutro formato.
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
             }).returning().get();
         } catch (e: any) {
             // Duas chamadas do mesmo pedido ao mesmo tempo: o índice único barra a

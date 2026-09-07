@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
             amount: body.amount || null,
             currency: body.currency || "BRL",
             metadata: body.metadata ? JSON.stringify(body.metadata) : null,
+            createdAt: new Date().toISOString(),
         }).returning().get();
 
         return NextResponse.json({

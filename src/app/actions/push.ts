@@ -28,6 +28,7 @@ export async function savePushSubscriptionAction(sub: SubscriptionInput, userAge
         p256dh: sub.keys.p256dh.slice(0, 300),
         auth: sub.keys.auth.slice(0, 300),
         userAgent: typeof userAgent === "string" ? userAgent.slice(0, 300) : null,
+        createdAt: new Date().toISOString(),
     });
 
     return { success: true };

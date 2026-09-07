@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import crypto from "node:crypto";
 import { saveFile } from "@/lib/upload";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
+import { parseMoney } from "@/lib/money";
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -17,15 +18,28 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
     if ("error" in auth) redirect("/login");
     const userId = auth.user.id;
 
-    const remunerationModel = formData.get("remunerationModel") as "fixed" | "distance" | "daily" | "hybrid";
-    if (!["fixed", "distance", "daily", "hybrid"].includes(remunerationModel)) {
+    const modeloEnviado = formData.get("remunerationModel") as string;
+    if (!["fixed", "distance", "daily", "hybrid"].includes(modeloEnviado)) {
         return { message: "Modelo inválido.", success: false };
     }
+    // "Diária" foi aposentada (não calculava nada): vira Taxa Fixa.
+    const remunerationModel = (modeloEnviado === "daily" ? "fixed" : modeloEnviado) as
+        "fixed" | "distance" | "hybrid";
 
-    const fixedValue = parseFloat((formData.get("fixedValue") as string || "0").replace(",", "."));
-    const valuePerKm = parseFloat((formData.get("valuePerKm") as string || "0").replace(",", "."));
-    const dailyValue = parseFloat((formData.get("dailyValue") as string || "0").replace(",", "."));
-    const guaranteedMinimum = parseFloat((formData.get("guaranteedMinimum") as string || "0").replace(",", "."));
+    // Dinheiro digitado passa por parseMoney: "1.850,00" com o conversor antigo
+    // virava 1,85 e a loja passava a pagar centavos por corrida.
+    const dinheiro = (campo: string) => parseMoney(String(formData.get(campo) ?? "").trim() || "0");
+    const fixedValue = dinheiro("fixedValue");
+    const valuePerKm = dinheiro("valuePerKm");
+    const dailyValue = dinheiro("dailyValue");
+    const guaranteedMinimum = dinheiro("guaranteedMinimum");
+
+    if (fixedValue === null || valuePerKm === null || dailyValue === null || guaranteedMinimum === null) {
+        return { message: "Valor inválido. Escreva assim: 12,50", success: false };
+    }
+    if (fixedValue < 0 || valuePerKm < 0 || dailyValue < 0 || guaranteedMinimum < 0) {
+        return { message: "Valor não pode ser negativo.", success: false };
+    }
 
     const showCustomerName = formData.get("showCustomerName") === "on";
     const showCustomerPhone = formData.get("showCustomerPhone") === "on";
@@ -78,6 +92,7 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 defaultState,
                 shopLat,
                 shopLng,
+                updatedAt: new Date().toISOString(),
             });
         }
 

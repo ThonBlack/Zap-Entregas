@@ -38,6 +38,7 @@ export async function requestPasswordResetAction(identifier: string) {
         userId: user.id,
         token,
         expiresAt,
+        createdAt: new Date().toISOString(),
     });
 
     // Monta URL de reset

@@ -98,6 +98,7 @@ export async function registerAction(prevState: any, formData: FormData) {
             password: hashedPassword,
             role,
             ...padroes,
+            createdAt: new Date().toISOString(),
         }).returning().get();
     } catch (e) {
         if (ehErroDeDuplicidade(e)) {

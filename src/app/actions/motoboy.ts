@@ -122,6 +122,7 @@ export async function createMotoboyAction(formData: FormData): Promise<void> {
             shopkeeperId,
             inviteToken: generateInviteToken(),
             inviteTokenExpiresAt: getInviteExpiration(),
+            createdAt: new Date().toISOString(),
         }).returning({ id: users.id });
         novoId = criado?.id;
     } catch {
