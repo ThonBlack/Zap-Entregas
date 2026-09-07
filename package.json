@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import ./scripts/test/ts-loader.mjs --test \"scripts/test/*.test.mjs\"",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "script:create-admin": "npx tsx scripts/utils/create_admin.ts",

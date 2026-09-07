@@ -71,6 +71,10 @@ export const deliveries = sqliteTable("deliveries", {
     receivedAmount: real("received_amount"), // Quanto o motoboy de fato recebeu do cliente
     receivedMethod: text("received_method", { enum: ["dinheiro", "pix", "cartao"] }),
     receiptNote: text("receipt_note"), // Observação do motoboy na entrega
+    // Correção do recibo pela loja depois da entrega (tela "Resumo do dia").
+    // Sem isto, um "não recebi" marcado por engano ficava errado pra sempre.
+    adjustedBy: integer("adjusted_by").references((): AnySQLiteColumn => users.id),
+    adjustedAt: text("adjusted_at"),
     createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
@@ -323,6 +327,52 @@ export const passwordResets = sqliteTable("password_resets", {
 export const passwordResetsRelations = relations(passwordResets, ({ one }) => ({
     user: one(users, {
         fields: [passwordResets.userId],
+        references: [users.id],
+    }),
+}));
+
+/**
+ * Fechamento do dia ("Resumo do dia"): o acerto de contas entre a loja e o
+ * motoboy referente a UM dia (dia de Brasília, texto "YYYY-MM-DD").
+ *
+ * A loja confere as corridas, congela os totais e manda pro motoboy dizer
+ * "de acordo" (confirmed) ou "tá errado" (disputed). Um fechamento por motoboy
+ * por dia — reenviar depois de corrigir atualiza a MESMA linha.
+ *
+ * Não gera lançamento na carteira: os créditos e débitos já foram feitos corrida
+ * a corrida. Isto aqui é só o "de acordo" das duas partes.
+ */
+export const dailyClosings = sqliteTable("daily_closings", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    shopkeeperId: integer("shopkeeper_id").references(() => users.id).notNull(),
+    motoboyId: integer("motoboy_id").references(() => users.id).notNull(),
+    day: text("day").notNull(), // "YYYY-MM-DD" no fuso de Brasília
+    deliveriesCount: integer("deliveries_count").default(0).notNull(),
+    feesTotal: real("fees_total").default(0).notNull(),
+    cashTotal: real("cash_total").default(0).notNull(), // dinheiro em espécie na mão do motoboy
+    pixTotal: real("pix_total").default(0).notNull(),
+    cardTotal: real("card_total").default(0).notNull(),
+    adjustmentsTotal: real("adjustments_total").default(0).notNull(),
+    // fees_total − cash_total, do ponto de vista do motoboy (igual à carteira):
+    //   > 0 → a loja deve a ele;  < 0 → ele tem dinheiro da loja pra entregar
+    net: real("net").default(0).notNull(),
+    status: text("status", { enum: ["draft", "sent", "confirmed", "disputed"] }).default("draft").notNull(),
+    note: text("note"), // recado da loja pro motoboy
+    motoboyNote: text("motoboy_note"), // o que o motoboy escreveu ao contestar
+    createdBy: integer("created_by").references(() => users.id),
+    sentAt: text("sent_at"),
+    respondedAt: text("responded_at"),
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const dailyClosingsRelations = relations(dailyClosings, ({ one }) => ({
+    motoboy: one(users, {
+        fields: [dailyClosings.motoboyId],
+        references: [users.id],
+    }),
+    shopkeeper: one(users, {
+        fields: [dailyClosings.shopkeeperId],
         references: [users.id],
     }),
 }));

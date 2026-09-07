@@ -77,3 +77,59 @@ export function hojeBrasilia(): { year: number; month: number; day: number } {
     const [y, m, d] = partes.split("-").map(Number);
     return { year: y, month: m, day: d };
 }
+
+/**
+ * O dia de HOJE em Brasília escrito como "YYYY-MM-DD".
+ * É a chave dos fechamentos diários (uma linha por motoboy por dia).
+ */
+export function hojeBrasiliaISO(): string {
+    const { year, month, day } = hojeBrasilia();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+/** "2026-09-07" está no formato certo e é uma data que existe? */
+export function ehDiaISO(v: unknown): v is string {
+    if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+    const d = new Date(`${v}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return false;
+    return d.toISOString().slice(0, 10) === v;
+}
+
+/** Anda dias no calendário a partir de "YYYY-MM-DD" (−1 = ontem, +1 = amanhã). */
+export function somaDiasISO(day: string, dias: number): string {
+    const d = new Date(`${day}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + dias);
+    return d.toISOString().slice(0, 10);
+}
+
+/** "2026-09-07" → "domingo, 07/09/2026" (pra dar nome ao dia do fechamento). */
+export function fmtDiaLegivel(day: string): string {
+    if (!ehDiaISO(day)) return day;
+    const d = new Date(`${day}T12:00:00Z`);
+    return d.toLocaleDateString("pt-BR", {
+        timeZone: "UTC", // a data já é o dia de Brasília; o meio-dia evita virada de fuso
+        weekday: "long",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    });
+}
+
+/** "2026-09-07" → "07/09" — pra título curto. */
+export function fmtDiaCurto(day: string): string {
+    if (!ehDiaISO(day)) return day;
+    return `${day.slice(8, 10)}/${day.slice(5, 7)}`;
+}
+
+/** Em que dia de Brasília ("YYYY-MM-DD") caiu esta data do banco? */
+export function diaBrasiliaDe(raw: string | Date | null | undefined): string | null {
+    const d = parseDbDate(raw);
+    if (!d) return null;
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: TZ_BRASILIA,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(d);
+}
