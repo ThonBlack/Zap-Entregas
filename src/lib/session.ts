@@ -2,71 +2,17 @@ import "server-only";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
-import crypto from "node:crypto";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
+// Assinatura/leitura do token mora em sessionToken.ts (módulo puro, testável
+// por script). É lá que fica a regra de "token de meio login não vale como sessão".
+import { buildToken, parseToken } from "@/lib/sessionToken";
 
 const COOKIE_NAME = "session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7;
-/**
- * Idade máxima do token, conferida NO SERVIDOR.
- *
- * O cookie tem prazo (7 dias), mas prazo de cookie é só um pedido ao navegador:
- * quem copiasse o valor entrava pra sempre, porque a assinatura não vencia nunca.
- * 30 dias é folgado de propósito — o motoboy abre o app todo dia e não pode cair
- * na tela de login no meio do expediente.
- */
-const TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const TWOFA_COOKIE = "2fa_pending";
 const TWOFA_MAX_AGE = 60 * 5;
-
-function getSecret(): string {
-    const secret = process.env.SESSION_SECRET;
-    if (!secret || secret.length < 32) {
-        throw new Error(
-            "SESSION_SECRET ausente ou muito curta. Configure uma string aleatória de pelo menos 32 caracteres em produção."
-        );
-    }
-    return secret;
-}
-
-function sign(payload: string): string {
-    return crypto
-        .createHmac("sha256", getSecret())
-        .update(payload)
-        .digest("base64url");
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-    const bufA = Buffer.from(a);
-    const bufB = Buffer.from(b);
-    if (bufA.length !== bufB.length) return false;
-    return crypto.timingSafeEqual(bufA, bufB);
-}
-
-function buildToken(userId: number): string {
-    const payload = `${userId}.${Date.now()}`;
-    return `${payload}.${sign(payload)}`;
-}
-
-function parseToken(token: string | undefined | null): number | null {
-    if (!token) return null;
-    const parts = token.split(".");
-    if (parts.length !== 3) return null;
-    const [rawId, rawTs, sig] = parts;
-    const expected = sign(`${rawId}.${rawTs}`);
-    if (!timingSafeEqual(sig, expected)) return null;
-    const id = Number(rawId);
-    if (!Number.isInteger(id) || id <= 0) return null;
-
-    // Token velho não vale mais, mesmo com assinatura boa.
-    const ts = Number(rawTs);
-    if (!Number.isFinite(ts) || ts <= 0) return null;
-    if (Date.now() - ts > TOKEN_MAX_AGE_MS) return null;
-
-    return id;
-}
 
 function cookieOptions() {
     const isProduction = process.env.NODE_ENV === "production";
@@ -80,7 +26,7 @@ function cookieOptions() {
 
 export async function setSessionCookie(userId: number): Promise<void> {
     const store = await cookies();
-    store.set(COOKIE_NAME, buildToken(userId), {
+    store.set(COOKIE_NAME, buildToken(userId, "session"), {
         ...cookieOptions(),
         maxAge: COOKIE_MAX_AGE,
     });
@@ -95,12 +41,13 @@ export async function clearSessionCookie(): Promise<void> {
 export async function getSessionUserId(): Promise<number | null> {
     const store = await cookies();
     const token = store.get(COOKIE_NAME)?.value;
-    return parseToken(token);
+    // "session": recusa de propósito um token de 2FA pendente colado aqui.
+    return parseToken(token, "session");
 }
 
 export async function setTwoFactorPendingCookie(userId: number): Promise<void> {
     const store = await cookies();
-    store.set(TWOFA_COOKIE, buildToken(userId), {
+    store.set(TWOFA_COOKIE, buildToken(userId, "2fa"), {
         ...cookieOptions(),
         maxAge: TWOFA_MAX_AGE,
     });
@@ -109,7 +56,8 @@ export async function setTwoFactorPendingCookie(userId: number): Promise<void> {
 export async function getTwoFactorPendingUserId(): Promise<number | null> {
     const store = await cookies();
     const token = store.get(TWOFA_COOKIE)?.value;
-    return parseToken(token);
+    // "2fa": só o token de meio login serve, e só por 5 minutos.
+    return parseToken(token, "2fa");
 }
 
 export async function clearTwoFactorPendingCookie(): Promise<void> {
