@@ -2,6 +2,11 @@ import { confirmTransactionAction, rejectTransactionAction } from "@/app/actions
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { fmtDateTime } from "@/lib/datetime";
+import { efeitoNoSaldo, formatBRL } from "@/lib/wallet-shared";
+
+/** Quem confirma aqui é sempre o motoboy — a fala é na perspectiva dele. */
+const efeito = (pc: { type: "credit" | "debit"; amount: number }) =>
+    efeitoNoSaldo(pc.type, pc.amount, "motoboy");
 
 interface PendingConfirmation {
     id: number;
@@ -31,9 +36,13 @@ export function PendingConfirmations({ confirmations }: { confirmations: Pending
                             </p>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                            <span className={`font-bold ${pc.type === 'debit' ? 'text-green-600' : 'text-red-600'}`}>
-                                {pc.type === 'debit' ? '+' : '-'} {pc.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {/* Mesma convenção do extrato: crédito = verde com "+", débito =
+                                vermelho com "−". Antes esta tela invertia os dois, e o mesmo
+                                lançamento aparecia verde aqui e vermelho no extrato. */}
+                            <span className={`font-bold ${efeito(pc).cor === 'green' ? 'text-green-600' : 'text-red-600'}`}>
+                                {efeito(pc).sinal} {formatBRL(pc.amount)}
                             </span>
+                            <span className="text-xs text-zinc-600 text-right">{efeito(pc).frase}</span>
 
                             <div className="flex gap-2">
                                 <form action={async () => {

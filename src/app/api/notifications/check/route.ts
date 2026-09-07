@@ -3,6 +3,7 @@ import { deliveries } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/session";
+import { formatBRL } from "@/lib/wallet-shared";
 
 export async function GET(request: NextRequest) {
     const auth = await getAuthUser();
@@ -14,7 +15,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const lastCheck = searchParams.get("lastCheck");
 
-    const notifications: { title: string; body: string; icon?: string }[] = [];
+    // `tag` = marca do aviso. Fixa por corrida ("corrida-12"): dois avisos da mesma
+    // corrida se substituem em vez de encher a gaveta de notificação do celular.
+    const notifications: { title: string; body: string; icon?: string; tag?: string }[] = [];
 
     // `lastCheck=abc` virava NaN → `new Date(NaN).toISOString()` lança e a rota
     // devolvia 500, matando as notificações do motoboy em silêncio. Valor que
@@ -39,17 +42,20 @@ export async function GET(request: NextRequest) {
 
         for (const delivery of newDeliveries) {
             const shopName = delivery.shopkeeper?.name || "Loja";
-            const value = delivery.value ? `R$ ${delivery.value.toFixed(2)}` : "";
-            const fee = delivery.fee ? ` (ganho: R$ ${delivery.fee.toFixed(2)})` : "";
+            // formatBRL: antes saía "R$ 180.00" com ponto na tela de bloqueio.
+            const value = delivery.value ? formatBRL(delivery.value) : "";
+            const fee = delivery.fee ? ` (ganho: ${formatBRL(delivery.fee)})` : "";
 
             notifications.push({
                 title: "🏍️ Nova Corrida Disponível!",
                 body: `${shopName}: ${delivery.customerName || "Cliente"} - ${delivery.address.substring(0, 50)}${delivery.address.length > 50 ? "..." : ""} ${value}${fee}`,
+                tag: `corrida-${delivery.id}`,
             });
         }
 
         if (newDeliveries.length >= 3) {
             notifications.unshift({
+                tag: "corridas-varias",
                 title: "🔥 Várias Corridas Disponíveis!",
                 body: `${newDeliveries.length} novas entregas aguardando. Corra e garanta a sua!`,
             });
@@ -64,6 +70,7 @@ export async function GET(request: NextRequest) {
             const fiveMinutesAgo = new Date(Date.now() - 300000);
             if (lastCheckTime < fiveMinutesAgo) {
                 notifications.push({
+                    tag: "corridas-aguardando",
                     title: "📍 Entregas Aguardando",
                     body: `${allPending.length} entrega${allPending.length > 1 ? "s" : ""} disponíve${allPending.length > 1 ? "is" : "l"} agora!`,
                 });
@@ -84,6 +91,7 @@ export async function GET(request: NextRequest) {
             notifications.push({
                 title: "✅ Pedido Entregue!",
                 body: `Entrega #${order.id} foi concluída${order.motoboy ? ` por ${order.motoboy.name}` : ""}`,
+                tag: `corrida-${order.id}`,
             });
         }
 
@@ -101,6 +109,7 @@ export async function GET(request: NextRequest) {
             notifications.push({
                 title: "📦 Entrega Aceita!",
                 body: `${order.motoboy?.name || "Motoboy"} aceitou a entrega #${order.id}`,
+                tag: `corrida-${order.id}`,
             });
         }
 
@@ -118,6 +127,7 @@ export async function GET(request: NextRequest) {
             notifications.push({
                 title: "🏍️ Saiu para Entrega!",
                 body: `${order.motoboy?.name || "Motoboy"} está a caminho com a entrega #${order.id}`,
+                tag: `corrida-${order.id}`,
             });
         }
     }
