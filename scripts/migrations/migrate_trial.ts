@@ -4,8 +4,10 @@ const db = new Database('sqlite.db');
 
 try {
     // Check and add trial columns
-    const columns = db.pragma("table_info(users)");
-    const columnNames = columns.map((col: any) => col.name);
+    // db.pragma devolve "unknown" na tipagem do better-sqlite3; aqui sabemos
+    // que é a lista de colunas de PRAGMA table_info.
+    const columns = db.pragma("table_info(users)") as { name: string }[];
+    const columnNames = columns.map((col) => col.name);
 
     if (!columnNames.includes('trial_ends_at')) {
         console.log("Adding trial_ends_at column...");

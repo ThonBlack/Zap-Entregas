@@ -9,13 +9,17 @@ export default async function FinanceManagerPage(props: { searchParams: Promise<
     const month = searchParams.month ? parseInt(searchParams.month) : new Date().getMonth() + 1;
     const year = searchParams.year ? parseInt(searchParams.year) : new Date().getFullYear();
 
-    const { records, error } = await getFinancialRecordsAction(month, year);
+    // A action devolve OU {error} OU {records}. Perguntar por "error" dentro do
+    // objeto é o que faz o TypeScript entender qual dos dois veio; abrir os dois
+    // campos de uma vez (const { records, error } = ...) ele recusa, e era daí
+    // que vinham 8 dos erros de tipo do projeto.
+    const resultado = await getFinancialRecordsAction(month, year);
 
-    if (error) {
-        return <div className="p-6 text-red-500">{error}</div>;
+    if ("error" in resultado) {
+        return <div className="p-6 text-red-500">{resultado.error}</div>;
     }
 
-    const safeRecords = records || [];
+    const safeRecords = resultado.records;
 
     const totalIncome = safeRecords.filter(r => r.type === 'income').reduce((acc, r) => acc + r.amount, 0);
     const totalExpense = safeRecords.filter(r => r.type === 'expense').reduce((acc, r) => acc + r.amount, 0);
