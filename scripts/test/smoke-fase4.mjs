@@ -291,6 +291,25 @@ erros = await comPagina(navegador, { ...DESKTOP, escuro: true, sessao: LOJA }, a
     const temFechar = await p.evaluate(() => /fechar o dia/i.test(document.body.innerText));
     console.log("  card 'Fechar o dia' presente:", temFechar);
 
+    // O "Olá, <nome>" tem que ficar ENCOSTADO na esquerda. A regra da área segura
+    // já quebrou isso uma vez: um ::before dentro de um header flex virou item da
+    // fila e o justify-between jogou o nome pro meio da tela.
+    const alinhamento = await p.evaluate(() => {
+        const h = document.querySelector("header.sticky");
+        if (!h) return null;
+        const titulo = h.querySelector("h1");
+        if (!titulo) return null;
+        return {
+            esquerdaDoHeader: Math.round(h.getBoundingClientRect().left),
+            esquerdaDoTitulo: Math.round(titulo.getBoundingClientRect().left),
+            largura: Math.round(h.getBoundingClientRect().width),
+        };
+    });
+    console.log("  cabeçalho:", JSON.stringify(alinhamento));
+    if (alinhamento && alinhamento.esquerdaDoTitulo - alinhamento.esquerdaDoHeader > alinhamento.largura / 4) {
+        problemas.push({ tela: "cabeçalho da loja", erros: ["o nome saiu da esquerda (a área segura virou item de flex?)"] });
+    }
+
     await p.goto(`${BASE}/motoboys/${MOTOBOY}/fechamento`, { waitUntil: "networkidle2" });
     await foto(p, "14-loja-fechamento-motoboy");
     console.log("  título:", await p.title());

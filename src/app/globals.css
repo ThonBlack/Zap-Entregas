@@ -36,14 +36,16 @@ body {
  * (sticky top-0) fica por baixo do relógio do Android.
  *
  * As duas regras SOMAM espaço em vez de trocar o que o Tailwind já pôs:
- *  - o ::before é um bloco vazio da altura exata do entalhe (0px no PC);
+ *  - em cima, uma borda TRANSPARENTE da altura do entalhe (0px no PC). A cor de
+ *    fundo do cabeçalho pinta por baixo dela, então parece só um cabeçalho mais
+ *    alto. Não dá pra usar padding (sobrescreveria o py-4 do Tailwind) nem um
+ *    ::before: os cabeçalhos são flex, e um ::before virava mais um ITEM da
+ *    fila — foi o que jogou o "Olá, Loja Teste" pro meio da tela.
  *  - embaixo, o pb-20 do celular vira "5rem + barra de gestos" (no md o
  *    Tailwind manda, por isso o max-width aqui).
  */
-header.sticky::before {
-  content: "";
-  display: block;
-  height: env(safe-area-inset-top, 0px);
+header.sticky {
+  border-top: env(safe-area-inset-top, 0px) solid transparent;
 }
 
 @media (max-width: 767px) {
