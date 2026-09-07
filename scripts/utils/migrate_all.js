@@ -42,6 +42,12 @@ const PASTA = __dirname;
  * (script novo que veio de outro branch). Não existe = pula sem reclamar.
  */
 const ORDEM = [
+    // --- nivelamento: tudo que foi feito na mão entre o dump de maio e os add_* ---
+    // (colunas de recibo/carimbos/public_token em deliveries, email/is_active/
+    //  rating/trial/api_key em users, tabelas reviews/app_logs/master_*/push/
+    //  password_resets). Os scripts abaixo dependem disto.
+    { arquivo: "add_base_schema_catchup.js" },
+
     // --- transactions ---
     { arquivo: "add_transaction_kind_column.js" },
 
@@ -62,10 +68,10 @@ const ORDEM = [
     { arquivo: "add_external_id_column.js" },
     { arquivo: "add_daily_closings_table.js" },
 
-    // --- scripts que outro branch pode ter trazido ---
-    { arquivo: "add_deliveries_indexes.js", opcional: true },
-    { arquivo: "add_transactions_unique_delivery_index.js", opcional: true },
-    { arquivo: "normalize_timestamps.js", opcional: true },
+    // --- índices, trava do crédito e datas num formato só ---
+    { arquivo: "add_deliveries_indexes.js" },
+    { arquivo: "add_transactions_unique_delivery_index.js" },
+    { arquivo: "normalize_timestamps.js" },
 
     // --- faxina (por último: não é migração, é manutenção) ---
     { arquivo: "prune_app_logs.js" },
