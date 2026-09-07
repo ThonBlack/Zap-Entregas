@@ -43,6 +43,25 @@ export async function createTransactionAction(_prev: ManualEntryState, formData:
         return { error: "Motoboy não encontrado." };
     }
 
+    // Trava de reenvio: o link "Acertar R$ X" é um GET com o valor na URL, então
+    // apertar "voltar" no navegador reabre o formulário preenchido e salvava de
+    // novo — dois pagamentos iguais na carteira. Lançamento idêntico (mesmo
+    // motoboy, valor e tipo) em menos de 1 minuto é recusado.
+    // `datetime()` normaliza os dois formatos de data que existem no banco.
+    const repetido = await db.query.transactions.findFirst({
+        where: and(
+            eq(transactions.userId, targetUserId),
+            eq(transactions.amount, amount),
+            eq(transactions.type, entry.type),
+            eq(transactions.kind, entry.kind),
+            sql`datetime(${transactions.createdAt}) >= datetime('now', '-60 seconds')`,
+        ),
+        columns: { id: true },
+    });
+    if (repetido) {
+        return { error: "Este mesmo lançamento acabou de ser salvo. Confira o extrato antes de repetir." };
+    }
+
     await db.insert(transactions).values({
         userId: targetUserId,
         creatorId: me.id,
