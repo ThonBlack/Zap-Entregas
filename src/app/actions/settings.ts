@@ -59,6 +59,8 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
     const parsedLng = parseFloat(shopLngRaw);
     const shopLat = Number.isFinite(parsedLat) && parsedLat >= -90 && parsedLat <= 90 ? parsedLat : null;
     const shopLng = Number.isFinite(parsedLng) && parsedLng >= -180 && parsedLng <= 180 ? parsedLng : null;
+    // Endereço por extenso: livre, só aparado (o campo é da própria loja).
+    const shopAddress = String(formData.get("shopAddress") ?? "").trim().slice(0, 300) || null;
 
     try {
         const existingSettings = await db.select().from(shopSettings).where(eq(shopSettings.userId, userId)).get();
@@ -79,6 +81,7 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 defaultState,
                 shopLat,
                 shopLng,
+                shopAddress,
                 updatedAt: new Date().toISOString(),
             }).where(eq(shopSettings.userId, userId));
         } else {
@@ -98,6 +101,7 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 defaultState,
                 shopLat,
                 shopLng,
+                shopAddress,
                 updatedAt: new Date().toISOString(),
             });
         }

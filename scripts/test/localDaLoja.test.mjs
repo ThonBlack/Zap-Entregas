@@ -23,7 +23,8 @@ const { podeVerLocalDaLoja, localDaLojaVisivel } = await import("@/lib/team");
 
 const LOJA_A = 2;
 const LOJA_B = 20;
-const CONFIG = { shopLat: -19.7472, shopLng: -47.9381 };
+const CONFIG = { shopLat: -19.7472, shopLng: -47.9381, shopAddress: "Avenida Leopoldino de Oliveira, 3490 - Centro" };
+const NADA = { shopLat: null, shopLng: null, shopAddress: null };
 
 const loja = (id) => ({ id, role: "shopkeeper" });
 const motoboy = (id, shopkeeperId) => ({ id, role: "motoboy", shopkeeperId });
@@ -71,13 +72,19 @@ test("quem pode ver recebe a coordenada", () => {
 
 test("quem não pode recebe null — o dado nem sai do servidor", () => {
     const visto = localDaLojaVisivel(motoboy(4, LOJA_B), LOJA_A, CONFIG);
-    assert.deepEqual(visto, { shopLat: null, shopLng: null });
-    // Sem isto a coordenada viajaria no HTML e "esconder" seria só cosmético.
+    assert.deepEqual(visto, NADA);
+    // Sem isto a coordenada (e o endereço) viajariam no HTML e "esconder" seria só cosmético.
     assert.equal(JSON.stringify(visto).includes("19.7"), false);
+    assert.equal(JSON.stringify(visto).includes("Leopoldino"), false);
 });
 
 test("sem configuração salva também não inventa coordenada", () => {
-    assert.deepEqual(localDaLojaVisivel(admin, LOJA_A, null), { shopLat: null, shopLng: null });
+    assert.deepEqual(localDaLojaVisivel(admin, LOJA_A, null), NADA);
+});
+
+test("configuração antiga sem endereço sai com endereço null, não undefined", () => {
+    const visto = localDaLojaVisivel(loja(LOJA_A), LOJA_A, { shopLat: -1, shopLng: -2 });
+    assert.deepEqual(visto, { shopLat: -1, shopLng: -2, shopAddress: null });
 });
 
 // --- (b) a página pública de rastreio --------------------------------------

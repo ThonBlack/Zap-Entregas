@@ -163,6 +163,9 @@ export const shopSettings = sqliteTable("shop_settings", {
     defaultState: text("default_state"),
     shopLat: real("shop_lat"),
     shopLng: real("shop_lng"),
+    // Endereço da loja por extenso. Mesma privacidade da coordenada: só a
+    // equipe, a loja e o admin (scripts/utils/add_shop_address_column.js).
+    shopAddress: text("shop_address"),
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
 

@@ -26,6 +26,7 @@ interface SettingsFormProps {
         defaultState?: string | null;
         shopLat?: number | null;
         shopLng?: number | null;
+        shopAddress?: string | null;
         poolMode?: "aberta" | "equipe" | null;
     } | null;
 }
@@ -248,10 +249,30 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                     </div>
                 </div>
 
+                {/* Endereço por extenso: é o que a loja quer escrever aqui. Fica
+                    separado da "Cidade padrão", que é só a cidade e alimenta o
+                    geocoder — endereço inteiro nela quebrava a busca. */}
+                <div className="mb-4">
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                        Endereço da loja
+                    </label>
+                    <input
+                        name="shopAddress"
+                        type="text"
+                        maxLength={300}
+                        defaultValue={initialData?.shopAddress ?? ""}
+                        placeholder="Avenida Leopoldino de Oliveira, 3490 - Centro"
+                        className="w-full px-3 py-2 border border-zinc-600 bg-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:ring-2 focus:ring-amber-500 outline-none"
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">
+                        Só os motoboys da sua equipe, você e o administrador veem este endereço.
+                    </p>
+                </div>
+
                 <div className="grid md:grid-cols-3 gap-4 mb-4">
                     <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-zinc-300 mb-1">
-                            Cidade padrão
+                            Cidade padrão <span className="text-zinc-500 font-normal">(só a cidade)</span>
                         </label>
                         <input
                             name="defaultCity"

@@ -197,15 +197,22 @@ export function podeVerLocalDaLoja(
  * pode vê-las, e `null` pro resto. Apagar do payload no SERVIDOR — esconder na
  * tela não adianta, o dado já teria viajado no HTML.
  */
-export function localDaLojaVisivel<T extends { shopLat?: number | null; shopLng?: number | null }>(
+export function localDaLojaVisivel<
+    T extends { shopLat?: number | null; shopLng?: number | null; shopAddress?: string | null },
+>(
     me: AtorComVinculo | null | undefined,
     shopkeeperId: number | null | undefined,
     settings: T | null | undefined,
-): { shopLat: number | null; shopLng: number | null } {
+): { shopLat: number | null; shopLng: number | null; shopAddress: string | null } {
     if (!settings || !podeVerLocalDaLoja(me, shopkeeperId)) {
-        return { shopLat: null, shopLng: null };
+        return { shopLat: null, shopLng: null, shopAddress: null };
     }
-    return { shopLat: settings.shopLat ?? null, shopLng: settings.shopLng ?? null };
+    // O endereço por extenso segue a coordenada: quem não pode ver uma, não vê a outra.
+    return {
+        shopLat: settings.shopLat ?? null,
+        shopLng: settings.shopLng ?? null,
+        shopAddress: settings.shopAddress ?? null,
+    };
 }
 
 /** Ids dos motoboys da equipe — pra filtrar extrato, lançamentos etc. */
