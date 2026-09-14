@@ -1,0 +1,164 @@
+=== TSC ===
+scripts/migrations/migrate_daily_goal.ts(8,23): error TS18046: 'columns' is of type 'unknown'.
+scripts/migrations/migrate_trial.ts(8,25): error TS18046: 'columns' is of type 'unknown'.
+src/app/admin/plans/page.tsx(65,39): error TS2322: Type '(formData: FormData) => Promise<{ error: string; } | { success: boolean; }>' is not assignable to type 'string | ((formData: FormData) => void | Promise<void>) | undefined'.
+  Type '(formData: FormData) => Promise<{ error: string; } | { success: boolean; }>' is not assignable to type '(formData: FormData) => void | Promise<void>'.
+    Type 'Promise<{ error: string; } | { success: boolean; }>' is not assignable to type 'void | Promise<void>'.
+      Type 'Promise<{ error: string; } | { success: boolean; }>' is not assignable to type 'Promise<void>'.
+        Type '{ error: string; } | { success: boolean; }' is not assignable to type 'void'.
+          Type '{ error: string; }' is not assignable to type 'void'.
+src/app/finance/manager/page.tsx(12,13): error TS2339: Property 'records' does not exist on type '{ error: string; } | { records: { id: number; userId: number; type: "income" | "expense"; amount: number; description: string; category: string | null; dueDate: string; status: "pending" | "paid" | "overdue"; paymentMethod: string | null; createdAt: string | null; }[]; }'.
+src/app/finance/manager/page.tsx(12,22): error TS2339: Property 'error' does not exist on type '{ error: string; } | { records: { id: number; userId: number; type: "income" | "expense"; amount: number; description: string; category: string | null; dueDate: string; status: "pending" | "paid" | "overdue"; paymentMethod: string | null; createdAt: string | null; }[]; }'.
+src/app/finance/manager/page.tsx(20,44): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/app/finance/manager/page.tsx(20,78): error TS7006: Parameter 'acc' implicitly has an 'any' type.
+src/app/finance/manager/page.tsx(20,83): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/app/finance/manager/page.tsx(21,45): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/app/finance/manager/page.tsx(21,80): error TS7006: Parameter 'acc' implicitly has an 'any' type.
+src/app/finance/manager/page.tsx(21,85): error TS7006: Parameter 'r' implicitly has an 'any' type.
+src/app/finance/manager/page.tsx(104,42): error TS7006: Parameter 'record' implicitly has an 'any' type.
+src/components/admin/FinancialDashboard.tsx(23,25): error TS2339: Property 'error' does not exist on type '{ error: string; } | { data: { day: number; value: number; }[]; total: number; role: Role; }'.
+  Property 'error' does not exist on type '{ data: { day: number; value: number; }[]; total: number; role: Role; }'.
+TSC_EXIT=2
+=== LINT ===
+
+D:\Zap-Entregas\src\components\deliveries\ReviewForm.tsx:47:24
+  45 |     }
+  46 |
+> 47 |     const StarRating = ({
+     |                        ^^
+> 48 |         value,
+     | ^^^^^^^^^^^^^^
+> 49 |         onChange,
+     …
+     | ^^^^^^^^^^^^^^
+> 77 |         </div>
+     | ^^^^^^^^^^^^^^
+> 78 |     );
+     | ^^^^^^ The component is created during render here
+  79 |
+  80 |     return (
+  81 |         <div className="space-y-4">  react-hooks/static-components
+
+D:\Zap-Entregas\src\components\landing\LandingNavMenu.tsx
+  44:21  error    Do not use an `<a>` element to navigate to `/`. Use `<Link />` from `next/link` instead. See: https://nextjs.org/docs/messages/no-html-link-for-pages                                                                                                                                    @next/next/no-html-link-for-pages
+  45:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\Zap-Entregas\src\components\map\LeafletPinPicker.tsx
+  47:23  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Zap-Entregas\src\components\map\LeafletPinPicker.tsx:47:23
+  45 |     const markerRef = useRef<L.Marker>(null);
+  46 |
+> 47 |     useEffect(() => { setIsMounted(true); }, []);
+     |                       ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  48 |
+  49 |     const position: [number, number] = [lat, lng];
+  50 |  react-hooks/set-state-in-effect
+
+D:\Zap-Entregas\src\components\map\LeafletTrackingMap.tsx
+  40:9  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Zap-Entregas\src\components\map\LeafletTrackingMap.tsx:40:9
+  38 |
+  39 |     useEffect(() => {
+> 40 |         setIsMounted(true);
+     |         ^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  41 |     }, []);
+  42 |
+  43 |     if (!isMounted) return <div className="h-64 bg-zinc-100 rounded-xl animate-pulse flex items-center justify-center text-zinc-400">Carregando Mapa...</div>;  react-hooks/set-state-in-effect
+
+D:\Zap-Entregas\src\components\map\LocationTracker.tsx
+  11:13  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Zap-Entregas\src\components\map\LocationTracker.tsx:11:13
+   9 |     useEffect(() => {
+  10 |         if (!("geolocation" in navigator)) {
+> 11 |             setStatus("error");
+     |             ^^^^^^^^^ Avoid calling setState() directly within an effect
+  12 |             return;
+  13 |         }
+  14 |  react-hooks/set-state-in-effect
+
+✖ 32 problems (10 errors, 22 warnings)
+  0 errors and 10 warnings potentially fixable with the `--fix` option.
+
+=== BUILD ===
+├ ○ /_not-found
+├ ƒ /admin
+├ ƒ /admin/master
+├ ○ /admin/master/products/new
+├ ƒ /admin/plans
+├ ƒ /admin/users
+├ ƒ /admin/users/[id]
+├ ƒ /admin/users/new
+├ ƒ /api/admin/users/update-plan
+├ ƒ /api/admin/users/update-status
+├ ƒ /api/assetlinks
+├ ƒ /api/auth/google
+├ ƒ /api/auth/google/callback
+├ ƒ /api/integration/delivery
+├ ƒ /api/logs
+├ ƒ /api/master/events
+├ ƒ /api/master/products
+├ ƒ /api/master/stats
+├ ƒ /api/notifications/check
+├ ƒ /api/places/autocomplete
+├ ƒ /api/places/details
+├ ƒ /api/uploads/[filename]
+├ ƒ /app
+├ ƒ /completar-cadastro
+├ ƒ /confirmar/[token]
+├ ƒ /convite/[token]
+├ ƒ /deliveries/[id]/confirmar
+├ ƒ /deliveries/[id]/editar
+├ ƒ /deliveries/history
+├ ƒ /finance/dashboard
+├ ƒ /finance/extrato
+├ ƒ /finance/manager
+├ ○ /finance/manager/new
+├ ƒ /finance/new
+├ ○ /icon.png
+├ ƒ /login
+├ ○ /login/2fa
+├ ○ /login/forgot-password
+├ ○ /login/reset-password
+├ ○ /master
+├ ƒ /motoboys
+├ ƒ /motoboys/[id]
+├ ƒ /motoboys/[id]/convite
+├ ƒ /motoboys/[id]/financeiro
+├ ○ /privacidade
+├ ƒ /register
+├ ƒ /review/[token]
+├ ƒ /routes/new
+├ ○ /security/2fa-setup
+├ ƒ /settings
+├ ƒ /settings/motoboy
+├ ƒ /tracking/[id]
+└ ƒ /upgrade
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
+BUILD_DONE

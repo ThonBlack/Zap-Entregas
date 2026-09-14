@@ -62,3 +62,6 @@ promote_admin.sql
 # App Android (TWA): a chave de assinatura NUNCA vai pro git.
 # Perder essa chave = não conseguir mais atualizar o app publicado.
 /android/
+
+# cópias locais do banco
+sqlite.db.bak*
