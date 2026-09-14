@@ -1,6 +1,7 @@
 import { db } from "@/db";
-import { deliveries, shopSettings } from "@/db/schema";
+import { deliveries, shopSettings, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { localDaLojaVisivel, motoboyScope } from "@/lib/team";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, PackageCheck } from "lucide-react";
@@ -43,6 +44,18 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
         draft.lat ?? 0, draft.lng ?? 0, settings?.shopLat, settings?.shopLng, 100
     );
 
+    // Onde a loja fica só vai pro navegador de quem pode ver (a própria loja ou
+    // o admin). Regra única em src/lib/team.ts — aqui ela sempre passa, mas o
+    // filtro fica explícito pra ninguém copiar esta tela sem ele.
+    const localDaLoja = localDaLojaVisivel(me, draft.shopkeeperId, settings);
+
+    // Equipe de quem está conferindo: dá pra já destinar a corrida a alguém em
+    // vez de jogar na fila aberta. Lojista vê só os dele (motoboyScope).
+    const motoboysDaEquipe = await db.select({ id: users.id, name: users.name })
+        .from(users)
+        .where(motoboyScope(me))
+        .orderBy(users.name);
+
     return (
         <div className="min-h-screen bg-zinc-900 text-white">
             <header className="border-b border-zinc-800 bg-zinc-900/95 sticky top-0 z-20">
@@ -76,9 +89,11 @@ export default async function ConfirmarCorridaPage({ params }: { params: Promise
                         observation: draft.observation,
                         createdAt: draft.createdAt,
                         geoPrecision: draft.geoPrecision,
+                        chargeMode: draft.chargeMode,
                     }}
-                    shopLat={settings?.shopLat ?? null}
-                    shopLng={settings?.shopLng ?? null}
+                    motoboys={motoboysDaEquipe}
+                    shopLat={localDaLoja.shopLat}
+                    shopLng={localDaLoja.shopLng}
                     defaultCity={settings?.defaultCity ?? null}
                     defaultState={settings?.defaultState ?? null}
                     isSuspect={isSuspect}

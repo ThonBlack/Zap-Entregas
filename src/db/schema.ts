@@ -53,6 +53,15 @@ export const deliveries = sqliteTable("deliveries", {
     lat: real("lat"),
     lng: real("lng"),
     value: real("value").default(0), // Valor do pedido (se motoboy precisar cobrar)
+    // Como o dinheiro desta corrida é tratado. Antes era deduzido de `value > 0`,
+    // que não distinguia "o motoboy cobra" de "o cliente paga no PIX da loja".
+    //   receber  → o motoboy cobra R$ `value` do cliente na entrega
+    //   conferir → o cliente paga no PIX DA LOJA; o motoboy só confere se caiu
+    //              (mas pode receber em dinheiro na porta — aí vira débito dele)
+    //   pago     → nada a receber
+    // Coluna criada em scripts/utils/add_charge_mode_column.js, que preenche as
+    // linhas antigas pela régua velha (value > 0 = 'receber').
+    chargeMode: text("charge_mode", { enum: ["receber", "conferir", "pago"] }).default("pago"),
     fee: real("fee").default(0), // Taxa de entrega (ganho do motoboy ou custo do lojista)
     observation: text("observation"),
     // Quão confiável é o pino: exata | rua | bairro | cidade (avisa na tela de conferência)
@@ -138,6 +147,12 @@ export const shopSettings = sqliteTable("shop_settings", {
     valuePerKm: real("value_per_km").default(0),
     dailyvalue: real("daily_value").default(0),
     guaranteedMinimum: real("guaranteed_minimum").default(0),
+    // Quem vê as corridas desta loja no pool:
+    //   equipe → só os motoboys dela (users.shopkeeper_id = a loja). PADRÃO.
+    //   aberta → qualquer motoboy cadastrado no app, como era antes.
+    // Corrida destinada a um motoboy específico vale nos dois modos, e o admin
+    // continua enxergando tudo. Coluna em scripts/utils/add_pool_mode_column.js.
+    poolMode: text("pool_mode", { enum: ["aberta", "equipe"] }).default("equipe"),
     // Privacidade — o que o motoboy enxerga sobre cada entrega
     showCustomerName: integer("show_customer_name", { mode: 'boolean' }).default(true),
     showCustomerPhone: integer("show_customer_phone", { mode: 'boolean' }).default(true),
@@ -148,6 +163,9 @@ export const shopSettings = sqliteTable("shop_settings", {
     defaultState: text("default_state"),
     shopLat: real("shop_lat"),
     shopLng: real("shop_lng"),
+    // Endereço da loja por extenso. Mesma privacidade da coordenada: só a
+    // equipe, a loja e o admin (scripts/utils/add_shop_address_column.js).
+    shopAddress: text("shop_address"),
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
 

@@ -6,10 +6,12 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { geocodeAddress, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUserWithRole } from "@/lib/session";
-import { pushToMotoboys } from "@/lib/push";
+import { pushDeCorridaNova, pushDeCorridaDestinada } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
 import { logServerError } from "@/lib/serverLog";
-import { avisoDeCorridaNova } from "@/lib/deliveryPrivacy";
+import { avisoDeCorridaNova, resumoDoLocal } from "@/lib/deliveryPrivacy";
+import { carregarMotoboyGerenciado } from "@/lib/team";
+import { normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
 
 type ActionResult = { error: string } | { success: true };
 
@@ -83,13 +85,32 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
         return n === null || n < 0 ? null : n;
     };
 
-    // "É pra receber" desligado zera o valor: é assim que o motoboy sabe que já está pago
-    // (o modal de finalizar usa value > 0 como régua).
-    const shouldCollect = formData.get("collect") === "on";
-    const value = shouldCollect ? lerDinheiro(formData.get("value")) : 0;
+    // Tipo de cobrança: "Receber na entrega", "Conferir Pix da loja" ou "Já pago".
+    // "Já pago" zera o valor — é assim que o motoboy sabe que não tem o que cobrar.
+    // Formulário antigo (sem o campo) cai na régua velha do checkbox "collect".
+    const chargeMode: ChargeMode = formData.has("chargeMode")
+        ? normalizarChargeMode(formData.get("chargeMode"), null)
+        : (formData.get("collect") === "on" ? "receber" : "pago");
+    // Em "Já pago" o campo de valor está escondido na tela: nem lê, pra um
+    // rascunho de texto esquecido lá dentro não derrubar a liberação.
+    const valorLido = chargeMode === "pago" ? 0 : lerDinheiro(formData.get("value"));
+    if (valorLido === null) return { error: "Valor a receber inválido. Escreva assim: 12,50" };
+    const value = valorLido;
     const fee = lerDinheiro(formData.get("fee"));
-    if (value === null) return { error: "Valor a receber inválido. Escreva assim: 12,50" };
     if (fee === null) return { error: "Taxa da corrida inválida. Escreva assim: 12,50" };
+
+    // Destinar a corrida a um motoboy da equipe é opcional: vazio = fila aberta.
+    // Pela tela do PDV (sem login) não dá pra saber quem é a loja logada, então
+    // o campo simplesmente não existe lá.
+    let destinatario: { id: number; name: string } | null = null;
+    const motoboyIdBruto = String(formData.get("motoboyId") ?? "").trim();
+    if (motoboyIdBruto && !confirmToken) {
+        const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+        if ("error" in auth) return { error: auth.error };
+        const escolhido = await carregarMotoboyGerenciado(auth.user, Number(motoboyIdBruto));
+        if (!escolhido) return { error: "Esse motoboy não é da sua equipe." };
+        destinatario = { id: escolhido.id, name: escolhido.name };
+    }
 
     // O pino do mapa manda coordenadas; se vierem vazias, tenta geocodificar o endereço editado.
     // `pinTouched` diz se ALGUÉM de fato mexeu no pino. Sem isso o formulário
@@ -148,7 +169,13 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
 
     const customerName = (formData.get("customerName") as string)?.trim() || null;
     const customerPhone = (formData.get("customerPhone") as string)?.trim() || null;
-    const observation = (formData.get("observation") as string)?.trim() || null;
+    const observationDigitada = (formData.get("observation") as string)?.trim() || null;
+    const observation = destinatario
+        ? [observationDigitada, `destinada pela loja a ${destinatario.name}`]
+            .filter(Boolean).join(" · ").slice(0, 1000)
+        : observationDigitada;
+
+    const agora = new Date().toISOString();
 
     // Condição de corrida: só libera se ainda estiver como rascunho (dois cliques não
     // podem notificar os motoboys duas vezes).
@@ -158,24 +185,35 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
             confirmToken: null,
             confirmTokenExpiresAt: null,
             address, lat, lng, value, fee, customerName, customerPhone, observation,
+            chargeMode,
             geoPrecision,
-            status: "pending",
-            updatedAt: new Date().toISOString(),
+            // Destinada a alguém já nasce "aceita": ele não precisa disputar no
+            // pool uma corrida que a loja deu pra ele.
+            motoboyId: destinatario?.id ?? null,
+            status: destinatario ? "assigned" : "pending",
+            acceptedAt: destinatario ? agora : null,
+            updatedAt: agora,
         })
         .where(and(eq(deliveries.id, draft.id), eq(deliveries.status, "draft")))
         .returning();
 
     if (!updated.length) return { error: "Essa corrida já foi liberada." };
 
-    // O aviso vai pro celular de TODO motoboy cadastrado, inclusive os de
-    // outra loja. Endereço com número aí é dado pessoal do cliente saindo do
-    // app pra um aparelho que a loja não controla — vai só o bairro.
-    pushToMotoboys({
-        title: "🏍️ Nova Corrida Disponível!",
-        body: avisoDeCorridaNova(address),
-        url: "/app",
-        tag: "nova-corrida",
-    }).catch(() => { });
+    // Endereço com número é dado pessoal do cliente saindo do app pra um
+    // aparelho que a loja não controla — nos dois casos vai só o bairro.
+    if (destinatario) {
+        // Corrida com dono não vira anúncio: só o escolhido é avisado.
+        pushDeCorridaDestinada(destinatario.id, draft.id, resumoDoLocal(address), null)
+            .catch(() => { });
+    } else {
+        // Só quem pode VER essa corrida é avisado (regra única em team.ts).
+        pushDeCorridaNova(draft.shopkeeperId, {
+            title: "🏍️ Nova Corrida Disponível!",
+            body: avisoDeCorridaNova(address),
+            url: "/app",
+            tag: "nova-corrida",
+        }).catch(() => { });
+    }
 
     // Aberto pelo PDV (com token): revalidar aqui re-renderiza a propria tela de
     // conferencia, que ja nao acha mais o token e mostraria "Link invalido".

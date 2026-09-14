@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Play, Trash2, Phone, Pencil, Navigation, Loader2, AlertTriangle, MapPin, X } from "lucide-react";
+import { Play, Trash2, Phone, Pencil, Navigation, Loader2, AlertTriangle, MapPin, X, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { optimizeSelectedRouteAction } from "@/app/actions/logistics";
 import type { DeliveryReceipt } from "@/lib/receipt";
+import { chargeModeDaCorrida, rotuloCobranca, tomCobranca } from "@/lib/chargeMode";
 import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import CompleteDeliveryModal from "@/components/deliveries/CompleteDeliveryModal";
 import RefreshButton from "@/components/shared/RefreshButton";
@@ -33,6 +34,10 @@ interface Delivery {
     lng: number | null;
     status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'canceled';
     motoboyId: number | null;
+    /** "receber" | "conferir" | "pago". Ausente = corrida antiga (cai na régua do valor). */
+    chargeMode?: string | null;
+    /** Nome de quem está com a corrida — só a loja recebe isto. */
+    motoboyName?: string | null;
     isSuspectAddress?: boolean;
     /**
      * Corrida de outra loja, ainda sem dono: o servidor já tirou nome, telefone
@@ -49,6 +54,11 @@ interface PendingDeliveriesFormProps {
     currentUserId?: number;
     /** Endereço público do site (APP_URL), vindo do servidor. Vazio = usa a janela atual. */
     baseUrl?: string;
+    /**
+     * Motoboys ativos da equipe (só vai pra tela da loja). É com esta lista que
+     * a loja destina uma corrida e diz quem fez a entrega ao finalizar sem GPS.
+     */
+    motoboys?: { id: number; name: string }[];
 }
 
 /**
@@ -74,7 +84,9 @@ function montarLinkWhatsApp(delivery: Delivery, baseUrl: string) {
 /** Classe base dos botões de ação: 44px de altura é o mínimo pra tocar de capacete. */
 const BOTAO = "min-h-11 px-3 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
-export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, currentUserId, baseUrl = "" }: PendingDeliveriesFormProps) {
+export default function PendingDeliveriesForm({
+    deliveries, isMotoboy = false, currentUserId, baseUrl = "", motoboys = [],
+}: PendingDeliveriesFormProps) {
     const router = useRouter();
     const [selected, setSelected] = useState<number[]>([]);
     const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
@@ -211,9 +223,51 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
     const [motivo, setMotivo] = useState("");
     const [erroMotivo, setErroMotivo] = useState("");
 
+    /**
+     * Quem fez a entrega, quando quem finaliza é a LOJA. Vazio enquanto a
+     * corrida já tem motoboy (aí é ele mesmo). A carteira precisa de um dono:
+     * sem isso a taxa e o dinheiro ficariam sem cair na conta de ninguém.
+     */
+    const [motoboyDaEntrega, setMotoboyDaEntrega] = useState<number | null>(null);
+    /** Corrida esperando a loja escolher o motoboy: "entregue" abre o recibo depois. */
+    const [escolhendo, setEscolhendo] = useState<{ id: number; para: "entregue" | "destinar" } | null>(null);
+    const [destinando, setDestinando] = useState(false);
+
     const handleCompleteClick = (id: number) => {
         limparErro(id);
+        const alvo = deliveries.find(d => d.id === id);
+        // Loja finalizando corrida que ninguém aceitou: primeiro "quem entregou?".
+        if (!isMotoboy && alvo && alvo.motoboyId == null) {
+            if (!motoboys.length) {
+                mostrarErro(id, "Cadastre um motoboy na sua equipe antes de marcar a entrega.");
+                return;
+            }
+            setMotoboyDaEntrega(null);
+            setEscolhendo({ id, para: "entregue" });
+            return;
+        }
+        setMotoboyDaEntrega(null);
         setCompletingId(id);
+    };
+
+    /** Destinar (ou devolver pra fila) uma corrida — só a loja faz isso. */
+    const destinar = async (id: number, motoboyId: number | null) => {
+        limparErro(id);
+        setDestinando(true);
+        try {
+            const m = await import("@/app/actions/logistics");
+            const res = await m.assignDeliveryAction(id, motoboyId);
+            if (res && "error" in res && res.error) {
+                mostrarErro(id, res.error);
+                setDestinando(false);
+                return;
+            }
+            setEscolhendo(null);
+            recarregar(() => setDestinando(false));
+        } catch {
+            mostrarErro(id, "Não consegui destinar agora. Confira a internet e tente de novo.");
+            setDestinando(false);
+        }
     };
 
     /** Manda pro servidor de verdade (já com motivo, se houve). */
@@ -225,7 +279,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
         setCompleting(true);
         try {
             const m = await import("@/app/actions/logistics");
-            const res = await m.completeDeliveryAction(id, receipt, contexto);
+            const res = await m.completeDeliveryAction(id, receipt, contexto, motoboyDaEntrega);
             if (res && "error" in res && res.error) {
                 if (justificativa) setErroMotivo(res.error);
                 else mostrarErro(id, res.error);
@@ -236,6 +290,7 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
             setJustificativa(null);
             setMotivo("");
             setErroMotivo("");
+            setMotoboyDaEntrega(null);
             recarregar(() => setCompleting(false));
         } catch {
             const msg = "Não consegui finalizar agora. Confira a internet e tente de novo.";
@@ -329,16 +384,46 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                 confirmText="Confirmar"
                 pendingText="Excluindo…"
             />
-            {completingId != null && justificativa == null && (
-                <CompleteDeliveryModal
-                    key={completingId}
-                    isOpen
-                    onClose={() => setCompletingId(null)}
-                    onConfirm={handleCompleteConfirm}
-                    orderValue={deliveries.find(d => d.id === completingId)?.value ?? null}
-                    loading={completing || pendente}
+            {escolhendo && (
+                <EscolherMotoboy
+                    titulo={escolhendo.para === "entregue" ? "Quem fez essa entrega?" : "Destinar a corrida"}
+                    ajuda={escolhendo.para === "entregue"
+                        ? "A taxa e o dinheiro recebido entram na conta de quem você escolher."
+                        : "Só esse motoboy vai receber o aviso. Ele não precisa aceitar de novo."}
+                    motoboys={motoboys}
+                    atual={deliveries.find(d => d.id === escolhendo.id)?.motoboyId ?? null}
+                    permiteFila={escolhendo.para === "destinar"}
+                    salvando={destinando || completing || pendente}
+                    erro={erros[escolhendo.id] ?? ""}
+                    onCancelar={() => setEscolhendo(null)}
+                    onEscolher={(motoboyId) => {
+                        if (escolhendo.para === "destinar") {
+                            void destinar(escolhendo.id, motoboyId);
+                            return;
+                        }
+                        // "Quem entregou" é a primeira metade: agora abre o recibo.
+                        setMotoboyDaEntrega(motoboyId);
+                        setCompletingId(escolhendo.id);
+                        setEscolhendo(null);
+                    }}
                 />
             )}
+
+            {completingId != null && justificativa == null && escolhendo == null && (() => {
+                const alvo = deliveries.find(d => d.id === completingId);
+                return (
+                    <CompleteDeliveryModal
+                        key={completingId}
+                        isOpen
+                        onClose={() => { setCompletingId(null); setMotoboyDaEntrega(null); }}
+                        onConfirm={handleCompleteConfirm}
+                        orderValue={alvo?.value ?? null}
+                        chargeMode={chargeModeDaCorrida(alvo ?? {})}
+                        porLoja={!isMotoboy}
+                        loading={completing || pendente}
+                    />
+                );
+            })()}
 
             {justificativa && (
                 <ConfirmacaoForaDoRaio
@@ -369,7 +454,12 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                 )}
 
                 <div className="flex items-center justify-between mb-4 gap-2">
-                    <h3 className="font-bold text-white">Entregas Pendentes ({deliveries.length})</h3>
+                    {/* A loja passou a ver também as que já estão com alguém
+                        ("em rota") — é lá que ficam o "Marcar entregue" e o
+                        "Trocar". Por isso o título muda pra ela. */}
+                    <h3 className="font-bold text-white">
+                        {isMotoboy ? "Entregas Pendentes" : "Entregas em aberto"} ({deliveries.length})
+                    </h3>
                     <div className="flex items-center gap-2">
                         <RefreshButton />
                         <button
@@ -414,9 +504,15 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                         const longe = situacao.tipo === "fora";
                         const carregando = loadingAction === delivery.id;
 
+                        const modoCobranca = chargeModeDaCorrida(delivery);
+
                         const podeAceitar = isMotoboy && delivery.status === 'pending' && !delivery.motoboyId;
                         const podePegar = isMotoboy && delivery.status === 'assigned' && delivery.motoboyId === currentUserId;
                         const podeEntregar = (isMotoboy && delivery.status === 'picked_up' && delivery.motoboyId === currentUserId) || !isMotoboy;
+                        // Destinar/trocar de motoboy só enquanto ninguém coletou: depois
+                        // disso a mercadoria já está na mão de alguém.
+                        const podeDestinar = !isMotoboy && motoboys.length > 0
+                            && (delivery.status === 'pending' || delivery.status === 'assigned');
 
                         return (
                             <div key={delivery.id} className={`block bg-zinc-800 p-4 rounded-xl shadow-sm border transition-all ${selected.includes(delivery.id) ? 'border-green-500 ring-1 ring-green-500 bg-zinc-700' : 'border-zinc-700'}`}>
@@ -474,8 +570,19 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                                 📝 {delivery.observation}
                                             </p>
                                         )}
+                                        {/* Tipo de cobrança: é o que o motoboy precisa saber ANTES
+                                            de tocar a campainha — cobrar, só conferir o Pix da
+                                            loja, ou nada. Some na corrida mascarada de outra loja. */}
+                                        {!delivery.masked && (
+                                            <p className={`text-xs font-bold rounded px-2 py-1 mb-1 inline-flex items-center gap-1 border ${tomCobranca(modoCobranca)}`}>
+                                                {rotuloCobranca(modoCobranca, delivery.value)}
+                                            </p>
+                                        )}
                                         <div className="flex items-center gap-4 text-xs text-zinc-400 flex-wrap">
                                             <span>Ordem: {delivery.stopOrder || '-'}</span>
+                                            {!isMotoboy && delivery.motoboyName && (
+                                                <span className="text-zinc-300">🏍️ {delivery.motoboyName}</span>
+                                            )}
                                             {delivery.value != null && delivery.value > 0 && (
                                                 <span>Valor: R$ {delivery.value.toFixed(2).replace('.', ',')}</span>
                                             )}
@@ -537,7 +644,20 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                                             className={`${BOTAO} flex-1 basis-full sm:basis-0 bg-green-600 text-white hover:bg-green-500`}
                                             title={longe ? `Você está a ${distanciaLegivel(situacao.distanciaMetros)} do local — vai pedir uma confirmação a mais.` : "Marcar como Entregue"}
                                         >
-                                            ✅ Entregue
+                                            {isMotoboy ? "✅ Entregue" : "✅ Marcar entregue"}
+                                        </button>
+                                    )}
+
+                                    {podeDestinar && (
+                                        <button
+                                            type="button"
+                                            onClick={() => { limparErro(delivery.id); setEscolhendo({ id: delivery.id, para: "destinar" }); }}
+                                            disabled={destinando}
+                                            className={`${BOTAO} bg-indigo-600 text-white hover:bg-indigo-500`}
+                                            title={delivery.motoboyId ? "Trocar o motoboy ou devolver pra fila" : "Mandar essa corrida pra um motoboy específico"}
+                                        >
+                                            <UserPlus size={16} />
+                                            {delivery.motoboyId ? "Trocar" : "Destinar"}
                                         </button>
                                     )}
 
@@ -611,6 +731,112 @@ export default function PendingDeliveriesForm({ deliveries, isMotoboy = false, c
                 )}
             </div>
         </>
+    );
+}
+
+/**
+ * "Quem faz essa corrida?" — a escolha do motoboy pela LOJA.
+ *
+ * Serve pras duas coisas que a loja passou a poder fazer: destinar uma corrida
+ * a alguém da equipe (em vez de jogar na fila aberta) e dizer quem fez a
+ * entrega na hora de marcar como entregue sem GPS. Nos dois casos o dono da
+ * corrida é o que decide em qual carteira o dinheiro cai.
+ */
+function EscolherMotoboy({
+    titulo, ajuda, motoboys, atual, permiteFila, salvando, erro, onCancelar, onEscolher,
+}: {
+    titulo: string;
+    ajuda: string;
+    motoboys: { id: number; name: string }[];
+    atual: number | null;
+    /** Mostra o "devolver pra fila" (só faz sentido ao destinar). */
+    permiteFila: boolean;
+    salvando: boolean;
+    erro: string;
+    onCancelar: () => void;
+    onEscolher: (motoboyId: number | null) => void;
+}) {
+    const [escolhido, setEscolhido] = useState<number | null>(atual);
+
+    useEffect(() => {
+        const aoTeclar = (e: KeyboardEvent) => { if (e.key === "Escape" && !salvando) onCancelar(); };
+        document.addEventListener("keydown", aoTeclar);
+        return () => document.removeEventListener("keydown", aoTeclar);
+    }, [onCancelar, salvando]);
+
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => { if (!salvando) onCancelar(); }}
+        >
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={titulo}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto"
+            >
+                <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-indigo-100 rounded-full"><UserPlus className="w-6 h-6 text-indigo-600" /></div>
+                    <h3 className="text-lg font-bold text-gray-900">{titulo}</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-4">{ajuda}</p>
+
+                <div className="space-y-2 mb-4">
+                    {motoboys.map((m) => (
+                        <label
+                            key={m.id}
+                            className={`flex items-center gap-3 p-3 min-h-11 rounded-lg border cursor-pointer transition-colors ${escolhido === m.id ? "border-green-500 bg-green-50" : "border-gray-200 hover:bg-gray-50"}`}
+                        >
+                            <input
+                                type="radio"
+                                name="motoboy-escolhido"
+                                checked={escolhido === m.id}
+                                onChange={() => setEscolhido(m.id)}
+                                className="w-4 h-4 text-green-600 focus:ring-green-500"
+                            />
+                            <span className="text-sm text-gray-800">
+                                {m.name}{atual === m.id ? " (está com ela)" : ""}
+                            </span>
+                        </label>
+                    ))}
+                    {permiteFila && (
+                        <label className={`flex items-center gap-3 p-3 min-h-11 rounded-lg border cursor-pointer transition-colors ${escolhido === null ? "border-green-500 bg-green-50" : "border-gray-200 hover:bg-gray-50"}`}>
+                            <input
+                                type="radio"
+                                name="motoboy-escolhido"
+                                checked={escolhido === null}
+                                onChange={() => setEscolhido(null)}
+                                className="w-4 h-4 text-green-600 focus:ring-green-500"
+                            />
+                            <span className="text-sm text-gray-800">↩️ Deixar na fila (qualquer motoboy pega)</span>
+                        </label>
+                    )}
+                </div>
+
+                {erro && <p className="mb-3 text-sm font-medium text-red-600">{erro}</p>}
+
+                <div className="flex gap-3 justify-end">
+                    <button
+                        type="button"
+                        onClick={onCancelar}
+                        disabled={salvando}
+                        className="min-h-11 px-4 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors disabled:opacity-50"
+                    >
+                        Voltar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onEscolher(escolhido)}
+                        disabled={salvando || (!permiteFila && escolhido === null)}
+                        className="min-h-11 px-4 rounded-lg font-bold bg-green-600 hover:bg-green-700 text-white transition-all disabled:opacity-50 flex items-center gap-2"
+                    >
+                        {salvando && <Loader2 size={16} className="animate-spin" />}
+                        {salvando ? "Salvando…" : "Confirmar"}
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }
 

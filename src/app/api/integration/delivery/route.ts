@@ -10,6 +10,7 @@ import { parseMoney } from "@/lib/money";
 import { calcularTaxa, dependeDaDistancia } from "@/lib/fee";
 import { logServerError } from "@/lib/serverLog";
 import { aplicarLimite } from "@/lib/rateLimit";
+import { normalizarChargeMode } from "@/lib/chargeMode";
 
 /**
  * API de Integração para PDV
@@ -273,6 +274,13 @@ export async function POST(request: NextRequest) {
             value = parsed;
         }
 
+        // Tipo de cobrança. O PDV pode mandar `chargeMode` ou `cobranca`, com
+        // "receber" | "conferir" | "pago". PDV antigo não manda nada: aí vale a
+        // régua de sempre (value > 0 = a receber), então nada muda pra quem já
+        // está no ar. "pago" zera o valor, igual à tela de conferência.
+        const chargeMode = normalizarChargeMode(body.chargeMode ?? body.cobranca, value);
+        if (chargeMode === "pago") value = 0;
+
         // O PDV às vezes manda "fee" achando que define o ganho do motoboy. Não
         // define (ver abaixo) — então avisamos na resposta em vez de ignorar calado.
         const feeIgnored = body.fee !== undefined && body.fee !== null && body.fee !== "";
@@ -345,6 +353,7 @@ export async function POST(request: NextRequest) {
                 lat: null,
                 lng: null,
                 value,
+                chargeMode,
                 fee,
                 observation,
                 geoPrecision: null,

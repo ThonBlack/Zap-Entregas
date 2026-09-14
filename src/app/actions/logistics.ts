@@ -1,20 +1,23 @@
 "use server";
 
 import { db } from "@/db";
-import { deliveries, shopSettings } from "@/db/schema";
+import { deliveries, shopSettings, users } from "@/db/schema";
 import { eq, inArray, and, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { geocodeAddress, optimizeRoute, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
+import { carregarMotoboyGerenciado, motoboyEnxergaCorrida, motoboyScope } from "@/lib/team";
+import { chargeModeDaCorrida, normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
 import { newTrackingToken } from "@/lib/trackingToken";
-import { pushToMotoboys, pushToUser } from "@/lib/push";
+import { pushDeCorridaNova, pushToUser, pushDeCorridaDestinada } from "@/lib/push";
 import { validarRecebimento, type DeliveryReceipt, type RecebimentoValidado } from "@/lib/receipt";
 import { fecharCorridaNoBanco } from "@/lib/deliveryLedger";
+import { planejarDestino } from "@/lib/deliveryAssign";
 import { parseMoney } from "@/lib/money";
 import { calcularTaxa, distanciaDaLoja } from "@/lib/fee";
 import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
 import { logServerError } from "@/lib/serverLog";
-import { avisoDeCorridaNova } from "@/lib/deliveryPrivacy";
+import { avisoDeCorridaNova, resumoDoLocal } from "@/lib/deliveryPrivacy";
 import { linkRota as montarLinkRota } from "@/lib/mapsLink";
 import { montarNotaJustificada, motivoValido, AVISO_MOTIVO_CURTO } from "@/lib/geofence";
 import { absoluteUrl } from "@/lib/appUrl";
@@ -32,6 +35,28 @@ async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
     };
 }
 
+/**
+ * Motoboys ativos que ESTA loja gerencia (admin vê todos).
+ *
+ * Existe porque a tela de "Nova Rota" é toda client-side: sem isto ela não teria
+ * como montar o campo "destinar a corrida a alguém". A regra de quem é da equipe
+ * de quem continua sendo a mesma de sempre — `motoboyScope` em src/lib/team.ts.
+ */
+export async function listarMotoboysDaEquipeAction(): Promise<
+    { motoboys: { id: number; name: string }[] } | { error: string }
+> {
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+    if ("error" in auth) return auth;
+
+    const lista = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(motoboyScope(auth.user))
+        .orderBy(users.name);
+
+    return { motoboys: lista };
+}
+
 export async function addDeliveryAction(formData: FormData) {
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
     if ("error" in auth) return auth;
@@ -46,10 +71,22 @@ export async function addDeliveryAction(formData: FormData) {
     // "1.850,00" digitado à mão virava R$ 1,85 no conversor antigo. `parseMoney`
     // entende milhar e devolve null quando não dá pra ler — aí é erro na tela,
     // nunca zero calado.
+    // "Já pago" zera o valor, como o antigo "é pra receber" desmarcado fazia.
+    const chargeMode: ChargeMode = normalizarChargeMode(formData.get("chargeMode"), null);
     const valueRaw = String(formData.get("value") ?? "").trim();
-    const value = valueRaw ? parseMoney(valueRaw) : 0;
-    if (value === null || value < 0) {
+    const valueLido = valueRaw ? parseMoney(valueRaw) : 0;
+    if (valueLido === null || valueLido < 0) {
         return { error: "Valor do pedido inválido. Escreva assim: 12,50" };
+    }
+    const value = chargeMode === "pago" ? 0 : valueLido;
+
+    // Destinar a corrida a um motoboy é opcional: vazio = fila aberta, como sempre.
+    const motoboyIdBruto = String(formData.get("motoboyId") ?? "").trim();
+    let destinatario: { id: number; name: string } | null = null;
+    if (motoboyIdBruto) {
+        const escolhido = await carregarMotoboyGerenciado(me, Number(motoboyIdBruto));
+        if (!escolhido) return { error: "Esse motoboy não é da sua equipe." };
+        destinatario = { id: escolhido.id, name: escolhido.name };
     }
 
     if (await existeCorridaIgualRecente(me.id, address, 5)) {
@@ -75,34 +112,48 @@ export async function addDeliveryAction(formData: FormData) {
     }
 
     const agora = new Date().toISOString();
-    await db.insert(deliveries).values({
+    const criada = await db.insert(deliveries).values({
         shopkeeperId: me.id,
+        // Destinada a alguém já nasce "aceita": o motoboy não precisa disputar
+        // no pool uma corrida que a loja já deu pra ele.
+        motoboyId: destinatario?.id ?? null,
         address,
         customerName,
         value,
-        observation,
+        chargeMode,
+        observation: destinatario
+            ? [observation, `destinada pela loja a ${destinatario.name}`].filter(Boolean).join(" · ").slice(0, 1000)
+            : observation,
         lat,
         lng,
         geoPrecision,
-        status: "pending",
+        status: destinatario ? "assigned" : "pending",
+        acceptedAt: destinatario ? agora : null,
         stopOrder: 999,
         publicToken: newTrackingToken(),
         // Data sempre em ISO: o CURRENT_TIMESTAMP do banco grava noutro formato
         // e as duas formas juntas quebravam comparação e ordenação.
         createdAt: agora,
         updatedAt: agora,
-    });
+    }).returning({ id: deliveries.id }).get();
 
-    // Fire-and-forget: push fora do ar não pode travar o cadastro
-    // O aviso vai pro celular de TODO motoboy cadastrado, inclusive os de
-    // outra loja. Endereço com número aí é dado pessoal do cliente saindo do
-    // app pra um aparelho que a loja não controla — vai só o bairro.
-    pushToMotoboys({
-        title: "🏍️ Nova Corrida Disponível!",
-        body: avisoDeCorridaNova(address),
-        url: "/app",
-        tag: "nova-corrida",
-    }).catch(() => { });
+    // Fire-and-forget: push fora do ar não pode travar o cadastro.
+    // Endereço com número é dado pessoal do cliente saindo do app pra um
+    // aparelho que a loja não controla — nos dois casos vai só o bairro.
+    if (destinatario) {
+        // Corrida com dono não vira anúncio: só o escolhido é avisado.
+        pushDeCorridaDestinada(destinatario.id, criada.id, resumoDoLocal(address), me.name)
+            .catch(() => { });
+    } else {
+        // Só quem pode VER essa corrida é avisado: loja no modo "equipe" não
+        // anuncia pro app inteiro (regra única em src/lib/team.ts).
+        pushDeCorridaNova(me.id, {
+            title: "🏍️ Nova Corrida Disponível!",
+            body: avisoDeCorridaNova(address),
+            url: "/app",
+            tag: "nova-corrida",
+        }).catch(() => { });
+    }
 
     revalidatePath("/app");
     return { success: true };
@@ -238,6 +289,18 @@ export async function acceptDeliveryAction(id: number) {
         if (!delivery) return { error: "Entrega não disponível ou já foi aceita." };
         if (delivery.motoboyId) return { error: "Esta entrega já foi aceita por outro motoboy." };
 
+        // "Quem vê minhas corridas": no modo "equipe" só motoboy da loja pega.
+        // A tela já esconde, mas a tela é só a primeira barreira — quem manda é
+        // o servidor (a mesma função que monta a query em /app).
+        // A sessão não carrega de que loja ele é: busca aqui.
+        const vinculo = await db.query.users.findFirst({
+            where: eq(users.id, me.id),
+            columns: { shopkeeperId: true },
+        });
+        if (!(await motoboyEnxergaCorrida({ ...me, shopkeeperId: vinculo?.shopkeeperId ?? null }, delivery))) {
+            return { error: "Essa corrida é só pros motoboys da loja." };
+        }
+
         // `.returning()` + `motoboy_id IS NULL`: se outro motoboy pegou primeiro,
         // o UPDATE não muda nada e quem perdeu precisa SABER disso. Antes a tela
         // recarregava sem erro e ele saía atrás de um pedido que não era dele.
@@ -275,6 +338,90 @@ export async function acceptDeliveryAction(id: number) {
         console.error("[ACCEPT ERROR]", e);
         await logServerError("aceitar_corrida", e, { userId: me.id, page: "/app", deliveryId: id });
         return { error: "Erro ao aceitar entrega." };
+    }
+}
+
+/**
+ * A LOJA destina uma corrida a um motoboy (ou devolve pra fila).
+ *
+ * Até aqui só existia fila aberta: a loja cadastrava e torcia pra alguém pegar.
+ * Com uma equipe fixa isso é ruim — o lojista sabe quem está livre.
+ *
+ * `motoboyId = null` devolve pra fila (status volta pra "pending" e a corrida
+ * some da mão de quem estava com ela).
+ *
+ * Janela: só enquanto a corrida está "pending" ou "assigned". Depois que o
+ * motoboy COLETOU o pedido (picked_up) ele já está com a mercadoria — trocar o
+ * dono aí deixaria a corrida no nome de quem não está com o pacote.
+ */
+export async function assignDeliveryAction(id: number, motoboyId: number | null) {
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+    if ("error" in auth) return auth;
+    const me = auth.user;
+
+    if (!Number.isInteger(id) || id <= 0) return { error: "ID inválido" };
+
+    try {
+        const ownership = me.role === "admin"
+            ? eq(deliveries.id, id)
+            : and(eq(deliveries.id, id), eq(deliveries.shopkeeperId, me.id));
+
+        const delivery = await db.query.deliveries.findFirst({ where: ownership });
+        if (!delivery) return { error: "Corrida não encontrada." };
+
+        // Lojista só destina pra motoboy DELE (motoboyScope, via carregarMotoboyGerenciado).
+        let escolhido: { id: number; name: string } | null = null;
+        if (motoboyId != null) {
+            const achado = await carregarMotoboyGerenciado(me, Number(motoboyId));
+            if (!achado) return { error: "Esse motoboy não é da sua equipe." };
+            if (achado.isActive === false) return { error: "Esse motoboy está desativado." };
+            escolhido = { id: achado.id, name: achado.name };
+        }
+
+        // A decisão (janela, status, rastro na observação) mora em
+        // src/lib/deliveryAssign.ts — lá ela é testável sem subir o servidor.
+        const agora = new Date().toISOString();
+        const plano = planejarDestino(delivery, escolhido, agora);
+        if (!plano.ok) return { error: plano.erro };
+        if (plano.jaEra) return { success: true, jaEra: true };
+
+        // O WHERE repete a condição: se o motoboy coletar (ou outro lojista mexer)
+        // entre a leitura e agora, nada é gravado.
+        const mudou = await db.update(deliveries)
+            .set({
+                motoboyId: plano.motoboyId,
+                status: plano.status,
+                acceptedAt: plano.acceptedAt,
+                observation: plano.observation,
+                updatedAt: agora,
+            })
+            .where(and(
+                eq(deliveries.id, id),
+                inArray(deliveries.status, ["pending", "assigned"]),
+            ))
+            .returning({ id: deliveries.id });
+
+        if (!mudou.length) return { error: "Essa corrida mudou de situação. Atualize a tela." };
+
+        if (escolhido) {
+            // Só o escolhido é avisado, e sem endereço/telefone no corpo.
+            pushDeCorridaDestinada(escolhido.id, id, resumoDoLocal(delivery.address), me.name)
+                .catch(() => { });
+        } else if (delivery.motoboyId) {
+            pushToUser(delivery.motoboyId, {
+                title: "↩️ Corrida devolvida pra fila",
+                body: `A loja tirou a corrida #${id} de você.`,
+                url: "/app",
+                tag: `entrega-${id}`,
+            }).catch(() => { });
+        }
+
+        revalidatePath("/app");
+        return { success: true };
+    } catch (e) {
+        console.error("[ASSIGN ERROR]", e);
+        await logServerError("destinar_corrida", e, { userId: me.id, page: "/app", deliveryId: id });
+        return { error: "Não consegui destinar a corrida agora. Tente de novo." };
     }
 }
 
@@ -337,34 +484,18 @@ export async function completeDeliveryAction(
     id: number,
     receipt?: DeliveryReceipt,
     contexto?: ContextoDeEntrega,
+    /**
+     * Quem fez a entrega, escolhido pela LOJA na hora de finalizar. Só vale pra
+     * lojista/admin: o motoboy finaliza a corrida dele e ponto. É obrigatório
+     * quando a corrida não tem dono, porque a carteira precisa de um.
+     */
+    motoboyIdEscolhido?: number | null,
 ) {
     const auth = await getAuthUserWithRole(["motoboy", "shopkeeper", "admin"]);
     if ("error" in auth) return auth;
     const me = auth.user;
 
     if (!Number.isInteger(id) || id <= 0) return { error: "ID inválido" };
-
-    // Validar recebimento (opcional — entrega pode ser finalizada sem informar).
-    // A regra mora em src/lib/receipt.ts, a mesma que a tela usa.
-    let receivedAmount: number | null = null;
-    let receivedMethod: RecebimentoValidado["method"] = null;
-    let receiptNote: string | null = null;
-    let receiptStatus: RecebimentoValidado["status"] | null = null;
-    if (receipt) {
-        const conferido = validarRecebimento(receipt);
-        if ("error" in conferido) return conferido;
-        receiptStatus = conferido.status;
-        receivedAmount = conferido.amount;
-        receivedMethod = conferido.method;
-        receiptNote = conferido.note;
-    }
-
-    // Finalizou fora do raio: o motivo é obrigatório, e a mesma regra da tela
-    // vale aqui (a tela é só a primeira barreira; quem manda é o servidor).
-    if (contexto?.foraDoRaio) {
-        if (!motivoValido(contexto.motivo)) return { error: AVISO_MOTIVO_CURTO };
-        receiptNote = montarNotaJustificada(receiptNote, contexto.motivo!, contexto.distanciaMetros);
-    }
 
     try {
         // Motoboy: só entregas atribuídas a ele. Lojista: só entregas da loja dele
@@ -396,6 +527,52 @@ export async function completeDeliveryAction(
             });
             if (alreadyDelivered) return { success: true, alreadyDelivered: true };
             return { error: "Entrega não encontrada, sem permissão ou em status inválido." };
+        }
+
+        // Validar recebimento (opcional — entrega pode ser finalizada sem informar).
+        // A regra mora em src/lib/receipt.ts, a mesma que a tela usa. Roda DEPOIS
+        // de carregar a corrida porque o valor do pedido e o tipo de cobrança
+        // ("a receber" × "a conferir" × "pago") fazem parte da régua.
+        const modoCobranca = chargeModeDaCorrida(delivery);
+        let receivedAmount: number | null = null;
+        let receivedMethod: RecebimentoValidado["method"] = null;
+        let receiptNote: string | null = null;
+        let receiptStatus: RecebimentoValidado["status"] | null = null;
+        if (receipt) {
+            const conferido = validarRecebimento(receipt, delivery.value, modoCobranca);
+            if ("error" in conferido) return conferido;
+            receiptStatus = conferido.status;
+            receivedAmount = conferido.amount;
+            receivedMethod = conferido.method;
+            receiptNote = conferido.note;
+        }
+
+        // Finalizou fora do raio: o motivo é obrigatório, e a mesma regra da tela
+        // vale aqui (a tela é só a primeira barreira; quem manda é o servidor).
+        if (contexto?.foraDoRaio) {
+            if (!motivoValido(contexto.motivo)) return { error: AVISO_MOTIVO_CURTO };
+            receiptNote = montarNotaJustificada(receiptNote, contexto.motivo!, contexto.distanciaMetros);
+        }
+
+        // ── Quem fez a entrega, quando quem fecha é a LOJA ──────────────────
+        // A loja finaliza sem GPS e sem app de motoboy. Se a corrida não tem
+        // dono, alguém precisa ser: crédito da taxa e débito do dinheiro têm que
+        // cair numa carteira, senão o acerto do dia fica furado.
+        let atribuirMotoboyId: number | null = null;
+        if (me.role !== "motoboy") {
+            if (motoboyIdEscolhido != null) {
+                const escolhido = await carregarMotoboyGerenciado(me, Number(motoboyIdEscolhido));
+                if (!escolhido) return { error: "Esse motoboy não é da sua equipe." };
+                if (escolhido.id !== delivery.motoboyId) atribuirMotoboyId = escolhido.id;
+            } else if (delivery.motoboyId == null) {
+                return { error: "Escolha quem fez a entrega — a taxa e o dinheiro precisam de dono." };
+            }
+            // Rastro de quem fechou: sem isto, "entregue" sem motoboy no GPS
+            // vira mistério no histórico.
+            receiptNote = [receiptNote, `finalizada pela loja (${me.name})`]
+                .filter(Boolean)
+                .join(" · ")
+                .slice(0, 500);
         }
 
         const shopId = delivery.shopkeeperId;
@@ -430,6 +607,7 @@ export async function completeDeliveryAction(
             fee,
             recibo: { receiptStatus, receivedAmount, receivedMethod, receiptNote },
             statusAbertos: openStatuses,
+            atribuirMotoboyId,
         });
 
         if (!fechado.ok) return { error: fechado.erro };
