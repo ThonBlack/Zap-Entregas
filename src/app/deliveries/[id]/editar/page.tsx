@@ -7,6 +7,7 @@ import { ArrowLeft, Pencil } from "lucide-react";
 import { getAuthUserWithRole, getSessionUserId } from "@/lib/session";
 import { isAddressSuspicious } from "@/lib/routeUtils";
 import DraftConfirmForm from "@/components/deliveries/DraftConfirmForm";
+import { localDaLojaVisivel } from "@/lib/team";
 import { getBrowserMapsKey } from "@/lib/mapsKey";
 import { fmtShortDateTime } from "@/lib/datetime";
 
@@ -45,6 +46,10 @@ export default async function EditarCorridaPage({ params }: { params: Promise<{ 
         corrida.lat ?? 0, corrida.lng ?? 0, settings?.shopLat, settings?.shopLng, 100
     );
 
+    // Onde a loja fica só vai pro navegador de quem pode ver (regra única em
+    // src/lib/team.ts). Aqui sempre passa — o filtro fica explícito de propósito.
+    const localDaLoja = localDaLojaVisivel(me, corrida.shopkeeperId, settings);
+
     return (
         <div className="min-h-screen bg-zinc-900 text-white">
             <header className="border-b border-zinc-800 bg-zinc-900/95 sticky top-0 z-20">
@@ -80,8 +85,8 @@ export default async function EditarCorridaPage({ params }: { params: Promise<{ 
                         createdAt: corrida.createdAt,
                         geoPrecision: corrida.geoPrecision,
                     }}
-                    shopLat={settings?.shopLat ?? null}
-                    shopLng={settings?.shopLng ?? null}
+                    shopLat={localDaLoja.shopLat}
+                    shopLng={localDaLoja.shopLng}
                     defaultCity={settings?.defaultCity ?? null}
                     defaultState={settings?.defaultState ?? null}
                     isSuspect={isSuspect}

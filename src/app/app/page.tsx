@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import { requireUser, clearSessionCookie } from "@/lib/session";
 import { LogOut, ShieldCheck, Settings, Store, Bike, Crown } from "lucide-react";
 import { isAddressSuspicious } from "@/lib/routeUtils";
-import { ehAdmin, idsDaEquipe, type Ator } from "@/lib/team";
+import { corridaVisivelParaMotoboy, ehAdmin, idsDaEquipe, motoboyScope, type Ator } from "@/lib/team";
 import { mascararParaOutraLoja } from "@/lib/deliveryPrivacy";
 
 type VisibilityFlags = {
@@ -200,6 +200,7 @@ export default async function Dashboard({
     let recentTransactions: Awaited<ReturnType<typeof getRecentTransactions>> = [];
     let painelCounts: PainelCounts = { pendentes: 0, emRota: 0, feitasHoje: 0, hoje: 0 };
     let draftDeliveries: { id: number; address: string; customerName: string | null; createdAt: string | null }[] = [];
+    let motoboysDaEquipe: { id: number; name: string }[] = [];
 
     const pendingConfirmations = await getPendingConfirmations(user.id);
 
@@ -231,13 +232,27 @@ export default async function Dashboard({
             .where(draftWhere)
             .orderBy(desc(deliveries.createdAt));
 
+        // A loja passou a poder finalizar e destinar corrida: pra isso ela
+        // precisa ver também as que já estão com alguém ("em rota"). Antes a
+        // lista só tinha "pending" e uma corrida aceita sumia da tela do lojista.
+        const ABERTAS = ["pending", "assigned", "picked_up"] as const;
         const pendingWhere = (user.role as string) === "admin"
-            ? eq(deliveries.status, "pending")
-            : and(eq(deliveries.status, "pending"), eq(deliveries.shopkeeperId, user.id));
-        pendingDeliveries = await db.select()
+            ? inArray(deliveries.status, [...ABERTAS])
+            : and(inArray(deliveries.status, [...ABERTAS]), eq(deliveries.shopkeeperId, user.id));
+        // leftJoin pra mostrar o nome de quem está com a corrida no card.
+        const abertas = await db.select({ d: deliveries, motoboyName: users.name })
             .from(deliveries)
+            .leftJoin(users, eq(deliveries.motoboyId, users.id))
             .where(pendingWhere)
             .orderBy(deliveries.stopOrder, desc(deliveries.createdAt));
+        pendingDeliveries = abertas.map(({ d, motoboyName }) => ({ ...d, motoboyName }));
+
+        // Equipe da loja: é com ela que o lojista destina uma corrida e diz quem
+        // fez a entrega ao marcar como entregue (motoboyScope = só os dele).
+        motoboysDaEquipe = await db.select({ id: users.id, name: users.name })
+            .from(users)
+            .where(motoboyScope(user))
+            .orderBy(users.name);
 
         // Marcar endereços suspeitos (fora do raio da loja)
         const shopIds = Array.from(new Set(pendingDeliveries.map(d => d.shopkeeperId).filter((x): x is number => x != null)));
@@ -259,15 +274,22 @@ export default async function Dashboard({
     } else {
         myBalance = await getUserBalance(user.id);
 
+        // "Quem vê minhas corridas": loja no modo "equipe" só aparece pros
+        // motoboys dela. A regra mora em src/lib/team.ts e é a MESMA que o
+        // aceitar e o push usam — se divergissem, chegaria notificação de
+        // corrida que a lista não mostra.
         pendingDeliveries = await db.select()
             .from(deliveries)
             .where(
-                or(
-                    eq(deliveries.status, "pending"),
-                    and(
-                        eq(deliveries.motoboyId, user.id),
-                        inArray(deliveries.status, ["assigned", "picked_up"])
-                    )
+                and(
+                    or(
+                        eq(deliveries.status, "pending"),
+                        and(
+                            eq(deliveries.motoboyId, user.id),
+                            inArray(deliveries.status, ["assigned", "picked_up"])
+                        )
+                    ),
+                    corridaVisivelParaMotoboy(user),
                 )
             )
             .orderBy(deliveries.stopOrder);
@@ -416,6 +438,7 @@ export default async function Dashboard({
                         pendingDeliveries={pendingDeliveries}
                         recentTransactions={recentTransactions}
                         counts={painelCounts}
+                        motoboys={motoboysDaEquipe}
                         user={user}
                     />
                 ) : (

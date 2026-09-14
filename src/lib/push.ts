@@ -80,9 +80,33 @@ export async function pushToDraftReviewers(shopkeeperId: number | null, payload:
 }
 
 /**
+ * A loja destinou uma corrida a UM motoboy: só ele é avisado.
+ *
+ * Mesma regra de privacidade do anúncio do pool (avisoDeCorridaNova): o corpo
+ * do push sai do app pro aparelho dele, então vai só o bairro — nunca endereço
+ * com número nem telefone do cliente. O resto ele lê dentro do app.
+ */
+export async function pushDeCorridaDestinada(
+    motoboyId: number,
+    deliveryId: number,
+    resumoDoLocal: string,
+    nomeDaLoja: string | null,
+): Promise<void> {
+    await pushToUser(motoboyId, {
+        title: "🎯 Corrida pra você",
+        body: nomeDaLoja ? `${nomeDaLoja} · ${resumoDoLocal}` : resumoDoLocal,
+        url: "/app",
+        tag: `entrega-${deliveryId}`,
+    });
+}
+
+/**
  * Notifica o pool de corrida nova: todos os motoboys + os admins.
  * O admin entra porque é ele quem acompanha a operação (e, hoje, quem testa no celular);
  * sem isso uma corrida nova não avisava ninguém quando não havia motoboy inscrito.
+ *
+ * ⚠️ Pra corrida nova de uma LOJA use `pushDeCorridaNova`: este aqui ignora o
+ * "quem vê minhas corridas" e avisaria motoboy que nem enxerga a corrida.
  */
 export async function pushToMotoboys(payload: PushPayload): Promise<void> {
     if (!ensureConfigured()) return;
@@ -91,5 +115,26 @@ export async function pushToMotoboys(payload: PushPayload): Promise<void> {
     if (!audience.length) return;
     const subs = await db.select().from(pushSubscriptions)
         .where(inArray(pushSubscriptions.userId, audience.map(m => m.id)));
+    await sendToSubscriptions(subs, payload);
+}
+
+/**
+ * Aviso de corrida NOVA respeitando o "quem vê minhas corridas" da loja
+ * (shop_settings.pool_mode). Loja no modo "equipe" avisa só os motoboys dela.
+ *
+ * Quem decide o público é `publicoDoAvisoDeCorridaNova`, em src/lib/team.ts — a
+ * mesma função que a tela e o aceitar usam. Se o push tivesse régua própria, o
+ * motoboy receberia notificação de corrida que não aparece na lista dele.
+ */
+export async function pushDeCorridaNova(
+    shopkeeperId: number | null,
+    payload: PushPayload,
+): Promise<void> {
+    if (!ensureConfigured()) return;
+    const { publicoDoAvisoDeCorridaNova } = await import("@/lib/team");
+    const ids = await publicoDoAvisoDeCorridaNova(shopkeeperId);
+    if (!ids.length) return;
+    const subs = await db.select().from(pushSubscriptions)
+        .where(inArray(pushSubscriptions.userId, ids));
     await sendToSubscriptions(subs, payload);
 }

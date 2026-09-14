@@ -59,6 +59,9 @@ corrida({ id: 502 });                       // duas chamadas seguidas
 corrida({ id: 503 });                       // com dinheiro do cliente
 corrida({ id: 504, motoboy: null });        // sem motoboy: não mexe em carteira
 corrida({ id: 505, status: "delivered" });  // já entregue
+corrida({ id: 506 });                       // "a conferir": Pix da loja confirmado
+corrida({ id: 507 });                       // "a conferir": cliente pagou em dinheiro na porta
+corrida({ id: 508, motoboy: null, status: "pending" }); // a LOJA finaliza e escolhe quem entregou
 
 const ABERTOS = ["pending", "assigned", "picked_up"];
 const SEM_RECIBO = { receiptStatus: null, receivedAmount: null, receivedMethod: null, receiptNote: null };
@@ -165,6 +168,96 @@ test("corrida que não existe devolve erro, não estoura", () => {
     const r = fecharCorridaNoBanco(base(9999));
     assert.equal(r.ok, false);
     assert.match(r.erro, /não encontrada/i);
+});
+
+// ── corrida "a conferir": o Pix é DA LOJA ──────────────────────────────────
+// É o caso novo e o que mais pode dar errado no acerto: o cliente paga no Pix
+// da loja e o motoboy só confere. Esse dinheiro nunca passou pela mão dele,
+// então NÃO pode virar débito — senão o motoboy fecha o dia devendo à loja um
+// valor que ele nunca recebeu.
+
+test('"Pix confirmado" numa corrida a conferir credita a taxa e NÃO debita nada', () => {
+    const r = fecharCorridaNoBanco(base(506, {
+        fee: 7,
+        recibo: {
+            receiptStatus: "recebido", receivedAmount: 120,
+            receivedMethod: "pix", receiptNote: null,
+        },
+    }));
+
+    assert.equal(r.ok, true);
+    assert.equal(r.creditoLancado, true);
+    assert.equal(r.debitoLancado, false, "PIX da loja não fica na mão do motoboy");
+    assert.equal(conta.get(506, "debit").n, 0, "nenhum débito lançado");
+    assert.equal(conta.get(506, "credit").total, 7);
+});
+
+test('"pagou em dinheiro pra mim" numa corrida a conferir DEBITA, igual a uma "a receber"', () => {
+    const r = fecharCorridaNoBanco(base(507, {
+        fee: 7,
+        recibo: {
+            receiptStatus: "recebido", receivedAmount: 120,
+            receivedMethod: "dinheiro", receiptNote: null,
+        },
+    }));
+
+    assert.equal(r.ok, true);
+    assert.equal(r.debitoLancado, true);
+    assert.equal(conta.get(507, "debit").total, 120);
+});
+
+test("no resumo do dia o Pix conferido entra em PIX, nunca em dinheiro", async () => {
+    // As duas corridas acima são do mesmo dia: o resumo tem que separar
+    // R$ 120 de Pix (da loja) de R$ 120 em espécie (na mão do motoboy).
+    const dia = raw.prepare(
+        "SELECT date(datetime(delivered_at, '-3 hours')) AS d FROM deliveries WHERE id = 506"
+    ).get().d;
+
+    const { getDailySummary } = await import("@/lib/dailySummary");
+    const resumo = await getDailySummary(MOTOBOY, LOJA, dia);
+
+    const pixDaCorrida = resumo.lines.find((l) => l.id === 506);
+    assert.equal(pixDaCorrida.receivedMethod, "pix");
+    assert.ok(resumo.pixTotal >= 120, `pixTotal deveria contar os R$ 120 do Pix (veio ${resumo.pixTotal})`);
+    assert.ok(resumo.cashTotal >= 120, `cashTotal conta só o dinheiro em espécie (veio ${resumo.cashTotal})`);
+
+    // O líquido é taxa − dinheiro em ESPÉCIE: o Pix não entra na conta.
+    assert.equal(
+        Math.round((resumo.feesTotal - resumo.cashTotal) * 100) / 100,
+        resumo.net,
+        "o Pix não pode aparecer no líquido"
+    );
+});
+
+// ── a LOJA finaliza uma corrida que ninguém aceitou ────────────────────────
+
+test("loja finaliza corrida órfã escolhendo o motoboy: a corrida vira dele e a carteira acompanha", () => {
+    const r = fecharCorridaNoBanco(base(508, {
+        motoboyId: null,          // a corrida não tinha dono
+        atribuirMotoboyId: MOTOBOY, // ...até a loja dizer quem entregou
+        fee: 9,
+        recibo: {
+            receiptStatus: "recebido", receivedAmount: 40,
+            receivedMethod: "dinheiro", receiptNote: "finalizada pela loja (Loja Dev)",
+        },
+    }));
+
+    assert.equal(r.ok, true);
+    assert.equal(r.jaEntregue, false);
+    assert.equal(r.creditoLancado, true);
+    assert.equal(r.debitoLancado, true);
+
+    const linha = raw.prepare("SELECT status, motoboy_id, receipt_note FROM deliveries WHERE id = 508").get();
+    assert.equal(linha.status, "delivered");
+    assert.equal(linha.motoboy_id, MOTOBOY, "sem dono a corrida sumiria do resumo do dia");
+    assert.match(linha.receipt_note, /finalizada pela loja/);
+
+    const credito = raw.prepare(
+        "SELECT user_id, amount FROM transactions WHERE related_delivery_id = 508 AND type = 'credit'"
+    ).get();
+    assert.equal(credito.user_id, MOTOBOY);
+    assert.equal(credito.amount, 9);
+    assert.equal(conta.get(508, "debit").total, 40);
 });
 
 test("lançamento manual (sem corrida) continua podendo repetir", () => {

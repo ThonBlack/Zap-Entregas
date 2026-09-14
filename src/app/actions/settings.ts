@@ -41,6 +41,10 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
         return { message: "Valor não pode ser negativo.", success: false };
     }
 
+    // "Quem vê minhas corridas". Padrão é fechado ("equipe"): só a loja que
+    // quiser é que abre o pool pro app inteiro.
+    const poolMode = formData.get("poolMode") === "aberta" ? "aberta" as const : "equipe" as const;
+
     const showCustomerName = formData.get("showCustomerName") === "on";
     const showCustomerPhone = formData.get("showCustomerPhone") === "on";
     const showOrderValue = formData.get("showOrderValue") === "on";
@@ -66,6 +70,7 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 valuePerKm,
                 dailyvalue: dailyValue,
                 guaranteedMinimum,
+                poolMode,
                 showCustomerName,
                 showCustomerPhone,
                 showOrderValue,
@@ -84,6 +89,7 @@ export async function updateSettingsAction(prevState: any, formData: FormData) {
                 valuePerKm,
                 dailyvalue: dailyValue,
                 guaranteedMinimum,
+                poolMode,
                 showCustomerName,
                 showCustomerPhone,
                 showOrderValue,

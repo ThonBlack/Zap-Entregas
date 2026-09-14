@@ -13,10 +13,12 @@ interface ShopkeeperViewProps {
     recentTransactions: any[];
     /** Contagens vindas do servidor (a lista aqui só tem as pendentes). */
     counts: { pendentes: number; emRota: number; feitasHoje: number; hoje: number };
+    /** Motoboys ativos da equipe — pra destinar corrida e dizer quem entregou. */
+    motoboys: { id: number; name: string }[];
     user: any;
 }
 
-export function ShopkeeperView({ pendingDeliveries, recentTransactions, counts, user }: ShopkeeperViewProps) {
+export function ShopkeeperView({ pendingDeliveries, recentTransactions, counts, motoboys, user }: ShopkeeperViewProps) {
     const { pendentes: pending, emRota: inProgress, feitasHoje: delivered, hoje: totalToday } = counts;
     const isFreeUser = user.plan === 'free' || !user.plan;
 
@@ -133,7 +135,11 @@ export function ShopkeeperView({ pendingDeliveries, recentTransactions, counts, 
 
             {/* Pending Deliveries */}
             <section>
-                <PendingDeliveriesForm deliveries={pendingDeliveries} baseUrl={process.env.APP_URL ?? ""} />
+                <PendingDeliveriesForm
+                    deliveries={pendingDeliveries}
+                    motoboys={motoboys}
+                    baseUrl={process.env.APP_URL ?? ""}
+                />
             </section>
 
             {/* Financial Summary */}

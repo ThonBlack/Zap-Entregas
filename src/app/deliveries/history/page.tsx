@@ -11,6 +11,8 @@ import Link from "next/link";
 import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, ShieldCheck } from "lucide-react";
 import { fmtDateTime, hojeBrasilia } from "@/lib/datetime";
 import { formatBRL, parseMonth } from "@/lib/wallet-shared";
+import { chargeModeDaCorrida, rotuloCobranca } from "@/lib/chargeMode";
+import CorrigirRecebimento from "@/components/deliveries/CorrigirRecebimento";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -77,6 +79,10 @@ export default async function HistoryPage({
             user.role === "shopkeeper"
                 ? and(eq(deliveries.shopkeeperId, user.id), eq(deliveries.status, "delivered"))
                 : and(eq(deliveries.motoboyId, user.id), eq(deliveries.status, "delivered"));
+
+    // Corrigir o recibo é coisa de loja (a mesma regra do adjustDeliveryReceiptAction):
+    // o motoboy vê o histórico dele, mas não mexe no próprio recebimento.
+    const podeCorrigir = user.role === "shopkeeper" || user.role === "admin";
 
     let history: any[] = await db.select()
         .from(deliveries)
@@ -188,6 +194,13 @@ export default async function HistoryPage({
                                         {item.address}
                                     </span>
                                 </div>
+                                {/* Tipo de cobrança combinado na criação da corrida — é a
+                                    régua pra conferir se o recibo abaixo faz sentido. */}
+                                <div className="flex items-center gap-2 flex-wrap text-xs">
+                                    <span className="px-2 py-1 font-bold rounded-full bg-zinc-700 text-zinc-200 border border-zinc-600">
+                                        {rotuloCobranca(chargeModeDaCorrida(item), item.value)}
+                                    </span>
+                                </div>
                                 {item.receiptStatus && (
                                     <div className="flex items-center gap-2 flex-wrap text-xs">
                                         <span className={`px-2 py-1 font-bold rounded-full ${item.receiptStatus === 'nao_recebido' ? 'bg-red-900/50 text-red-300 border border-red-700' : 'bg-zinc-700 text-zinc-200 border border-zinc-600'}`}>
@@ -200,6 +213,21 @@ export default async function HistoryPage({
                                             <span className="text-zinc-400 italic">📝 {item.receiptNote}</span>
                                         )}
                                     </div>
+                                )}
+
+                                {/* Colocar OU tirar o valor recebido de uma corrida já
+                                    entregue, sem depender de ela estar no "Resumo do dia"
+                                    (que só alcança o dia que a loja está fechando). */}
+                                {podeCorrigir && (
+                                    <CorrigirRecebimento
+                                        deliveryId={item.id}
+                                        fee={item.fee}
+                                        receiptStatus={item.receiptStatus}
+                                        receivedAmount={item.receivedAmount}
+                                        receivedMethod={item.receivedMethod}
+                                        chargeMode={item.chargeMode}
+                                        value={item.value}
+                                    />
                                 )}
                             </div>
 

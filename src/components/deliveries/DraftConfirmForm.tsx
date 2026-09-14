@@ -8,6 +8,13 @@ import AddressAutocomplete from "@/components/map/AddressAutocomplete";
 import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import { confirmDraftAction, cancelDraftAction } from "@/app/actions/drafts";
 import { updatePendingDeliveryAction } from "@/app/actions/deliveries";
+import {
+    CHARGE_MODES,
+    CHARGE_MODE_AJUDA,
+    CHARGE_MODE_LABEL,
+    chargeModeDaCorrida,
+    type ChargeMode,
+} from "@/lib/chargeMode";
 
 const PinPicker = dynamic(() => import("@/components/map/PinPicker"), {
     ssr: false,
@@ -27,6 +34,8 @@ export interface DraftForConfirm {
     createdAt: string | null;
     /** exata | rua | bairro | cidade — o quanto dá pra confiar no pino que veio */
     geoPrecision?: string | null;
+    /** "receber" | "conferir" | "pago". Ausente = corrida antiga (régua do valor). */
+    chargeMode?: string | null;
 }
 
 interface DraftConfirmFormProps {
@@ -48,6 +57,11 @@ interface DraftConfirmFormProps {
      * "edicao" = corrida já liberada, ainda sem motoboy, sendo corrigida pelo lojista.
      */
     modo?: "conferencia" | "edicao";
+    /**
+     * Motoboys ativos da equipe. Vazio pela tela do PDV (sem login não dá pra
+     * saber de que loja é quem está conferindo) — aí o campo nem aparece.
+     */
+    motoboys?: { id: number; name: string }[];
 }
 
 // Dinheiro na tela é sempre "150,50" — nunca "150.5".
@@ -56,7 +70,7 @@ const money = (n: number | null | undefined) =>
 
 export default function DraftConfirmForm({
     draft, shopLat, shopLng, defaultCity, defaultState, isSuspect, hidesValueFromMotoboy, confirmToken,
-    googleMapsKey, modo = "conferencia",
+    googleMapsKey, modo = "conferencia", motoboys = [],
 }: DraftConfirmFormProps) {
     const editando = modo === "edicao";
     const router = useRouter();
@@ -73,8 +87,11 @@ export default function DraftConfirmForm({
     const [lng, setLng] = useState(startLng);
     const [pinTouched, setPinTouched] = useState(false);
     const [recenter, setRecenter] = useState(0);
-    const [collect, setCollect] = useState((draft.value ?? 0) > 0);
+    const [cobranca, setCobranca] = useState<ChargeMode>(chargeModeDaCorrida(draft));
     const [concluido, setConcluido] = useState<"liberada" | "cancelada" | null>(null);
+    /** Vazio = fila aberta (qualquer motoboy pega), como sempre foi. */
+    const [motoboyId, setMotoboyId] = useState("");
+    const pedeValor = cobranca !== "pago";
 
     const doPdv = Boolean(confirmToken);
 
@@ -245,22 +262,43 @@ export default function DraftConfirmForm({
             </div>
 
             <div className="p-4 rounded-xl bg-zinc-800 border border-zinc-700 space-y-3">
-                <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        name="collect"
-                        checked={collect}
-                        onChange={(e) => setCollect(e.target.checked)}
-                        className="w-5 h-5 accent-green-600"
-                    />
-                    <span className="text-sm font-medium text-white">O motoboy tem que receber do cliente</span>
-                </label>
+                <p className="text-sm font-medium text-white">Como esse pedido é pago?</p>
+                {/* Três casos diferentes que antes viviam num checkbox só: cobrar
+                    na porta não é a mesma coisa que conferir o Pix DA LOJA — no
+                    segundo o dinheiro nem passa pela mão do motoboy. */}
+                <input type="hidden" name="chargeMode" value={cobranca} />
+                <div className="space-y-2">
+                    {CHARGE_MODES.map((modo) => (
+                        <label
+                            key={modo}
+                            className={`flex items-start gap-3 p-3 min-h-11 rounded-lg border cursor-pointer transition-colors ${cobranca === modo ? "border-green-500 bg-green-500/10" : "border-zinc-600 hover:bg-zinc-700/60"}`}
+                        >
+                            <input
+                                type="radio"
+                                name="chargeModeRadio"
+                                checked={cobranca === modo}
+                                onChange={() => setCobranca(modo)}
+                                className="mt-0.5 w-5 h-5 accent-green-600"
+                            />
+                            <span>
+                                <span className="block text-sm font-medium text-white">
+                                    {modo === "receber" ? "💵 " : modo === "conferir" ? "🔎 " : "✅ "}
+                                    {CHARGE_MODE_LABEL[modo]}
+                                </span>
+                                <span className="block text-xs text-zinc-400">{CHARGE_MODE_AJUDA[modo]}</span>
+                            </span>
+                        </label>
+                    ))}
+                </div>
 
-                {collect && (
+                {pedeValor && (
                     <>
                         <div>
-                            <label className="block text-xs text-zinc-400 mb-1">Quanto receber (R$)</label>
+                            <label htmlFor="valor-cobranca" className="block text-xs text-zinc-400 mb-1">
+                                {cobranca === "conferir" ? "Valor do Pix (R$)" : "Quanto receber (R$)"}
+                            </label>
                             <input
+                                id="valor-cobranca"
                                 name="value"
                                 defaultValue={money(draft.value)}
                                 inputMode="decimal"
@@ -271,15 +309,35 @@ export default function DraftConfirmForm({
                         {hidesValueFromMotoboy && (
                             <p className="text-xs text-yellow-300">
                                 Atenção: nas configurações da loja o valor do pedido está escondido do motoboy —
-                                ele não vai ver quanto cobrar. Escreva na observação ou ligue &quot;mostrar valor&quot; em Configurações.
+                                ele não vai ver quanto {cobranca === "conferir" ? "conferir" : "cobrar"}. Escreva na observação ou ligue &quot;mostrar valor&quot; em Configurações.
                             </p>
                         )}
                     </>
                 )}
-                {!collect && (
-                    <p className="text-xs text-zinc-400">Desmarcado = pedido já pago, o motoboy só entrega.</p>
-                )}
             </div>
+
+            {motoboys.length > 0 && (
+                <div>
+                    <label htmlFor="motoboy-destino" className="block text-sm font-medium text-zinc-300 mb-2">
+                        Motoboy (opcional)
+                    </label>
+                    <select
+                        id="motoboy-destino"
+                        name="motoboyId"
+                        value={motoboyId}
+                        onChange={(e) => setMotoboyId(e.target.value)}
+                        className="w-full px-3 py-2.5 min-h-11 rounded-lg border border-zinc-600 bg-zinc-700 text-white outline-none focus:border-green-500"
+                    >
+                        <option value="">Deixar na fila (qualquer motoboy pega)</option>
+                        {motoboys.map((m) => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-zinc-500 mt-1">
+                        Escolhendo alguém, só ele recebe o aviso e a corrida já sai no nome dele.
+                    </p>
+                </div>
+            )}
 
             <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Taxa da corrida (R$)</label>

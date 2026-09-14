@@ -2,7 +2,7 @@
 
 import { updateSettingsAction } from "@/app/actions/settings";
 import { useActionState, useState } from "react";
-import { CheckCircle, Save, HelpCircle, DollarSign, Eye, EyeOff, MapPin, Crosshair, Loader2 } from "lucide-react";
+import { CheckCircle, Save, HelpCircle, DollarSign, Eye, EyeOff, MapPin, Crosshair, Loader2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -26,8 +26,27 @@ interface SettingsFormProps {
         defaultState?: string | null;
         shopLat?: number | null;
         shopLng?: number | null;
+        poolMode?: "aberta" | "equipe" | null;
     } | null;
 }
+
+/**
+ * Quem enxerga a fila desta loja. O padrão é FECHADO ("equipe") — era aberto
+ * pra todo mundo e o dono pediu o contrário: loja que quiser ajuda de fora
+ * liga "fila aberta".
+ */
+const POOL_MODES = [
+    {
+        id: "equipe" as const,
+        label: "Só minha equipe",
+        desc: "Apenas os motoboys cadastrados na minha loja veem e podem aceitar.",
+    },
+    {
+        id: "aberta" as const,
+        label: "Fila aberta",
+        desc: "Qualquer motoboy cadastrado no app vê e pode aceitar.",
+    },
+];
 
 const PRIVACY_FIELDS = [
     { key: "showCustomerName", label: "Nome do cliente", desc: "Aparece como cabeçalho de cada entrega.", default: true },
@@ -60,6 +79,11 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
     );
     const [locating, setLocating] = useState(false);
     const [locateError, setLocateError] = useState<string | null>(null);
+
+    // Loja sem configuração salva ainda cai no padrão fechado, igual ao servidor.
+    const [poolMode, setPoolMode] = useState<"aberta" | "equipe">(
+        initialData?.poolMode === "aberta" ? "aberta" : "equipe"
+    );
 
     const captureLocation = () => {
         setLocateError(null);
@@ -311,6 +335,51 @@ export default function SettingsForm({ initialData }: SettingsFormProps) {
                         </a>
                     )}
                 </div>
+            </div>
+
+            {/* Quem vê as corridas desta loja */}
+            <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="p-2 bg-indigo-600 rounded-lg">
+                        <Users size={20} className="text-white" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-white">Quem vê minhas corridas</h2>
+                        <p className="text-sm text-zinc-400">
+                            Vale pra fila. Corrida que você destinar a alguém sempre chega nele.
+                        </p>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    {POOL_MODES.map((m) => (
+                        <label
+                            key={m.id}
+                            className={cn(
+                                "flex items-start gap-3 p-3 min-h-11 rounded-lg border cursor-pointer transition-colors",
+                                poolMode === m.id
+                                    ? "border-green-500 bg-green-500/10"
+                                    : "border-zinc-700 bg-zinc-900/40 hover:bg-zinc-900/70",
+                            )}
+                        >
+                            <input
+                                type="radio"
+                                name="poolMode"
+                                value={m.id}
+                                checked={poolMode === m.id}
+                                onChange={() => setPoolMode(m.id)}
+                                className="mt-1 w-5 h-5 accent-green-600"
+                            />
+                            <div className="flex-1 min-w-0">
+                                <div className="text-white text-sm font-medium">{m.label}</div>
+                                <div className="text-zinc-500 text-xs">{m.desc}</div>
+                            </div>
+                        </label>
+                    ))}
+                </div>
+                <p className="text-xs text-zinc-500 mt-3">
+                    Motoboy sem loja no cadastro não entra em &quot;só minha equipe&quot;.
+                </p>
             </div>
 
             {/* Privacidade do Motoboy */}

@@ -66,6 +66,10 @@ export default async function ConfirmarPeloPdvPage({ params }: { params: Promise
             </header>
 
             <main className="max-w-3xl mx-auto p-4">
+                {/* Onde a loja fica vai pra esta tela de propósito: ela é o PDV DA
+                    PRÓPRIA LOJA conferindo uma venda dela, autorizado pelo código de
+                    uso único daquela corrida. Mostrar o pino da loja pra ela mesma não
+                    é vazamento — e é a referência pro caixa arrastar o pino do cliente. */}
                 <DraftConfirmForm
                     draft={{
                         id: draft.id,
@@ -79,6 +83,7 @@ export default async function ConfirmarPeloPdvPage({ params }: { params: Promise
                         observation: draft.observation,
                         createdAt: draft.createdAt,
                         geoPrecision: draft.geoPrecision,
+                        chargeMode: draft.chargeMode,
                     }}
                     shopLat={settings?.shopLat ?? null}
                     shopLng={settings?.shopLng ?? null}

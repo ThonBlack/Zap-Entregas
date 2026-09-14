@@ -4,10 +4,12 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { getMotoboyLocationAction } from "@/app/actions/tracking";
+import { carregarLocalDoMotoboy } from "@/lib/motoboyLocation";
 import TrackingMapWrapper from "@/components/map/TrackingMapWrapper";
 import { getBrowserMapsKey } from "@/lib/mapsKey";
 import AutoRefresh from "@/components/shared/AutoRefresh";
+import { chargeModeDaCorrida } from "@/lib/chargeMode";
+import { formatBRL } from "@/lib/wallet-shared";
 
 export const metadata = { title: "Rastreio do pedido · Zap Entregas" };
 
@@ -42,10 +44,15 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
 
     if (!delivery) notFound();
 
+    // Esta página é PÚBLICA (quem tem o link tem o pedido). O que ela pode
+    // mostrar é o caminho do motoboy e o destino — nunca onde a loja fica:
+    // o endereço físico do negócio não tem por que viajar pro celular do
+    // cliente. Por isso aqui não se carrega shop_settings, e o mapa recebe só
+    // a posição do motoboy.
     let motoboyLocation = null;
 
     if (delivery.motoboyId) {
-        const result = await getMotoboyLocationAction(delivery.motoboyId);
+        const result = await carregarLocalDoMotoboy(delivery.motoboyId);
         if (result && result.lat && result.lng) {
             motoboyLocation = { lat: result.lat, lng: result.lng };
         }
@@ -54,6 +61,9 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
     // Enquanto o pedido está andando vale atualizar sozinho; entregue/cancelado
     // é estado final e ficar batendo no servidor só gasta dado do cliente.
     const emAndamento = delivery.status !== "delivered" && delivery.status !== "canceled";
+
+    const modoCobranca = chargeModeDaCorrida(delivery);
+    const temValor = delivery.value != null && delivery.value > 0;
 
     return (
         <div className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -121,6 +131,31 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
                                 <div className="font-medium text-zinc-900">{delivery.address}</div>
                             </div>
                         </div>
+
+                        {/* Como o pedido é pago. Enquanto está a caminho isto evita a
+                            cena mais chata da entrega: o motoboy na porta e o cliente
+                            sem saber se tinha que pagar, e quanto. Pedido já pago não
+                            mostra nada — não há o que avisar. */}
+                        {emAndamento && modoCobranca !== "pago" && (
+                            <div className={`flex items-center gap-3 p-3 rounded-lg border ${modoCobranca === "conferir" ? "bg-sky-50 border-sky-200" : "bg-amber-50 border-amber-200"}`}>
+                                <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center border border-zinc-200 font-bold text-zinc-700">
+                                    {modoCobranca === "conferir" ? "🔎" : "💵"}
+                                </div>
+                                <div>
+                                    <div className="text-xs text-zinc-600">Pagamento</div>
+                                    <div className="font-medium text-zinc-900">
+                                        {modoCobranca === "conferir"
+                                            ? `Pix da loja${temValor ? ` · ${formatBRL(delivery.value!)}` : ""}`
+                                            : `A pagar na entrega${temValor ? ` · ${formatBRL(delivery.value!)}` : ""}`}
+                                    </div>
+                                    <div className="text-xs text-zinc-600">
+                                        {modoCobranca === "conferir"
+                                            ? "O motoboy confere se o Pix caiu antes de entregar."
+                                            : "Combine o troco com a loja se for pagar em dinheiro."}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="mt-6">

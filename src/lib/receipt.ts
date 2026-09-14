@@ -1,4 +1,5 @@
 import { parseMoney } from "@/lib/money";
+import type { ChargeMode } from "@/lib/chargeMode";
 
 /**
  * O que o motoboy respondeu na hora de finalizar a entrega ("recebeu do cliente?").
@@ -23,6 +24,14 @@ const VALOR_MAXIMO = 100000;
 export const AVISO_VALOR_VAZIO =
     'Digite quanto você recebeu. Se não recebeu nada, escolha "Não recebi".';
 
+/**
+ * Corrida "a conferir": marcar como recebida sem dizer COMO é o erro que
+ * bagunça a carteira — PIX da loja não é dinheiro na mão do motoboy, dinheiro
+ * na mão é. São coisas opostas e o servidor precisa saber qual das duas foi.
+ */
+export const AVISO_CONFERIR_SEM_METODO =
+    "Diga o que aconteceu: o Pix da loja caiu ou o cliente te pagou em dinheiro?";
+
 export type RecebimentoValidado = {
     status: (typeof RECEIPT_STATUSES)[number];
     amount: number;
@@ -37,7 +46,12 @@ export type RecebimentoValidado = {
 export function validarRecebimento(
     receipt: DeliveryReceipt,
     /** Valor do pedido, usado quando ele diz "recebi o valor" certinho. */
-    orderValue?: number | null
+    orderValue?: number | null,
+    /**
+     * Tipo de cobrança da corrida. Só aperta a regra — nunca afrouxa — e serve
+     * pra o servidor continuar sendo a régua única mesmo com telas diferentes.
+     */
+    chargeMode?: ChargeMode | null,
 ): { error: string } | RecebimentoValidado {
     if (!RECEIPT_STATUSES.includes(receipt.status)) {
         return { error: "Status de recebimento inválido." };
@@ -69,7 +83,14 @@ export function validarRecebimento(
     }
 
     if (!receipt.method || !RECEIPT_METHODS.includes(receipt.method)) {
-        return { error: "Informe como recebeu (dinheiro, PIX ou cartão)." };
+        // Na corrida "a conferir" a pergunta é outra (PIX da loja × dinheiro na
+        // mão), e são justamente essas duas que mexem na carteira de jeitos
+        // opostos — por isso a frase muda.
+        return {
+            error: chargeMode === "conferir"
+                ? AVISO_CONFERIR_SEM_METODO
+                : "Informe como recebeu (dinheiro, PIX ou cartão).",
+        };
     }
 
     return { status: receipt.status, amount, method: receipt.method, note };

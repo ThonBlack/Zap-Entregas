@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { geocodeAddress, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUserWithRole } from "@/lib/session";
 import { parseMoney } from "@/lib/money";
+import { normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
 
 type ActionResult = { error: string } | { success: true };
 
@@ -52,8 +53,12 @@ export async function updatePendingDeliveryAction(formData: FormData): Promise<A
     const address = (formData.get("address") as string)?.trim();
     if (!address) return { error: "Endereço obrigatório." };
 
-    const shouldCollect = formData.get("collect") === "on";
-    const value = shouldCollect ? lerDinheiro(formData.get("value")) : 0;
+    // Mesma régua da conferência do rascunho (drafts.ts): "Já pago" zera o valor.
+    // Formulário antigo (sem o campo) cai no checkbox "collect" de antes.
+    const chargeMode: ChargeMode = formData.has("chargeMode")
+        ? normalizarChargeMode(formData.get("chargeMode"), null)
+        : (formData.get("collect") === "on" ? "receber" : "pago");
+    const value = chargeMode === "pago" ? 0 : lerDinheiro(formData.get("value"));
     const fee = lerDinheiro(formData.get("fee"));
     if (value === null) return { error: "Valor a receber inválido. Escreva assim: 12,50" };
     if (fee === null) return { error: "Taxa da corrida inválida. Escreva assim: 12,50" };
@@ -104,6 +109,7 @@ export async function updatePendingDeliveryAction(formData: FormData): Promise<A
     const updated = await db.update(deliveries)
         .set({
             address, lat, lng, value, fee, customerName, customerPhone, observation,
+            chargeMode,
             geoPrecision,
             updatedAt: new Date().toISOString(),
         })

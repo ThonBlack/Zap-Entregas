@@ -1,10 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { createRouteAction } from "../../actions/routes";
+import { listarMotoboysDaEquipeAction } from "../../actions/logistics";
 import { Plus, Trash, User, DollarSign, ArrowLeft, Loader2, Package } from "lucide-react";
 import Link from "next/link";
 import AddressAutocomplete from "@/components/map/AddressAutocomplete";
+import { CHARGE_MODES, CHARGE_MODE_AJUDA, CHARGE_MODE_LABEL, type ChargeMode } from "@/lib/chargeMode";
 
 const initialState = {
     message: "",
@@ -14,9 +16,23 @@ const initialState = {
 export default function NewRoutePage() {
     const [items, setItems] = useState([{ id: 1 }]);
     const [state, formAction, isPending] = useActionState(createRouteAction, initialState);
+    /** Tipo de cobrança por parada (chave = id do item na tela). */
+    const [cobrancas, setCobrancas] = useState<Record<number, ChargeMode>>({ 1: "receber" });
+    /** Equipe da loja, pra já destinar a rota a alguém. Vazia = só fila aberta. */
+    const [motoboys, setMotoboys] = useState<{ id: number; name: string }[]>([]);
+
+    // A lista vem do servidor (motoboyScope): esta página é toda client-side,
+    // então é aqui que ela é buscada. Falhou? O campo some e a rota vai pra fila.
+    useEffect(() => {
+        listarMotoboysDaEquipeAction()
+            .then((r) => { if (!("error" in r)) setMotoboys(r.motoboys); })
+            .catch(() => { });
+    }, []);
 
     const addItem = () => {
-        setItems([...items, { id: Date.now() }]);
+        const id = Date.now();
+        setItems([...items, { id }]);
+        setCobrancas(c => ({ ...c, [id]: "receber" }));
     };
 
     const removeItem = (id: number) => {
@@ -76,9 +92,34 @@ export default function NewRoutePage() {
                                                 type="text"
                                                 inputMode="decimal"
                                                 placeholder="0,00"
-                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-zinc-600 bg-zinc-700 text-white placeholder-zinc-500 focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
+                                                // readOnly (e não disabled): campo desabilitado não
+                                                // é enviado, e o servidor lê os valores POR ÍNDICE —
+                                                // faltar um embaralharia o valor de todas as paradas.
+                                                readOnly={cobrancas[item.id] === "pago"}
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-zinc-600 bg-zinc-700 text-white placeholder-zinc-500 focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all read-only:opacity-40"
                                             />
                                         </div>
+                                    </div>
+
+                                    {/* Tipo de cobrança, um por parada. Vai em paralelo com
+                                        os outros campos (o servidor lê pelo índice). */}
+                                    <div className="md:col-span-2">
+                                        <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">
+                                            Como é pago
+                                        </label>
+                                        <select
+                                            name="chargeMode"
+                                            value={cobrancas[item.id] ?? "receber"}
+                                            onChange={(e) => setCobrancas(c => ({ ...c, [item.id]: e.target.value as ChargeMode }))}
+                                            className="w-full px-4 py-2.5 min-h-11 rounded-lg border border-zinc-600 bg-zinc-700 text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
+                                        >
+                                            {CHARGE_MODES.map(m => (
+                                                <option key={m} value={m}>{CHARGE_MODE_LABEL[m]}</option>
+                                            ))}
+                                        </select>
+                                        <p className="text-xs text-zinc-500 mt-1">
+                                            {CHARGE_MODE_AJUDA[cobrancas[item.id] ?? "receber"]}
+                                        </p>
                                     </div>
 
                                     <div className="md:col-span-2 relative">
@@ -119,6 +160,28 @@ export default function NewRoutePage() {
                             </div>
                         ))}
                     </div>
+
+                    {motoboys.length > 0 && (
+                        <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
+                            <label htmlFor="motoboy-da-rota" className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">
+                                Motoboy (opcional)
+                            </label>
+                            <select
+                                id="motoboy-da-rota"
+                                name="motoboyId"
+                                defaultValue=""
+                                className="w-full px-4 py-2.5 min-h-11 rounded-lg border border-zinc-600 bg-zinc-700 text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
+                            >
+                                <option value="">Deixar na fila (qualquer motoboy pega)</option>
+                                {motoboys.map(m => (
+                                    <option key={m.id} value={m.id}>{m.name}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-zinc-500 mt-1">
+                                Escolhendo alguém, só ele recebe o aviso e as corridas já saem no nome dele.
+                            </p>
+                        </div>
+                    )}
 
                     {state?.error && (
                         <div className="bg-red-900/50 text-red-400 p-4 rounded-xl border border-red-700 text-center">

@@ -37,6 +37,14 @@ export type EntradaDoFechamento = {
     recibo: ReciboDaEntrega;
     /** De quais status a corrida pode sair (varia por papel de quem clicou). */
     statusAbertos: StatusAberto[];
+    /**
+     * A loja finalizou uma corrida que ninguém tinha aceitado e escolheu o
+     * motoboy na hora: além de lançar na carteira dele, a corrida passa a ser
+     * dele no banco. Sem isto a entrega ficava órfã no histórico e o resumo do
+     * dia (que filtra por motoboy_id) não achava a corrida que já tinha gerado
+     * crédito e débito.
+     */
+    atribuirMotoboyId?: number | null;
 };
 
 export type ResultadoDoFechamento =
@@ -60,9 +68,12 @@ export function ehLancamentoRepetido(e: unknown): boolean {
  */
 export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoFechamento {
     const {
-        deliveryId: id, motoboyId, shopkeeperId, customerName, fee, recibo, statusAbertos,
+        deliveryId: id, shopkeeperId, customerName, fee, recibo, statusAbertos, atribuirMotoboyId,
     } = entrada;
     const agora = new Date().toISOString();
+    // Quem vai receber crédito/débito: o motoboy escolhido pela loja na hora de
+    // finalizar tem prioridade sobre o que estava (ou não estava) na corrida.
+    const motoboyId = atribuirMotoboyId ?? entrada.motoboyId;
 
     return db.transaction((tx): ResultadoDoFechamento => {
         const atual = tx
@@ -79,6 +90,9 @@ export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoF
             .set({
                 status: "delivered",
                 fee,
+                // Só mexe no dono quando a loja escolheu alguém — `undefined` não
+                // entra no UPDATE do Drizzle, então a corrida do motoboy fica como está.
+                ...(atribuirMotoboyId != null ? { motoboyId: atribuirMotoboyId } : {}),
                 receiptStatus: recibo.receiptStatus,
                 receivedAmount: recibo.receivedAmount,
                 receivedMethod: recibo.receivedMethod,
