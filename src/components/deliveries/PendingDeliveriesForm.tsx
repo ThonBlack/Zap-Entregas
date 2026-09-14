@@ -7,6 +7,7 @@ import Link from "next/link";
 import { optimizeSelectedRouteAction } from "@/app/actions/logistics";
 import type { DeliveryReceipt } from "@/lib/receipt";
 import { chargeModeDaCorrida, rotuloCobranca, tomCobranca } from "@/lib/chargeMode";
+import { rotuloCorrida } from "@/lib/dailySeq-shared";
 import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import CompleteDeliveryModal from "@/components/deliveries/CompleteDeliveryModal";
 import RefreshButton from "@/components/shared/RefreshButton";
@@ -34,6 +35,8 @@ interface Delivery {
     lng: number | null;
     status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'canceled';
     motoboyId: number | null;
+    /** "Corrida N" do dia (por loja). Ausente em corrida antiga: o rótulo some. */
+    dailySeq?: number | null;
     /** "receber" | "conferir" | "pago". Ausente = corrida antiga (cai na régua do valor). */
     chargeMode?: string | null;
     /** Nome de quem está com a corrida — só a loja recebe isto. */
@@ -544,7 +547,16 @@ export default function PendingDeliveriesForm({
                                                                     delivery.status === 'canceled' ? '✖ Cancelada' : ''}
                                                     </span>
                                                 )}
-                                                <span className="text-zinc-400 text-xs font-mono">#{delivery.id}</span>
+                                                {/* "Corrida 7" é como a loja chama a corrida no
+                                                    grupo de WhatsApp. Corrida antiga (sem número)
+                                                    continua mostrando o id do banco. */}
+                                                {rotuloCorrida(delivery.dailySeq) ? (
+                                                    <span className="px-2 py-1 text-xs font-bold rounded bg-green-600 text-white">
+                                                        {rotuloCorrida(delivery.dailySeq)}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-zinc-400 text-xs font-mono">#{delivery.id}</span>
+                                                )}
                                             </div>
                                         </div>
                                         <p className="text-zinc-300 text-sm mb-1 break-words">

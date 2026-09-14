@@ -1,4 +1,5 @@
 import { parseBrazilianAddress } from "@/lib/addressParser";
+import { rotuloCorrida } from "@/lib/dailySeq-shared";
 
 /**
  * O que um motoboy de OUTRA loja pode ver de uma corrida ainda não aceita.
@@ -98,4 +99,25 @@ export function avisoDeCorridaNova(endereco: string | null | undefined): string 
     return resumo === "Endereço aparece quando você aceitar"
         ? "Abra o app pra ver os detalhes"
         : `Nova corrida em ${resumo}`;
+}
+
+/**
+ * O mesmo aviso, começando pelo "Corrida N" do dia: "Corrida 7 · Centro ·
+ * Uberaba". É assim que a loja anuncia no grupo, então é assim que o push fala.
+ *
+ * A privacidade não muda: continua saindo só o bairro e a cidade. Corrida sem
+ * número (rascunho liberado por versão antiga, linha antiga) cai no aviso de
+ * sempre — o rótulo simplesmente não aparece.
+ */
+export function avisoDeCorridaNovaComNumero(
+    dailySeq: number | null | undefined,
+    endereco: string | null | undefined,
+): string {
+    const rotulo = rotuloCorrida(dailySeq);
+    if (!rotulo) return avisoDeCorridaNova(endereco);
+
+    const resumo = resumoDoLocal(endereco);
+    return resumo === "Endereço aparece quando você aceitar"
+        ? `${rotulo} · abra o app pra ver os detalhes`
+        : `${rotulo} · ${resumo}`;
 }

@@ -359,6 +359,9 @@ export async function POST(request: NextRequest) {
                 geoPrecision: null,
                 externalId,
                 // Nasce rascunho: o lojista/admin confere endereço no mapa e libera pros motoboys.
+                // Por isso NÃO ganha "Corrida N" aqui: rascunho ainda não é corrida, e
+                // reservar um número que o lojista pode cancelar deixaria buraco na
+                // contagem do dia. O número sai na liberação (src/app/actions/drafts.ts).
                 status: "draft",
                 publicToken: newTrackingToken(),
                 confirmToken: newConfirmToken(),

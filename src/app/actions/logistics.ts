@@ -17,7 +17,8 @@ import { parseMoney } from "@/lib/money";
 import { calcularTaxa, distanciaDaLoja } from "@/lib/fee";
 import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
 import { logServerError } from "@/lib/serverLog";
-import { avisoDeCorridaNova, resumoDoLocal } from "@/lib/deliveryPrivacy";
+import { avisoDeCorridaNovaComNumero, resumoDoLocal } from "@/lib/deliveryPrivacy";
+import { proximoNumeroDoDia } from "@/lib/dailySeq";
 import { linkRota as montarLinkRota } from "@/lib/mapsLink";
 import { montarNotaJustificada, motivoValido, AVISO_MOTIVO_CURTO } from "@/lib/geofence";
 import { absoluteUrl } from "@/lib/appUrl";
@@ -112,8 +113,11 @@ export async function addDeliveryAction(formData: FormData) {
     }
 
     const agora = new Date().toISOString();
-    const criada = await db.insert(deliveries).values({
+    // O "Corrida N" do dia e o INSERT na MESMA transação: dois pedidos entrando
+    // ao mesmo tempo não podem receber o mesmo número (ver src/lib/dailySeq.ts).
+    const criada = db.transaction((tx) => tx.insert(deliveries).values({
         shopkeeperId: me.id,
+        dailySeq: proximoNumeroDoDia(tx, me.id, agora),
         // Destinada a alguém já nasce "aceita": o motoboy não precisa disputar
         // no pool uma corrida que a loja já deu pra ele.
         motoboyId: destinatario?.id ?? null,
@@ -135,21 +139,23 @@ export async function addDeliveryAction(formData: FormData) {
         // e as duas formas juntas quebravam comparação e ordenação.
         createdAt: agora,
         updatedAt: agora,
-    }).returning({ id: deliveries.id }).get();
+    }).returning({ id: deliveries.id, dailySeq: deliveries.dailySeq }).get());
 
     // Fire-and-forget: push fora do ar não pode travar o cadastro.
     // Endereço com número é dado pessoal do cliente saindo do app pra um
     // aparelho que a loja não controla — nos dois casos vai só o bairro.
     if (destinatario) {
         // Corrida com dono não vira anúncio: só o escolhido é avisado.
-        pushDeCorridaDestinada(destinatario.id, criada.id, resumoDoLocal(address), me.name)
+        pushDeCorridaDestinada(destinatario.id, criada.id, resumoDoLocal(address), me.name, criada.dailySeq)
             .catch(() => { });
     } else {
         // Só quem pode VER essa corrida é avisado: loja no modo "equipe" não
         // anuncia pro app inteiro (regra única em src/lib/team.ts).
         pushDeCorridaNova(me.id, {
             title: "🏍️ Nova Corrida Disponível!",
-            body: avisoDeCorridaNova(address),
+            // "Corrida 7 · Centro · Uberaba" — o número é como a loja chama a
+            // corrida no grupo; o bairro é o máximo que pode sair no push.
+            body: avisoDeCorridaNovaComNumero(criada.dailySeq, address),
             url: "/app",
             tag: "nova-corrida",
         }).catch(() => { });

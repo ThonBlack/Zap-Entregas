@@ -77,6 +77,13 @@ export const deliveries = sqliteTable("deliveries", {
     confirmToken: text("confirm_token").unique(),
     confirmTokenExpiresAt: text("confirm_token_expires_at"),
     stopOrder: integer("stop_order"), // Ordem da entrega na rota (1, 2, 3...)
+    // "Corrida 1, 2, 3…" do dia, POR LOJA — o mesmo costume do grupo de WhatsApp,
+    // onde cada corrida do dia é anunciada pelo número. Recomeça do 1 a cada dia
+    // de Brasília e é atribuído quando a corrida NASCE (ou quando o rascunho é
+    // liberado). Rascunho (`draft`) fica sem número: ainda não é corrida.
+    // NULL = corrida antiga sem contador ou rascunho — a tela simplesmente não
+    // mostra o rótulo. Coluna e backfill em scripts/utils/add_daily_seq_column.js.
+    dailySeq: integer("daily_seq"),
     acceptedAt: text("accepted_at"), // Quando motoboy aceitou
     pickedUpAt: text("picked_up_at"), // Quando saiu da loja
     deliveredAt: text("delivered_at"), // Quando entregou

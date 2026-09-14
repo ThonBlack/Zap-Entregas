@@ -11,7 +11,9 @@ import { newTrackingToken } from "@/lib/trackingToken";
 import { pushDeCorridaNova, pushDeCorridaDestinada } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
 import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
-import { avisoDeCorridaNova, resumoDoLocal } from "@/lib/deliveryPrivacy";
+import { avisoDeCorridaNovaComNumero, resumoDoLocal } from "@/lib/deliveryPrivacy";
+import { sequenciaDoDia } from "@/lib/dailySeq";
+import { faixaDeCorridas } from "@/lib/dailySeq-shared";
 import { carregarMotoboyGerenciado } from "@/lib/team";
 import { normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
 
@@ -149,8 +151,20 @@ export async function createRouteAction(prevState: any, formData: FormData) {
         newDeliveries.push(montar(p.index, optimizedPath.length + i + 1, 0, 0));
     });
 
-    const criadas = await db.insert(deliveries).values(newDeliveries)
-        .returning({ id: deliveries.id });
+    // "Corrida 7, 8, 9": os números saem seguidos, na ordem em que as paradas
+    // entram no banco, e no MESMO fôlego do INSERT — outra rota chegando junto
+    // não pode repetir número (ver src/lib/dailySeq.ts).
+    const criadas = db.transaction((tx) => {
+        const numeros = sequenciaDoDia(tx, me.id, agora, newDeliveries.length);
+        const comNumero = newDeliveries.map((d, i) => ({ ...d, dailySeq: numeros[i] }));
+        return tx.insert(deliveries).values(comNumero)
+            .returning({ id: deliveries.id, dailySeq: deliveries.dailySeq })
+            .all();
+    });
+
+    // Pro texto do push: o número da primeira e o da última parada.
+    const primeiroNumero = criadas[0]?.dailySeq ?? null;
+    const ultimoNumero = criadas[criadas.length - 1]?.dailySeq ?? null;
 
     if (destinatario) {
         // Corrida com dono não vira anúncio pro pool: só o escolhido é avisado,
@@ -159,19 +173,23 @@ export async function createRouteAction(prevState: any, formData: FormData) {
             destinatario.id,
             criadas[0]?.id ?? 0,
             newDeliveries.length > 1
-                ? `${newDeliveries.length} entregas pra você`
+                ? `${faixaDeCorridas(primeiroNumero, ultimoNumero) ?? `${newDeliveries.length} entregas`} pra você`
                 : resumoDoLocal(newDeliveries[0].address),
             me.name,
+            // Rota de uma parada só tem um número; com várias, a faixa já foi
+            // pro corpo do push e o título fica sem número.
+            newDeliveries.length > 1 ? null : primeiroNumero,
         ).catch(() => { });
     } else {
         // Só quem pode VER essas corridas é avisado (regra única em team.ts).
         pushDeCorridaNova(me.id, {
             title: newDeliveries.length > 1 ? "🔥 Várias Corridas Novas!" : "🏍️ Nova Corrida Disponível!",
             body: newDeliveries.length > 1
-                ? `${newDeliveries.length} entregas aguardando`
+                ? [faixaDeCorridas(primeiroNumero, ultimoNumero), `${newDeliveries.length} entregas aguardando`]
+                    .filter(Boolean).join(" · ")
                 // Endereço cru no push é dado pessoal do cliente saindo pro
                 // celular de motoboy de qualquer loja — vai só o bairro.
-                : avisoDeCorridaNova(newDeliveries[0].address),
+                : avisoDeCorridaNovaComNumero(primeiroNumero, newDeliveries[0].address),
             url: "/app",
             tag: "nova-corrida",
         }).catch(() => { });
