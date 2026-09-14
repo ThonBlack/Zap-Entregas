@@ -12,6 +12,7 @@ import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, ShieldCheck } from "lucid
 import { fmtDateTime, hojeBrasilia } from "@/lib/datetime";
 import { formatBRL, parseMonth } from "@/lib/wallet-shared";
 import { chargeModeDaCorrida, rotuloCobranca } from "@/lib/chargeMode";
+import { rotuloCorrida } from "@/lib/dailySeq-shared";
 import CorrigirRecebimento from "@/components/deliveries/CorrigirRecebimento";
 
 const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -176,6 +177,14 @@ export default async function HistoryPage({
                                     <span className="px-2 py-1 bg-green-600 text-white text-xs font-bold uppercase rounded-full">
                                         Entregue
                                     </span>
+                                    {/* "Corrida 7" do dia — é por esse número que a loja
+                                        procura a corrida no grupo de WhatsApp. Corrida
+                                        antiga (sem número) não mostra nada. */}
+                                    {rotuloCorrida(item.dailySeq) && (
+                                        <span className="px-2 py-1 bg-green-700 text-white text-xs font-bold rounded-full">
+                                            {rotuloCorrida(item.dailySeq)}
+                                        </span>
+                                    )}
                                     <span className="text-zinc-400 text-xs">
                                         {fmtDateTime(item.deliveredAt || item.updatedAt)}
                                     </span>

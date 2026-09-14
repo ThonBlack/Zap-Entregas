@@ -12,6 +12,7 @@ import { parseMoney } from "@/lib/money";
 import { pushToUser } from "@/lib/push";
 import { ehDiaISO, fmtDiaCurto } from "@/lib/datetime";
 import { formatBRL } from "@/lib/wallet-shared";
+import { nomeDaCorridaNoExtrato } from "@/lib/dailySeq-shared";
 import { logServerError } from "@/lib/serverLog";
 
 /**
@@ -114,6 +115,9 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
 
     const agora = new Date().toISOString();
     const motoboyId = delivery.motoboyId;
+    // No extrato a corrida atende pelo número do dia ("Corrida 7 do dia 14/09"),
+    // que é como a loja fala dela. Corrida antiga, sem número, cai no "#id".
+    const nomeDaCorrida = nomeDaCorridaNoExtrato(id, delivery.dailySeq, delivery.createdAt);
     // Fechamento já enviado (aguardando o motoboy): a correção NÃO reenvia
     // sozinha — a loja decide quando reenviar — mas marcamos que os totais
     // congelados ficaram pra trás, pra UI avisar.
@@ -153,7 +157,7 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
                 .get();
 
             if (fee > 0) {
-                const descricao = `Corrida #${id} - ${delivery.customerName || "Cliente"}`;
+                const descricao = `${nomeDaCorrida} - ${delivery.customerName || "Cliente"}`;
                 if (credito) {
                     tx.update(transactions)
                         .set({ amount: fee, kind: "corrida", userId: motoboyId, description: descricao, status: "confirmed" })
@@ -188,7 +192,7 @@ export async function adjustDeliveryReceiptAction(input: AdjustReceiptInput): Pr
 
             const dinheiro = receivedMethod === "dinheiro" ? receivedAmount : 0;
             if (dinheiro > 0) {
-                const descricao = `Recebido do cliente em dinheiro - Corrida #${id}`;
+                const descricao = `Recebido do cliente em dinheiro - ${nomeDaCorrida}`;
                 if (debito) {
                     tx.update(transactions)
                         .set({ amount: dinheiro, kind: "dinheiro", userId: motoboyId, description: descricao, status: "confirmed" })

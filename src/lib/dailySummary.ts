@@ -19,6 +19,8 @@ import { and, eq, sql } from "drizzle-orm";
 /** Uma corrida do dia, do jeito que aparece na conferência. */
 export type DailySummaryLine = {
     id: number;
+    /** "Corrida N" do dia (por loja). NULL em corrida antiga, sem contador. */
+    dailySeq: number | null;
     deliveredAt: string | null;
     customerName: string | null;
     address: string;
@@ -78,6 +80,7 @@ export async function getDailySummary(
     const rows = await db
         .select({
             id: deliveries.id,
+            dailySeq: deliveries.dailySeq,
             deliveredAt: deliveries.deliveredAt,
             customerName: deliveries.customerName,
             address: deliveries.address,
@@ -131,6 +134,7 @@ export async function getDailySummary(
         }
         return {
             id: r.id,
+            dailySeq: r.dailySeq ?? null,
             deliveredAt: r.deliveredAt,
             customerName: r.customerName,
             address: r.address,

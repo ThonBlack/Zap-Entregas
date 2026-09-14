@@ -70,6 +70,7 @@ const ORDEM = [
     { arquivo: "add_charge_mode_column.js" },
     { arquivo: "add_pool_mode_column.js" },
     { arquivo: "add_shop_address_column.js" },
+    { arquivo: "add_daily_seq_column.js" },
 
     // --- índices, trava do crédito e datas num formato só ---
     { arquivo: "add_deliveries_indexes.js" },

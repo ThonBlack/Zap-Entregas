@@ -10,6 +10,7 @@ import { getBrowserMapsKey } from "@/lib/mapsKey";
 import AutoRefresh from "@/components/shared/AutoRefresh";
 import { chargeModeDaCorrida } from "@/lib/chargeMode";
 import { formatBRL } from "@/lib/wallet-shared";
+import { rotuloCorrida } from "@/lib/dailySeq-shared";
 
 export const metadata = { title: "Rastreio do pedido · Zap Entregas" };
 
@@ -70,7 +71,15 @@ export default async function TrackingPage({ params }: { params: Promise<{ id: s
             {emAndamento && <AutoRefresh segundos={20} />}
             <header className="bg-white p-4 shadow-sm flex items-center gap-4">
                 <div className="font-bold text-lg text-green-600">Zap Entregas</div>
-                <div className="text-sm text-zinc-600">Rastreio de Pedido #{delivery.id}</div>
+                {/* O número do dia é o que a loja usa pra falar do pedido ("a
+                    Corrida 7 já saiu?"). É só um contador: não diz nada sobre o
+                    cliente nem sobre o movimento da loja, então pode aparecer
+                    nesta página, que é pública. Pedido antigo cai no id. */}
+                <div className="text-sm text-zinc-600">
+                    {rotuloCorrida(delivery.dailySeq)
+                        ? `Rastreio · ${rotuloCorrida(delivery.dailySeq)}`
+                        : `Rastreio de Pedido #${delivery.id}`}
+                </div>
             </header>
 
             <main className="max-w-lg mx-auto p-4 space-y-4">

@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { deliveries, transactions } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
+import { nomeDaCorridaNoExtrato } from "@/lib/dailySeq-shared";
 
 /**
  * Fechamento de uma corrida no banco: marca "entregue" e lança o dinheiro.
@@ -77,13 +78,21 @@ export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoF
 
     return db.transaction((tx): ResultadoDoFechamento => {
         const atual = tx
-            .select({ status: deliveries.status })
+            .select({
+                status: deliveries.status,
+                // Pro nome que vai no extrato: "Corrida 7 do dia 14/09" é o que
+                // a pessoa reconhece; o "#135" é id de banco.
+                dailySeq: deliveries.dailySeq,
+                createdAt: deliveries.createdAt,
+            })
             .from(deliveries)
             .where(eq(deliveries.id, id))
             .get();
 
         if (!atual) return { ok: false, erro: "Entrega não encontrada." };
         if (atual.status === "delivered") return { ok: true, jaEntregue: true };
+
+        const nomeDaCorrida = nomeDaCorridaNoExtrato(id, atual.dailySeq, atual.createdAt);
 
         const mudou = tx
             .update(deliveries)
@@ -119,7 +128,7 @@ export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoF
                     amount: fee,
                     type: "credit",
                     kind: "corrida",
-                    description: `Corrida #${id} - ${customerName || "Cliente"}`,
+                    description: `${nomeDaCorrida} - ${customerName || "Cliente"}`,
                     relatedDeliveryId: id,
                     creatorId: shopkeeperId,
                     createdAt: agora,
@@ -138,7 +147,7 @@ export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoF
                     amount: dinheiro,
                     type: "debit",
                     kind: "dinheiro",
-                    description: `Recebido do cliente em dinheiro - Corrida #${id}`,
+                    description: `Recebido do cliente em dinheiro - ${nomeDaCorrida}`,
                     relatedDeliveryId: id,
                     creatorId: shopkeeperId,
                     createdAt: agora,

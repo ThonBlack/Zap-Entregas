@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { db } from "@/db";
 import { pushSubscriptions, users } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
+import { rotuloCorrida } from "@/lib/dailySeq-shared";
 
 let configured = false;
 function ensureConfigured(): boolean {
@@ -91,9 +92,12 @@ export async function pushDeCorridaDestinada(
     deliveryId: number,
     resumoDoLocal: string,
     nomeDaLoja: string | null,
+    /** "Corrida N" do dia, quando a corrida tem número — é como a loja a chama. */
+    dailySeq?: number | null,
 ): Promise<void> {
+    const rotulo = rotuloCorrida(dailySeq);
     await pushToUser(motoboyId, {
-        title: "🎯 Corrida pra você",
+        title: rotulo ? `🎯 ${rotulo} pra você` : "🎯 Corrida pra você",
         body: nomeDaLoja ? `${nomeDaLoja} · ${resumoDoLocal}` : resumoDoLocal,
         url: "/app",
         tag: `entrega-${deliveryId}`,

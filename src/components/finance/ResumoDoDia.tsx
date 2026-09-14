@@ -12,6 +12,7 @@ import {
 import type { DailySummary, DailySummaryLine } from "@/lib/dailySummary";
 import { formatBRL } from "@/lib/wallet-shared";
 import { fmtTime, fmtDateTime } from "@/lib/datetime";
+import { rotuloCorrida } from "@/lib/dailySeq-shared";
 import {
     RECEIPT_METHOD_LABEL,
     RECEIPT_STATUS_LABEL,
@@ -325,6 +326,13 @@ function LinhaLeitura({
         <div className="p-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
                 <div className="text-sm text-white truncate">
+                    {/* "Corrida 7" na frente: é por esse número que a loja e o
+                        motoboy se entendem sobre qual corrida é qual. */}
+                    {rotuloCorrida(linha.dailySeq) && (
+                        <span className="mr-1.5 px-1.5 py-0.5 text-[11px] font-bold rounded bg-green-600 text-white align-middle">
+                            {rotuloCorrida(linha.dailySeq)}
+                        </span>
+                    )}
                     {linha.customerName || "Cliente"} · {linha.address.split(",")[0]}
                 </div>
                 <div className="text-xs text-zinc-500 truncate">
@@ -346,7 +354,7 @@ function LinhaLeitura({
                     type="button"
                     onClick={onEditar}
                     className="min-h-11 min-w-11 flex items-center justify-center text-zinc-400 hover:text-green-400 rounded-lg hover:bg-zinc-700"
-                    aria-label={`Corrigir corrida ${linha.id}`}
+                    aria-label={`Corrigir ${rotuloCorrida(linha.dailySeq) ?? `corrida ${linha.id}`}`}
                 >
                     <Pencil size={18} />
                 </button>

@@ -9,7 +9,8 @@ import { getAuthUserWithRole } from "@/lib/session";
 import { pushDeCorridaNova, pushDeCorridaDestinada } from "@/lib/push";
 import { parseMoney } from "@/lib/money";
 import { logServerError } from "@/lib/serverLog";
-import { avisoDeCorridaNova, resumoDoLocal } from "@/lib/deliveryPrivacy";
+import { avisoDeCorridaNovaComNumero, resumoDoLocal } from "@/lib/deliveryPrivacy";
+import { proximoNumeroDoDia } from "@/lib/dailySeq";
 import { carregarMotoboyGerenciado } from "@/lib/team";
 import { normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
 
@@ -179,37 +180,58 @@ export async function confirmDraftAction(formData: FormData): Promise<ActionResu
 
     // Condição de corrida: só libera se ainda estiver como rascunho (dois cliques não
     // podem notificar os motoboys duas vezes).
-    const updated = await db.update(deliveries)
-        .set({
-            // Código usado: não serve de novo.
-            confirmToken: null,
-            confirmTokenExpiresAt: null,
-            address, lat, lng, value, fee, customerName, customerPhone, observation,
-            chargeMode,
-            geoPrecision,
-            // Destinada a alguém já nasce "aceita": ele não precisa disputar no
-            // pool uma corrida que a loja deu pra ele.
-            motoboyId: destinatario?.id ?? null,
-            status: destinatario ? "assigned" : "pending",
-            acceptedAt: destinatario ? agora : null,
-            updatedAt: agora,
-        })
-        .where(and(eq(deliveries.id, draft.id), eq(deliveries.status, "draft")))
-        .returning();
+    //
+    // É AQUI que o rascunho ganha o "Corrida N" do dia: enquanto era rascunho
+    // ele não era corrida nenhuma, e ficar com número reservado deixaria buraco
+    // na contagem se o lojista cancelasse. O número sai e o status muda na MESMA
+    // transação — dois cliques simultâneos não geram dois "Corrida 7".
+    const updated = db.transaction((tx) => {
+        const dailySeq = draft.dailySeq ?? proximoNumeroDoDia(
+            tx,
+            draft.shopkeeperId,
+            // O dia é o da CRIAÇÃO da corrida, não o do clique. Rascunho feito
+            // 23h50 e liberado 00h05 é raro, mas se fosse numerado no dia da
+            // liberação ele não entraria na conta de nenhum dos dois dias (a
+            // conta é feita por `created_at`) e o próximo pedido repetiria o
+            // número. Na prática o caixa confere em segundos e os dois dias são
+            // o mesmo.
+            draft.createdAt ?? agora,
+        );
+        return tx.update(deliveries)
+            .set({
+                dailySeq,
+                // Código usado: não serve de novo.
+                confirmToken: null,
+                confirmTokenExpiresAt: null,
+                address, lat, lng, value, fee, customerName, customerPhone, observation,
+                chargeMode,
+                geoPrecision,
+                // Destinada a alguém já nasce "aceita": ele não precisa disputar no
+                // pool uma corrida que a loja deu pra ele.
+                motoboyId: destinatario?.id ?? null,
+                status: destinatario ? "assigned" : "pending",
+                acceptedAt: destinatario ? agora : null,
+                updatedAt: agora,
+            })
+            .where(and(eq(deliveries.id, draft.id), eq(deliveries.status, "draft")))
+            .returning({ id: deliveries.id, dailySeq: deliveries.dailySeq })
+            .all();
+    });
 
     if (!updated.length) return { error: "Essa corrida já foi liberada." };
+    const numeroDoDia = updated[0].dailySeq;
 
     // Endereço com número é dado pessoal do cliente saindo do app pra um
     // aparelho que a loja não controla — nos dois casos vai só o bairro.
     if (destinatario) {
         // Corrida com dono não vira anúncio: só o escolhido é avisado.
-        pushDeCorridaDestinada(destinatario.id, draft.id, resumoDoLocal(address), null)
+        pushDeCorridaDestinada(destinatario.id, draft.id, resumoDoLocal(address), null, numeroDoDia)
             .catch(() => { });
     } else {
         // Só quem pode VER essa corrida é avisado (regra única em team.ts).
         pushDeCorridaNova(draft.shopkeeperId, {
             title: "🏍️ Nova Corrida Disponível!",
-            body: avisoDeCorridaNova(address),
+            body: avisoDeCorridaNovaComNumero(numeroDoDia, address),
             url: "/app",
             tag: "nova-corrida",
         }).catch(() => { });
