@@ -52,6 +52,7 @@ import TrialBanner from "@/components/billing/TrialBanner";
 import FirstRunWrapper from "@/components/shared/FirstRunWrapper";
 import DraftsBanner from "@/components/deliveries/DraftsBanner";
 import FecharODiaCard from "@/components/finance/FecharODiaCard";
+import BotaoRelatorioDoDia from "@/components/finance/BotaoRelatorioDoDia";
 import FechamentoPendente from "@/components/finance/FechamentoPendente";
 import { getBalance } from "@/lib/wallet";
 
@@ -396,6 +397,8 @@ export default async function Dashboard({
             </header>
 
             <main className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
+                {/* Atalho pedido pelo dono: o relatório do dia fica logo no alto. */}
+                {isShopkeeperOrAdmin && <BotaoRelatorioDoDia />}
                 <TrialBanner trialEndsAt={user.trialEndsAt ?? null} isTrialUser={user.isTrialUser ?? false} />
                 <FirstRunWrapper userId={user.id} semDigital={semDigital} />
                 <PendingConfirmations confirmations={pendingConfirmations} />
