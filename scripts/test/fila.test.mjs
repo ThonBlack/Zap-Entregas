@@ -353,8 +353,6 @@ test("conferir pela fila não zera a taxa que a regra da loja calculou", async (
     fd.set("queueToken", token);
     fd.set("address", "Rua da Taxa, 1 - Centro");
     fd.set("chargeMode", "pago");
-    // O formulário da fila manda a taxa num campo ESCONDIDO, com o valor atual.
-    fd.set("fee", "9,50");
     fd.set("lat", "-19.75");
     fd.set("lng", "-47.93");
     fd.set("pinTouched", "1");
@@ -366,4 +364,39 @@ test("conferir pela fila não zera a taxa que a regra da loja calculou", async (
     assert.equal(depois.status, "pending", "o rascunho tinha que virar corrida na fila");
     assert.equal(depois.fee, 9.5, "a taxa do motoboy foi perdida na conferência pela fila");
     assert.ok(depois.daily_seq > 0, "a corrida liberada tem que ganhar o 'Corrida N' do dia");
+});
+
+test("a taxa da conferência vem do BANCO — o que vier do formulário é ignorado", async () => {
+    // A tela da fila não mostra nem manda a taxa. Mas o formulário é código que
+    // roda no navegador do vendedor, dentro do painel do EpicStore: quem abrisse
+    // o inspetor poderia acrescentar o campo à mão e se dar um aumento (ou zerar
+    // o ganho do motoboy). Quem decide o valor é o servidor, relendo o banco.
+    corrida({
+        id: 921, loja: LOJA_A, status: "draft", taxa: 9.5,
+        endereco: "Rua da Taxa Adulterada, 2 - Centro",
+    });
+    raw.prepare("UPDATE deliveries SET lat = -19.75, lng = -47.93, geo_precision = 'exata' WHERE id = 921").run();
+
+    const { token } = await criarSessaoDaFila(LOJA_A, "Maria");
+    const { conferirRascunhoDaFilaAction } = await import("@/app/actions/queue");
+
+    for (const adulterado of ["999,99", "0", ""]) {
+        raw.prepare("UPDATE deliveries SET status = 'draft', fee = 9.5 WHERE id = 921").run();
+
+        const fd = new FormData();
+        fd.set("id", "921");
+        fd.set("queueToken", token);
+        fd.set("address", "Rua da Taxa Adulterada, 2 - Centro");
+        fd.set("chargeMode", "pago");
+        fd.set("fee", adulterado);
+        fd.set("lat", "-19.75");
+        fd.set("lng", "-47.93");
+        fd.set("pinTouched", "1");
+
+        const res = await conferirRascunhoDaFilaAction(fd);
+        assert.deepEqual(res, { success: true }, `${adulterado}: ${JSON.stringify(res)}`);
+
+        const depois = raw.prepare("SELECT fee FROM deliveries WHERE id = 921").get();
+        assert.equal(depois.fee, 9.5, `a taxa virou ${depois.fee} porque o formulário mandou "${adulterado}"`);
+    }
 });

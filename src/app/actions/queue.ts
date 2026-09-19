@@ -123,6 +123,10 @@ export async function conferirRascunhoDaFilaAction(formData: FormData): Promise<
         if (!trocou.length) return { error: "Essa corrida já foi liberada." };
 
         formData.set("confirmToken", confirmToken);
+        // A taxa do motoboy vem do BANCO, nunca do formulário: o campo viaja
+        // escondido na tela e quem abrisse o inspetor do navegador poderia
+        // trocar o valor. Vendedor não mexe em dinheiro da operação.
+        formData.set("fee", String(corrida.fee ?? 0).replace(".", ","));
         const resultado = await confirmDraftAction(formData);
         if ("error" in resultado) return resultado;
 
