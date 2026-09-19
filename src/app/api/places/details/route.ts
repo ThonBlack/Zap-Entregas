@@ -9,7 +9,10 @@ export async function GET(request: NextRequest) {
     const placeId = searchParams.get("place_id");
 
     // Mesma tranca do autocomplete: a chave paga do Google não fica aberta.
-    const quem = await autorizarBuscaDeEndereco(searchParams.get("confirmToken"));
+    const quem = await autorizarBuscaDeEndereco(
+        searchParams.get("confirmToken"),
+        searchParams.get("filaToken"),
+    );
     if (!quem.autorizado) {
         return NextResponse.json({ error: "Faça login para buscar endereços." }, { status: 401 });
     }

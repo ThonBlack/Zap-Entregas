@@ -9,8 +9,12 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get("query");
 
     // Esta rota gasta a chave paga do Google. Só quem está logado — ou o caixa
-    // com o código de conferência do PDV — pode chamar.
-    const quem = await autorizarBuscaDeEndereco(searchParams.get("confirmToken"));
+    // com o código de conferência do PDV, ou o vendedor com o código da fila da
+    // loja — pode chamar.
+    const quem = await autorizarBuscaDeEndereco(
+        searchParams.get("confirmToken"),
+        searchParams.get("filaToken"),
+    );
     if (!quem.autorizado) {
         return NextResponse.json({ error: "Faça login para buscar endereços." }, { status: 401 });
     }

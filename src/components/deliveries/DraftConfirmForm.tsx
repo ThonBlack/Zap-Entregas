@@ -9,6 +9,11 @@ import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import { confirmDraftAction, cancelDraftAction } from "@/app/actions/drafts";
 import { updatePendingDeliveryAction } from "@/app/actions/deliveries";
 import {
+    cancelarCorridaDaFilaAction,
+    conferirRascunhoDaFilaAction,
+    editarCorridaDaFilaAction,
+} from "@/app/actions/queue";
+import {
     CHARGE_MODES,
     CHARGE_MODE_AJUDA,
     CHARGE_MODE_LABEL,
@@ -50,6 +55,21 @@ interface DraftConfirmFormProps {
     hidesValueFromMotoboy: boolean;
     /** Presente quando a tela foi aberta pelo PDV (sem login). Muda o "depois de salvar". */
     confirmToken?: string;
+    /**
+     * Código da Fila da loja. Quando vem, é ELE que autoriza: o formulário passa
+     * a falar com as ações de src/app/actions/queue.ts, que revalidam o código e
+     * conferem que a corrida é da loja dele antes de qualquer coisa.
+     *
+     * O formulário é o mesmo de propósito — o vendedor confere endereço, pino e
+     * cobrança exatamente como o caixa faz pela janelinha do PDV.
+     */
+    queueToken?: string;
+    /**
+     * Pra onde voltar depois de salvar ou cancelar. Usado pela fila (volta pra
+     * lista). Sem isto vale o comportamento de sempre: pelo PDV a janela avisa a
+     * venda e fecha; logado, vai pro /app.
+     */
+    voltarPara?: string;
     /** Chave do Google pro navegador (vem do servidor). Vazia = mapa do OpenStreetMap. */
     googleMapsKey?: string | null;
     /**
@@ -62,6 +82,14 @@ interface DraftConfirmFormProps {
      * saber de que loja é quem está conferindo) — aí o campo nem aparece.
      */
     motoboys?: { id: number; name: string }[];
+    /**
+     * Mostrar o campo "Taxa da corrida"? Padrão sim.
+     *
+     * A Fila da loja desliga: quem está nessa tela é o VENDEDOR, e quanto o
+     * motoboy ganha é acerto entre a loja e ele. O valor já gravado não se perde
+     * — viaja num campo escondido (ver lá embaixo).
+     */
+    mostrarTaxa?: boolean;
 }
 
 // Dinheiro na tela é sempre "150,50" — nunca "150.5".
@@ -70,7 +98,8 @@ const money = (n: number | null | undefined) =>
 
 export default function DraftConfirmForm({
     draft, shopLat, shopLng, defaultCity, defaultState, isSuspect, hidesValueFromMotoboy, confirmToken,
-    googleMapsKey, modo = "conferencia", motoboys = [],
+    googleMapsKey, modo = "conferencia", motoboys = [], queueToken, voltarPara,
+    mostrarTaxa = true,
 }: DraftConfirmFormProps) {
     const editando = modo === "edicao";
     const router = useRouter();
@@ -94,6 +123,24 @@ export default function DraftConfirmForm({
     const pedeValor = cobranca !== "pago";
 
     const doPdv = Boolean(confirmToken);
+    const daFila = Boolean(queueToken);
+
+    /**
+     * O que fazer depois que deu certo.
+     *
+     * Três destinos: a fila volta pra lista dela, a janelinha do PDV avisa a
+     * venda e fecha, e o app logado vai pro painel.
+     */
+    const aoTerminar = (resultado: "liberada" | "cancelada") => {
+        if (voltarPara) {
+            router.push(voltarPara);
+            router.refresh();
+            return;
+        }
+        if (doPdv) { encerrarPeloPdv(resultado); return; }
+        router.push("/app");
+        router.refresh();
+    };
 
     /**
      * Aberto pelo PDV: avisa a tela da venda e fecha sozinho.
@@ -156,15 +203,18 @@ export default function DraftConfirmForm({
         fd.set("lat", String(lat));
         fd.set("lng", String(lng));
         if (confirmToken) fd.set("confirmToken", confirmToken);
+        if (queueToken) fd.set("queueToken", queueToken);
         fd.set("pinTouched", pinTouched ? "1" : "0");
         startTransition(async () => {
-            const res = editando
-                ? await updatePendingDeliveryAction(fd)
-                : await confirmDraftAction(fd);
+            const res = daFila
+                ? (editando
+                    ? await editarCorridaDaFilaAction(fd)
+                    : await conferirRascunhoDaFilaAction(fd))
+                : (editando
+                    ? await updatePendingDeliveryAction(fd)
+                    : await confirmDraftAction(fd));
             if (res && "error" in res) { setError(res.error); return; }
-            if (doPdv) { encerrarPeloPdv("liberada"); return; }
-            router.push("/app");
-            router.refresh();
+            aoTerminar("liberada");
         });
     };
 
@@ -174,12 +224,13 @@ export default function DraftConfirmForm({
         const fd = new FormData();
         fd.set("id", String(draft.id));
         if (confirmToken) fd.set("confirmToken", confirmToken);
+        if (queueToken) fd.set("queueToken", queueToken);
         startTransition(async () => {
-            const res = await cancelDraftAction(fd);
+            const res = daFila
+                ? await cancelarCorridaDaFilaAction(fd)
+                : await cancelDraftAction(fd);
             if (res && "error" in res) { setError(res.error); return; }
-            if (doPdv) { encerrarPeloPdv("cancelada"); return; }
-            router.push("/app");
-            router.refresh();
+            aoTerminar("cancelada");
         });
     };
 
@@ -222,6 +273,7 @@ export default function DraftConfirmForm({
                     shopLat={shopLat}
                     shopLng={shopLng}
                     confirmToken={confirmToken}
+                    filaToken={queueToken}
                     required
                 />
                 <p className="text-xs text-zinc-500 mt-2 flex items-center gap-1.5">
@@ -339,17 +391,25 @@ export default function DraftConfirmForm({
                 </div>
             )}
 
-            <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Taxa da corrida (R$)</label>
-                <input
-                    name="fee"
-                    defaultValue={money(draft.fee)}
-                    inputMode="decimal"
-                    placeholder="0,00"
-                    className="w-full px-3 py-2.5 rounded-lg border border-zinc-600 bg-zinc-700 text-white outline-none focus:border-green-500"
-                />
-                <p className="text-xs text-zinc-500 mt-1">É o que o motoboy ganha por essa entrega.</p>
-            </div>
+            {mostrarTaxa ? (
+                <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">Taxa da corrida (R$)</label>
+                    <input
+                        name="fee"
+                        defaultValue={money(draft.fee)}
+                        inputMode="decimal"
+                        placeholder="0,00"
+                        className="w-full px-3 py-2.5 rounded-lg border border-zinc-600 bg-zinc-700 text-white outline-none focus:border-green-500"
+                    />
+                    <p className="text-xs text-zinc-500 mt-1">É o que o motoboy ganha por essa entrega.</p>
+                </div>
+            ) : (
+                // Escondido, mas VIAJANDO: o campo some da vista de quem não pode
+                // ver o ganho do motoboy — e o valor que já estava gravado vai
+                // junto assim mesmo. Sem este campo oculto, salvar zeraria a taxa
+                // que a regra da loja tinha calculado.
+                <input type="hidden" name="fee" value={money(draft.fee)} />
+            )}
 
             <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-2">Observação pro motoboy</label>
@@ -370,7 +430,7 @@ export default function DraftConfirmForm({
                 {editando ? (
                     <button
                         type="button"
-                        onClick={() => router.push("/app")}
+                        onClick={() => router.push(voltarPara ?? "/app")}
                         disabled={isPending}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-zinc-600 text-zinc-300 hover:bg-zinc-700 transition-colors disabled:opacity-50"
                     >
