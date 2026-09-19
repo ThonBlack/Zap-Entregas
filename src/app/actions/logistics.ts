@@ -18,17 +18,15 @@ import {
 import { lojaDaNovaCorrida, motoboyServeALoja } from "@/lib/lojaDaCorrida";
 import { instanteDaFinalizacao, interpretarDataDaCorrida } from "@/lib/lancamentoRetroativo";
 import { chargeModeDaCorrida, normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
-import { newTrackingToken } from "@/lib/trackingToken";
 import { pushDeCorridaNova, pushToUser, pushDeCorridaDestinada } from "@/lib/push";
 import { validarRecebimento, type DeliveryReceipt, type RecebimentoValidado } from "@/lib/receipt";
 import { fecharCorridaNoBanco } from "@/lib/deliveryLedger";
 import { planejarDestino } from "@/lib/deliveryAssign";
 import { parseMoney } from "@/lib/money";
 import { calcularTaxa, distanciaDaLoja } from "@/lib/fee";
-import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
 import { logServerError } from "@/lib/serverLog";
 import { avisoDeCorridaNovaComNumero, resumoDoLocal } from "@/lib/deliveryPrivacy";
-import { proximoNumeroDoDia } from "@/lib/dailySeq";
+import { criarCorridaDaLoja } from "@/lib/novaCorrida";
 import { linkRota as montarLinkRota } from "@/lib/mapsLink";
 import { montarNotaJustificada, motivoValido, AVISO_MOTIVO_CURTO } from "@/lib/geofence";
 import { absoluteUrl } from "@/lib/appUrl";
@@ -156,58 +154,26 @@ export async function addDeliveryAction(formData: FormData) {
         destinatario = { id: escolhido.id, name: escolhido.name };
     }
 
-    if (await existeCorridaIgualRecente(loja.id, address, 5)) {
-        return { error: "Entrega já adicionada recentemente." };
-    }
-
-    const geoOpts = await loadGeocodeOpts(loja.id);
-    let lat = 0, lng = 0;
-    let geoPrecision: string | null = null;
-    try {
-        const coords = await geocodeAddress(address, geoOpts);
-        if (coords) { lat = coords.lat; lng = coords.lng; geoPrecision = coords.precision; }
-    } catch (e) {
-        console.error("Geocode form failed", e);
-        await logServerError("geocode_cadastro_corrida", e, { userId: me.id, page: "/app", address });
-    }
-
-    const { canCreateDelivery } = await import("@/lib/planLimits");
-    const limitCheck = await canCreateDelivery(loja.id);
-
-    if (!limitCheck.allowed) {
-        return { error: limitCheck.reason || "Limite de entregas atingido." };
-    }
-
     // Lançamento atrasado: o carimbo é o dia da corrida com a hora de agora —
     // e o "Corrida N" sai da contagem DAQUELE dia, não do dia da digitação.
-    const agora = data.quandoISO;
-    // O "Corrida N" do dia e o INSERT na MESMA transação: dois pedidos entrando
-    // ao mesmo tempo não podem receber o mesmo número (ver src/lib/dailySeq.ts).
-    const criada = db.transaction((tx) => tx.insert(deliveries).values({
+    //
+    // A gravação em si (trava de duplo clique, busca do endereço no mapa, limite
+    // do plano, "Corrida N" + INSERT na mesma transação) mora em
+    // src/lib/novaCorrida.ts: é o mesmo miolo que a Fila da loja usa.
+    const criada = await criarCorridaDaLoja({
         shopkeeperId: loja.id,
-        dailySeq: proximoNumeroDoDia(tx, loja.id, agora),
-        // Destinada a alguém já nasce "aceita": o motoboy não precisa disputar
-        // no pool uma corrida que a loja já deu pra ele.
-        motoboyId: destinatario?.id ?? null,
         address,
         customerName,
-        value,
-        chargeMode,
         observation: destinatario
             ? [observation, `destinada pela loja a ${destinatario.name}`].filter(Boolean).join(" · ").slice(0, 1000)
             : observation,
-        lat,
-        lng,
-        geoPrecision,
-        status: destinatario ? "assigned" : "pending",
-        acceptedAt: destinatario ? agora : null,
-        stopOrder: 999,
-        publicToken: newTrackingToken(),
-        // Data sempre em ISO: o CURRENT_TIMESTAMP do banco grava noutro formato
-        // e as duas formas juntas quebravam comparação e ordenação.
-        createdAt: agora,
-        updatedAt: agora,
-    }).returning({ id: deliveries.id, dailySeq: deliveries.dailySeq }).get());
+        chargeMode,
+        value,
+        motoboyId: destinatario?.id ?? null,
+        quandoISO: data.quandoISO,
+        origem: "/app",
+    });
+    if (!criada.ok) return { error: criada.erro };
 
     // Fire-and-forget: push fora do ar não pode travar o cadastro.
     // Endereço com número é dado pessoal do cliente saindo do app pra um

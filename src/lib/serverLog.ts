@@ -39,6 +39,48 @@ function textoDoErro(err: unknown): { message: string; stack: string | null } {
     return { message: String(err ?? "erro sem descrição").slice(0, LIMITE_MENSAGEM), stack: null };
 }
 
+/**
+ * Registra um ACONTECIMENTO normal do servidor (não um erro) em `app_logs`.
+ *
+ * Existe pra Fila da loja: lá quem mexe na corrida é um vendedor SEM conta no
+ * Zap, autorizado só por um código. Sem esse rastro, "quem cancelou a corrida
+ * 12?" não teria resposta — não há usuário logado pra apontar. Por isso cada
+ * ação da fila deixa uma linha com o nome de quem estava no caixa.
+ *
+ * Mesmas regras da irmã acima: nunca lança, nunca substitui o console, corta o
+ * texto pra não engordar o `sqlite.db`.
+ */
+export async function logServerEvent(
+    event: string,
+    message: string,
+    meta: MetaDoLog = {},
+): Promise<void> {
+    try {
+        const { page = null, userId = null, ...extra } = meta;
+
+        let metadata: string | null = null;
+        if (Object.keys(extra).length) {
+            try {
+                metadata = JSON.stringify(extra).slice(0, LIMITE_METADATA);
+            } catch {
+                metadata = null;
+            }
+        }
+
+        await db.insert(appLogs).values({
+            level: "info",
+            event: String(event).slice(0, 100),
+            message: String(message).slice(0, LIMITE_MENSAGEM),
+            userId: typeof userId === "number" ? userId : null,
+            page: page ? String(page).slice(0, 200) : null,
+            metadata,
+            createdAt: new Date().toISOString(),
+        });
+    } catch {
+        // Banco fora do ar: registro é bom ter, não é pré-requisito da operação.
+    }
+}
+
 export async function logServerError(event: string, err: unknown, meta: MetaDoLog = {}): Promise<void> {
     try {
         const { page = null, userId = null, ...extra } = meta;
