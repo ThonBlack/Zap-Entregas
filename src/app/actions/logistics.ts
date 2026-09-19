@@ -6,7 +6,17 @@ import { eq, inArray, and, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { geocodeAddress, optimizeRoute, type GeocodeOpts } from "@/lib/routeUtils";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
-import { carregarMotoboyGerenciado, motoboyEnxergaCorrida, motoboyScope } from "@/lib/team";
+import {
+    carregarLojaAtiva,
+    carregarMotoboyGerenciado,
+    lojaDaCorridaMaisRecente,
+    listarLojasAtivas,
+    motoboyEnxergaCorrida,
+    motoboyScope,
+    motoboyScopeDaLoja,
+} from "@/lib/team";
+import { lojaDaNovaCorrida, motoboyServeALoja } from "@/lib/lojaDaCorrida";
+import { instanteDaFinalizacao, interpretarDataDaCorrida } from "@/lib/lancamentoRetroativo";
 import { chargeModeDaCorrida, normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
 import { newTrackingToken } from "@/lib/trackingToken";
 import { pushDeCorridaNova, pushToUser, pushDeCorridaDestinada } from "@/lib/push";
@@ -42,20 +52,53 @@ async function loadGeocodeOpts(shopkeeperId: number): Promise<GeocodeOpts> {
  * Existe porque a tela de "Nova Rota" é toda client-side: sem isto ela não teria
  * como montar o campo "destinar a corrida a alguém". A regra de quem é da equipe
  * de quem continua sendo a mesma de sempre — `motoboyScope` em src/lib/team.ts.
+ *
+ * `shopId` só vale pro ADMIN: quando ele escolhe a loja da corrida, a lista de
+ * motoboys tem que ser a DAQUELA loja (mais os "da casa", sem loja) — senão ele
+ * destinaria a corrida da loja A pro motoboy da loja B.
  */
-export async function listarMotoboysDaEquipeAction(): Promise<
-    { motoboys: { id: number; name: string }[] } | { error: string }
-> {
+export async function listarMotoboysDaEquipeAction(
+    shopId?: number | null,
+): Promise<{ motoboys: { id: number; name: string }[] } | { error: string }> {
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
     if ("error" in auth) return auth;
+    const me = auth.user;
+
+    const escopo = me.role === "admin" && Number.isInteger(shopId) && (shopId as number) > 0
+        ? motoboyScopeDaLoja(shopId as number)
+        : motoboyScope(me);
 
     const lista = await db
         .select({ id: users.id, name: users.name })
         .from(users)
-        .where(motoboyScope(auth.user))
+        .where(escopo)
         .orderBy(users.name);
 
     return { motoboys: lista };
+}
+
+/**
+ * As lojas do campo "Loja" no cadastro de corrida — só o admin tem esse campo.
+ *
+ * Pro lojista devolve lista vazia de propósito: a loja dele é ele, e o campo
+ * nem aparece na tela (o servidor ignora `shopId` vindo de lojista de qualquer
+ * jeito — ver src/lib/lojaDaCorrida.ts).
+ */
+export async function listarLojasParaCorridaAction(): Promise<
+    { ehAdmin: boolean; lojas: { id: number; name: string }[]; sugerida: number | null }
+    | { error: string }
+> {
+    const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
+    if ("error" in auth) return auth;
+    if (auth.user.role !== "admin") return { ehAdmin: false, lojas: [], sugerida: null };
+
+    const lojas = await listarLojasAtivas();
+    const ultima = await lojaDaCorridaMaisRecente();
+    // A loja da corrida mais recente só serve de padrão se ainda estiver na
+    // lista (pode ter sido desativada); senão cai na primeira.
+    const sugerida = lojas.some((l) => l.id === ultima) ? ultima : (lojas[0]?.id ?? null);
+
+    return { ehAdmin: true, lojas, sugerida };
 }
 
 export async function addDeliveryAction(formData: FormData) {
@@ -68,6 +111,24 @@ export async function addDeliveryAction(formData: FormData) {
     const observation = formData.get("observation") as string;
 
     if (!address) return { error: "Endereço obrigatório" };
+
+    // ── De quem é a corrida ──────────────────────────────────────────────────
+    // Lojista: dele mesmo, e o `shopId` do formulário é ignorado. Admin: a loja
+    // que ele escolheu na tela, conferida no banco (existe? está ativa?). Daqui
+    // pra baixo é `loja.id` que manda — `me.id` como dono da corrida é
+    // justamente o bug que deixava a corrida do admin fora do fechamento da loja.
+    const escolha = lojaDaNovaCorrida(me, formData.get("shopId"));
+    if (!escolha.ok) return { error: escolha.erro };
+    const loja = me.role === "admin"
+        ? await carregarLojaAtiva(escolha.shopkeeperId)
+        : { id: me.id, name: me.name };
+    if (!loja) return { error: "Essa loja não existe ou está desativada." };
+
+    // ── Quando foi a corrida ─────────────────────────────────────────────────
+    // Vazio = hoje (o de sempre). Dia passado = lançamento atrasado: o carimbo
+    // vai pro dia da corrida (regras em src/lib/lancamentoRetroativo.ts).
+    const data = interpretarDataDaCorrida(formData.get("deliveryDate"));
+    if (!data.ok) return { error: data.erro };
 
     // "1.850,00" digitado à mão virava R$ 1,85 no conversor antigo. `parseMoney`
     // entende milhar e devolve null quando não dá pra ler — aí é erro na tela,
@@ -87,14 +148,19 @@ export async function addDeliveryAction(formData: FormData) {
     if (motoboyIdBruto) {
         const escolhido = await carregarMotoboyGerenciado(me, Number(motoboyIdBruto));
         if (!escolhido) return { error: "Esse motoboy não é da sua equipe." };
+        // O admin gerencia todo mundo, mas a corrida é de UMA loja: o motoboy
+        // tem que ser da equipe dela (ou "da casa", sem loja).
+        if (!motoboyServeALoja(escolhido, loja.id)) {
+            return { error: "Esse motoboy não é da equipe dessa loja." };
+        }
         destinatario = { id: escolhido.id, name: escolhido.name };
     }
 
-    if (await existeCorridaIgualRecente(me.id, address, 5)) {
+    if (await existeCorridaIgualRecente(loja.id, address, 5)) {
         return { error: "Entrega já adicionada recentemente." };
     }
 
-    const geoOpts = await loadGeocodeOpts(me.id);
+    const geoOpts = await loadGeocodeOpts(loja.id);
     let lat = 0, lng = 0;
     let geoPrecision: string | null = null;
     try {
@@ -106,18 +172,20 @@ export async function addDeliveryAction(formData: FormData) {
     }
 
     const { canCreateDelivery } = await import("@/lib/planLimits");
-    const limitCheck = await canCreateDelivery(me.id);
+    const limitCheck = await canCreateDelivery(loja.id);
 
     if (!limitCheck.allowed) {
         return { error: limitCheck.reason || "Limite de entregas atingido." };
     }
 
-    const agora = new Date().toISOString();
+    // Lançamento atrasado: o carimbo é o dia da corrida com a hora de agora —
+    // e o "Corrida N" sai da contagem DAQUELE dia, não do dia da digitação.
+    const agora = data.quandoISO;
     // O "Corrida N" do dia e o INSERT na MESMA transação: dois pedidos entrando
     // ao mesmo tempo não podem receber o mesmo número (ver src/lib/dailySeq.ts).
     const criada = db.transaction((tx) => tx.insert(deliveries).values({
-        shopkeeperId: me.id,
-        dailySeq: proximoNumeroDoDia(tx, me.id, agora),
+        shopkeeperId: loja.id,
+        dailySeq: proximoNumeroDoDia(tx, loja.id, agora),
         // Destinada a alguém já nasce "aceita": o motoboy não precisa disputar
         // no pool uma corrida que a loja já deu pra ele.
         motoboyId: destinatario?.id ?? null,
@@ -144,14 +212,20 @@ export async function addDeliveryAction(formData: FormData) {
     // Fire-and-forget: push fora do ar não pode travar o cadastro.
     // Endereço com número é dado pessoal do cliente saindo do app pra um
     // aparelho que a loja não controla — nos dois casos vai só o bairro.
-    if (destinatario) {
+    //
+    // Corrida de anteontem NÃO avisa ninguém: o aviso serve pra alguém sair pra
+    // buscar o pedido, e não tem pedido nenhum esperando. Vale pros dois casos
+    // (fila aberta e destinada a alguém).
+    if (data.retroativa) {
+        // nada de push: é lançamento de histórico
+    } else if (destinatario) {
         // Corrida com dono não vira anúncio: só o escolhido é avisado.
-        pushDeCorridaDestinada(destinatario.id, criada.id, resumoDoLocal(address), me.name, criada.dailySeq)
+        pushDeCorridaDestinada(destinatario.id, criada.id, resumoDoLocal(address), loja.name, criada.dailySeq)
             .catch(() => { });
     } else {
         // Só quem pode VER essa corrida é avisado: loja no modo "equipe" não
         // anuncia pro app inteiro (regra única em src/lib/team.ts).
-        pushDeCorridaNova(me.id, {
+        pushDeCorridaNova(loja.id, {
             title: "🏍️ Nova Corrida Disponível!",
             // "Corrida 7 · Centro · Uberaba" — o número é como a loja chama a
             // corrida no grupo; o bairro é o máximo que pode sair no push.
@@ -605,6 +679,14 @@ export async function completeDeliveryAction(
         // Marcar "entregue" e lançar o dinheiro acontece numa transação só
         // (src/lib/deliveryLedger.ts). Dois cliques ao mesmo tempo não creditam
         // duas vezes: a transação fecha a janela e o índice único é a tranca.
+        // Corrida lançada atrasada e fechada pela LOJA cai no dia dela, não em
+        // "agora" — senão o Resumo do dia joga a corrida de terça na quinta.
+        // O motoboy, que finaliza na rua no dia, continua com "agora".
+        const entregueEmISO = instanteDaFinalizacao({
+            createdAt: delivery.createdAt,
+            porLoja: me.role !== "motoboy",
+        });
+
         const fechado = fecharCorridaNoBanco({
             deliveryId: id,
             motoboyId: delivery.motoboyId,
@@ -614,6 +696,7 @@ export async function completeDeliveryAction(
             recibo: { receiptStatus, receivedAmount, receivedMethod, receiptNote },
             statusAbertos: openStatuses,
             atribuirMotoboyId,
+            entregueEmISO,
         });
 
         if (!fechado.ok) return { error: fechado.erro };

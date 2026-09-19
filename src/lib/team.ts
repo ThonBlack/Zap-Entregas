@@ -215,6 +215,65 @@ export function localDaLojaVisivel<
     };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// As LOJAS (pro admin dizer de quem é a corrida)
+//
+// O admin não tem loja: ele opera por cima de todas. Quando é ele quem cadastra
+// a corrida, alguém precisa dizer de qual loja ela é — senão ela nasce no nome
+// do admin e some do fechamento da loja de verdade (ver src/lib/lojaDaCorrida.ts).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lojas ativas, em ordem de nome — a lista do campo "Loja" no cadastro. */
+export async function listarLojasAtivas(): Promise<{ id: number; name: string }[]> {
+    return db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.role, "shopkeeper"), ATIVO))
+        .orderBy(users.name);
+}
+
+/** A loja, SE ela existir e estiver ativa. `null` quando não serve. */
+export async function carregarLojaAtiva(
+    shopkeeperId: number,
+): Promise<{ id: number; name: string } | null> {
+    if (!Number.isInteger(shopkeeperId) || shopkeeperId <= 0) return null;
+    const loja = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.id, shopkeeperId), eq(users.role, "shopkeeper"), ATIVO))
+        .get();
+    return loja ?? null;
+}
+
+/**
+ * De qual loja foi a última corrida cadastrada — é ela que o campo "Loja" já
+ * vem marcando. Na prática o admin lança sempre pela mesma loja, então o padrão
+ * certo economiza um toque e evita o erro de deixar no nome errado.
+ */
+export async function lojaDaCorridaMaisRecente(): Promise<number | null> {
+    const ultima = await db
+        .select({ shopkeeperId: deliveries.shopkeeperId })
+        .from(deliveries)
+        .where(sql`${deliveries.shopkeeperId} IS NOT NULL`)
+        .orderBy(sql`${deliveries.createdAt} DESC`)
+        .limit(1)
+        .get();
+    return ultima?.shopkeeperId ?? null;
+}
+
+/**
+ * Motoboys que podem pegar corrida DESTA loja: os dela mais os "da casa"
+ * (sem loja). É a lista que o admin vê depois de escolher a loja — a mesma
+ * régua de `motoboyServeALoja` em src/lib/lojaDaCorrida.ts, só que em SQL.
+ */
+export function motoboyScopeDaLoja(shopkeeperId: number): SQL | undefined {
+    return and(
+        eq(users.role, "motoboy"),
+        or(eq(users.shopkeeperId, shopkeeperId), isNull(users.shopkeeperId)),
+        ATIVO,
+    );
+}
+
 /** Ids dos motoboys da equipe — pra filtrar extrato, lançamentos etc. */
 export async function idsDaEquipe(
     me: Ator,
