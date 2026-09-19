@@ -140,6 +140,18 @@ export const LIMITES = {
     webhookPdv: { maximo: 120, janelaMs: 1 * MIN },
     /** Busca de endereço (proxy do Google Places), por sessão/IP. */
     places: { maximo: 60, janelaMs: 1 * MIN },
+    /**
+     * Pedido de sessão da Fila da loja, por chave de API. O EpicStore pede uma
+     * por PC no começo do expediente e de novo quando a de 12h vence — 20 por
+     * minuto já é folga grande pra isso.
+     */
+    filaSessao: { maximo: 20, janelaMs: 1 * MIN },
+    /**
+     * Ações da Fila da loja (conferir, editar, cancelar, lançar), por código de
+     * sessão. É gente digitando no balcão: 60 por minuto é muito mais do que
+     * qualquer vendedor consegue, e segura um código roubado em laço.
+     */
+    fila: { maximo: 60, janelaMs: 1 * MIN },
 } as const;
 
 /** Atalho: aplica uma das regras acima. */

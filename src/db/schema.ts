@@ -396,6 +396,42 @@ export const dailyClosings = sqliteTable("daily_closings", {
     updatedAt: text("updated_at").default(sql`CURRENT_TIMESTAMP`),
 });
 
+/**
+ * Sessão da "Fila da loja" — a tela que o VENDEDOR abre dentro do painel do
+ * EpicStore pra conferir, editar, lançar e cancelar corrida.
+ *
+ * O vendedor não tem conta no Zap. Quem autoriza ele é esta linha: o EpicStore
+ * pede a sessão com a chave de API da loja (POST /api/integration/queue-session)
+ * e recebe um endereço `/fila/<token>` que vale 12 horas — o expediente.
+ *
+ * Diferente do `deliveries.confirm_token`, que autoriza UMA corrida e é apagado
+ * ao usar, este autoriza a LOJA inteira enquanto o prazo durar. Por isso o que
+ * a tela da fila mostra é sempre filtrado por `shopkeeper_id` daqui, nunca por
+ * nada que venha do navegador.
+ *
+ * Várias sessões válidas ao mesmo tempo é o normal — a loja tem mais de um PC
+ * no balcão. As vencidas são apagadas quando uma nova é criada.
+ *
+ * Tabela em scripts/utils/add_shop_queue_sessions_table.js.
+ */
+export const shopQueueSessions = sqliteTable("shop_queue_sessions", {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    token: text("token").notNull().unique(),
+    shopkeeperId: integer("shopkeeper_id").references(() => users.id).notNull(),
+    // Quem está no caixa, quando o EpicStore sabe dizer. Vira carimbo na
+    // corrida ("lançada pela loja (Fulano)") e no registro de eventos.
+    operatorName: text("operator_name"),
+    expiresAt: text("expires_at").notNull(), // ISO em UTC
+    createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const shopQueueSessionsRelations = relations(shopQueueSessions, ({ one }) => ({
+    shopkeeper: one(users, {
+        fields: [shopQueueSessions.shopkeeperId],
+        references: [users.id],
+    }),
+}));
+
 export const dailyClosingsRelations = relations(dailyClosings, ({ one }) => ({
     motoboy: one(users, {
         fields: [dailyClosings.motoboyId],
