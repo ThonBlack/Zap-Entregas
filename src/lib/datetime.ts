@@ -133,3 +133,50 @@ export function diaBrasiliaDe(raw: string | Date | null | undefined): string | n
         day: "2-digit",
     }).format(d);
 }
+
+/** A hora do relógio de Brasília neste instante ("14:30:09.111"). */
+export function horaBrasiliaDe(quando: Date = new Date()): string {
+    const partes = new Intl.DateTimeFormat("en-GB", {
+        timeZone: TZ_BRASILIA,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+    }).format(quando);
+    // O "24:00:00" que o Intl devolve à meia-noite em alguns runtimes seria uma
+    // hora que não existe no ISO — vira "00:00:00".
+    const relogio = partes.replace(/^24:/, "00:");
+    return `${relogio}.${String(quando.getUTCMilliseconds()).padStart(3, "0")}`;
+}
+
+/**
+ * O instante (ISO em UTC) de um DIA de Brasília com a hora atual de Brasília.
+ *
+ * É o carimbo do lançamento atrasado: a corrida de terça, digitada na quinta,
+ * fica gravada em terça — no mesmo horário em que está sendo digitada, pra não
+ * inventar uma hora que ninguém sabe qual foi.
+ *
+ * O "-03:00" é escrito na mão de propósito: UTC−3 fixo é a mesma régua que o
+ * Resumo do dia e o contador "Corrida N" usam no SQLite (`'-3 hours'`). O Brasil
+ * não tem mais horário de verão, então as duas contas sempre concordam.
+ *
+ * Devolve `null` quando o dia não dá pra ler.
+ */
+export function instanteNoDiaBrasilia(
+    dia: string,
+    agora: Date = new Date(),
+): string | null {
+    if (!ehDiaISO(dia)) return null;
+    const d = new Date(`${dia}T${horaBrasiliaDe(agora)}-03:00`);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** Soma minutos a uma data do banco e devolve ISO em UTC (null se ilegível). */
+export function somaMinutos(
+    raw: string | Date | null | undefined,
+    minutos: number,
+): string | null {
+    const d = parseDbDate(raw);
+    if (!d) return null;
+    return new Date(d.getTime() + minutos * 60_000).toISOString();
+}

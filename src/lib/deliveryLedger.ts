@@ -46,6 +46,13 @@ export type EntradaDoFechamento = {
      * crédito e débito.
      */
     atribuirMotoboyId?: number | null;
+    /**
+     * Quando a entrega aconteceu (ISO). Serve pra corrida ATRASADA finalizada
+     * pela loja: sem isto o `delivered_at` sairia "agora" e a corrida de terça
+     * cairia no Resumo do dia de quinta. Quem decide o instante é
+     * `instanteDaFinalizacao` (src/lib/lancamentoRetroativo.ts); vazio = agora.
+     */
+    entregueEmISO?: string | null;
 };
 
 export type ResultadoDoFechamento =
@@ -72,6 +79,10 @@ export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoF
         deliveryId: id, shopkeeperId, customerName, fee, recibo, statusAbertos, atribuirMotoboyId,
     } = entrada;
     const agora = new Date().toISOString();
+    // O "quando" da ENTREGA e do dinheiro pode ser um dia passado (corrida
+    // atrasada fechada pela loja); o `updated_at` continua sendo o relógio de
+    // verdade — ele é rastro de quando a linha foi mexida, não do serviço.
+    const entregueEm = entrada.entregueEmISO ?? agora;
     // Quem vai receber crédito/débito: o motoboy escolhido pela loja na hora de
     // finalizar tem prioridade sobre o que estava (ou não estava) na corrida.
     const motoboyId = atribuirMotoboyId ?? entrada.motoboyId;
@@ -106,7 +117,7 @@ export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoF
                 receivedAmount: recibo.receivedAmount,
                 receivedMethod: recibo.receivedMethod,
                 receiptNote: recibo.receiptNote,
-                deliveredAt: agora,
+                deliveredAt: entregueEm,
                 updatedAt: agora,
             })
             .where(and(eq(deliveries.id, id), inArray(deliveries.status, statusAbertos)))
@@ -131,7 +142,9 @@ export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoF
                     description: `${nomeDaCorrida} - ${customerName || "Cliente"}`,
                     relatedDeliveryId: id,
                     creatorId: shopkeeperId,
-                    createdAt: agora,
+                    // Mesmo dia da entrega: o extrato e o fechamento leem por
+                    // `created_at`, então o crédito tem que andar junto com ela.
+                    createdAt: entregueEm,
                 });
             }
 
@@ -150,7 +163,7 @@ export function fecharCorridaNoBanco(entrada: EntradaDoFechamento): ResultadoDoF
                     description: `Recebido do cliente em dinheiro - ${nomeDaCorrida}`,
                     relatedDeliveryId: id,
                     creatorId: shopkeeperId,
-                    createdAt: agora,
+                    createdAt: entregueEm,
                 });
             }
         }

@@ -14,7 +14,9 @@ import { existeCorridaIgualRecente } from "@/lib/deliveryGuards";
 import { avisoDeCorridaNovaComNumero, resumoDoLocal } from "@/lib/deliveryPrivacy";
 import { sequenciaDoDia } from "@/lib/dailySeq";
 import { faixaDeCorridas } from "@/lib/dailySeq-shared";
-import { carregarMotoboyGerenciado } from "@/lib/team";
+import { carregarLojaAtiva, carregarMotoboyGerenciado } from "@/lib/team";
+import { lojaDaNovaCorrida, motoboyServeALoja } from "@/lib/lojaDaCorrida";
+import { interpretarDataDaCorrida } from "@/lib/lancamentoRetroativo";
 import { normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
 
 /** Teto de paradas numa rota só (cada uma é uma busca de endereço no mapa). */
@@ -34,6 +36,23 @@ export async function createRouteAction(prevState: any, formData: FormData) {
 
     if (!addresses.length) return { error: "Adicione ao menos um endereço" };
 
+    // ── De quem é a corrida, e de que dia ────────────────────────────────────
+    // A mesma régua do cadastro avulso (addDeliveryAction): admin escolhe a
+    // loja na tela; lojista é sempre ele mesmo e o `shopId` do formulário é
+    // ignorado. Daqui pra baixo quem manda é `loja.id` — gravar `me.id` era o
+    // que deixava a corrida criada pelo admin fora do fechamento da loja.
+    const escolha = lojaDaNovaCorrida(me, formData.get("shopId"));
+    if (!escolha.ok) return { error: escolha.erro };
+    const loja = me.role === "admin"
+        ? await carregarLojaAtiva(escolha.shopkeeperId)
+        : { id: me.id, name: me.name };
+    if (!loja) return { error: "Essa loja não existe ou está desativada." };
+
+    // Vazio = hoje (o de sempre); dia passado = lançamento atrasado
+    // (src/lib/lancamentoRetroativo.ts).
+    const data = interpretarDataDaCorrida(formData.get("deliveryDate"));
+    if (!data.ok) return { error: data.erro };
+
     // Cada endereço vira uma busca no mapa (Google + até 3 tentativas no
     // OpenStreetMap, com 1,1s de espera entre elas). Sem teto, uma lista grande
     // segura o processo inteiro por horas — o app é um Node só.
@@ -45,7 +64,7 @@ export async function createRouteAction(prevState: any, formData: FormData) {
     // Aqui comparamos com QUANTOS endereços vêm — antes bastava sobrar 1 vaga
     // pra passar uma rota de 20 paradas.
     const { canCreateDelivery } = await import("@/lib/planLimits");
-    const limitCheck = await canCreateDelivery(me.id);
+    const limitCheck = await canCreateDelivery(loja.id);
     if (!limitCheck.allowed) {
         return { error: limitCheck.reason || "Limite de entregas atingido." };
     }
@@ -55,12 +74,12 @@ export async function createRouteAction(prevState: any, formData: FormData) {
         };
     }
 
-    if (await existeCorridaIgualRecente(me.id, addresses[0] as string, 1)) {
+    if (await existeCorridaIgualRecente(loja.id, addresses[0] as string, 1)) {
         return { error: "Rota já criada recentemente. Aguarde um momento." };
     }
 
     const shopCfg = await db.query.shopSettings.findFirst({
-        where: eq(shopSettings.userId, me.id),
+        where: eq(shopSettings.userId, loja.id),
         columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
     });
     const geoOpts = {
@@ -97,6 +116,11 @@ export async function createRouteAction(prevState: any, formData: FormData) {
     if (motoboyIdBruto) {
         const escolhido = await carregarMotoboyGerenciado(me, Number(motoboyIdBruto));
         if (!escolhido) return { error: "Esse motoboy não é da sua equipe." };
+        // Admin gerencia todo mundo, mas a rota é de UMA loja: o motoboy tem
+        // que ser da equipe dela (ou "da casa", sem loja).
+        if (!motoboyServeALoja(escolhido, loja.id)) {
+            return { error: "Esse motoboy não é da equipe dessa loja." };
+        }
         destinatario = { id: escolhido.id, name: escolhido.name };
     }
 
@@ -117,13 +141,15 @@ export async function createRouteAction(prevState: any, formData: FormData) {
 
     // Data sempre em ISO (o CURRENT_TIMESTAMP do banco grava noutro formato e as
     // duas formas juntas quebram comparação e ordenação).
-    const agora = new Date().toISOString();
+    // No lançamento atrasado é o dia escolhido com a hora de agora — e é ele que
+    // decide de qual dia sai o "Corrida N".
+    const agora = data.quandoISO;
 
     /** Uma parada, do jeito que vai pro banco. Destinada a alguém já nasce "aceita". */
     const montar = (originalIndex: number, ordem: number, lat: number, lng: number) => ({
         createdAt: agora,
         updatedAt: agora,
-        shopkeeperId: me.id,
+        shopkeeperId: loja.id,
         motoboyId: destinatario?.id ?? null,
         address: addresses[originalIndex] as string,
         customerName: names[originalIndex] as string,
@@ -155,7 +181,7 @@ export async function createRouteAction(prevState: any, formData: FormData) {
     // entram no banco, e no MESMO fôlego do INSERT — outra rota chegando junto
     // não pode repetir número (ver src/lib/dailySeq.ts).
     const criadas = db.transaction((tx) => {
-        const numeros = sequenciaDoDia(tx, me.id, agora, newDeliveries.length);
+        const numeros = sequenciaDoDia(tx, loja.id, agora, newDeliveries.length);
         const comNumero = newDeliveries.map((d, i) => ({ ...d, dailySeq: numeros[i] }));
         return tx.insert(deliveries).values(comNumero)
             .returning({ id: deliveries.id, dailySeq: deliveries.dailySeq })
@@ -166,7 +192,11 @@ export async function createRouteAction(prevState: any, formData: FormData) {
     const primeiroNumero = criadas[0]?.dailySeq ?? null;
     const ultimoNumero = criadas[criadas.length - 1]?.dailySeq ?? null;
 
-    if (destinatario) {
+    // Rota de dias atrás não avisa ninguém: o push serve pra alguém sair pra
+    // buscar o pedido, e não tem pedido nenhum esperando.
+    if (data.retroativa) {
+        // nada de push: é lançamento de histórico
+    } else if (destinatario) {
         // Corrida com dono não vira anúncio pro pool: só o escolhido é avisado,
         // e sem endereço com número no corpo do push (é dado do cliente).
         pushDeCorridaDestinada(
@@ -175,14 +205,14 @@ export async function createRouteAction(prevState: any, formData: FormData) {
             newDeliveries.length > 1
                 ? `${faixaDeCorridas(primeiroNumero, ultimoNumero) ?? `${newDeliveries.length} entregas`} pra você`
                 : resumoDoLocal(newDeliveries[0].address),
-            me.name,
+            loja.name,
             // Rota de uma parada só tem um número; com várias, a faixa já foi
             // pro corpo do push e o título fica sem número.
             newDeliveries.length > 1 ? null : primeiroNumero,
         ).catch(() => { });
     } else {
         // Só quem pode VER essas corridas é avisado (regra única em team.ts).
-        pushDeCorridaNova(me.id, {
+        pushDeCorridaNova(loja.id, {
             title: newDeliveries.length > 1 ? "🔥 Várias Corridas Novas!" : "🏍️ Nova Corrida Disponível!",
             body: newDeliveries.length > 1
                 ? [faixaDeCorridas(primeiroNumero, ultimoNumero), `${newDeliveries.length} entregas aguardando`]

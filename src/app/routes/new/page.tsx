@@ -2,11 +2,12 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { createRouteAction } from "../../actions/routes";
-import { listarMotoboysDaEquipeAction } from "../../actions/logistics";
-import { Plus, Trash, User, DollarSign, ArrowLeft, Loader2, Package } from "lucide-react";
+import { listarLojasParaCorridaAction, listarMotoboysDaEquipeAction } from "../../actions/logistics";
+import { Plus, Trash, User, DollarSign, ArrowLeft, Loader2, Package, Store, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import AddressAutocomplete from "@/components/map/AddressAutocomplete";
 import { CHARGE_MODES, CHARGE_MODE_AJUDA, CHARGE_MODE_LABEL, type ChargeMode } from "@/lib/chargeMode";
+import { limitesDoCampoData, MAX_DIAS_ATRAS } from "@/lib/lancamentoRetroativo";
 
 const initialState = {
     message: "",
@@ -20,14 +21,40 @@ export default function NewRoutePage() {
     const [cobrancas, setCobrancas] = useState<Record<number, ChargeMode>>({ 1: "receber" });
     /** Equipe da loja, pra já destinar a rota a alguém. Vazia = só fila aberta. */
     const [motoboys, setMotoboys] = useState<{ id: number; name: string }[]>([]);
+    /**
+     * As lojas do campo "Loja" — só o admin vê. Lojista recebe lista vazia do
+     * servidor, e pra ele nada muda na tela.
+     */
+    const [lojas, setLojas] = useState<{ id: number; name: string }[]>([]);
+    const [lojaId, setLojaId] = useState<string>("");
+    /** É admin? Só pra avisar quando não há NENHUMA loja ativa pra escolher. */
+    const [ehAdmin, setEhAdmin] = useState(false);
+    /** Limites do "Data da corrida": a mesma régua que o servidor cobra. */
+    const [limitesData] = useState(() => limitesDoCampoData());
 
-    // A lista vem do servidor (motoboyScope): esta página é toda client-side,
-    // então é aqui que ela é buscada. Falhou? O campo some e a rota vai pra fila.
+    // As listas vêm do servidor: esta página é toda client-side. Falhou? O campo
+    // de motoboy some e a rota vai pra fila.
     useEffect(() => {
-        listarMotoboysDaEquipeAction()
-            .then((r) => { if (!("error" in r)) setMotoboys(r.motoboys); })
+        listarLojasParaCorridaAction()
+            .then((r) => {
+                if ("error" in r) return;
+                setEhAdmin(r.ehAdmin);
+                setLojas(r.lojas);
+                // Já vem marcada a loja da corrida mais recente: o admin lança
+                // sempre pela mesma, e o padrão certo evita o nome errado.
+                if (r.sugerida != null) setLojaId(String(r.sugerida));
+            })
             .catch(() => { });
     }, []);
+
+    // A equipe muda com a loja escolhida: motoboy da loja A não pode receber
+    // corrida da loja B (a mesma regra é cobrada no servidor).
+    useEffect(() => {
+        const alvo = lojaId ? Number(lojaId) : null;
+        listarMotoboysDaEquipeAction(alvo)
+            .then((r) => { if (!("error" in r)) setMotoboys(r.motoboys); })
+            .catch(() => { });
+    }, [lojaId]);
 
     const addItem = () => {
         const id = Date.now();
@@ -161,6 +188,64 @@ export default function NewRoutePage() {
                         ))}
                     </div>
 
+                    {/* Só o admin tem esse campo: ele não tem loja própria, então
+                        precisa dizer de quem é a corrida. Sem isto ela nascia no
+                        nome dele e ficava fora do fechamento da loja de verdade. */}
+                    {lojas.length > 0 && (
+                        <div className="bg-zinc-800 p-6 rounded-xl border border-amber-700/50">
+                            <label htmlFor="loja-da-rota" className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                <Store size={14} />
+                                Loja
+                            </label>
+                            <select
+                                id="loja-da-rota"
+                                name="shopId"
+                                required
+                                value={lojaId}
+                                onChange={(e) => setLojaId(e.target.value)}
+                                className="w-full px-4 py-2.5 min-h-11 rounded-lg border border-zinc-600 bg-zinc-700 text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
+                            >
+                                <option value="">Escolha a loja…</option>
+                                {lojas.map(l => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-zinc-500 mt-1">
+                                A corrida entra no resumo do dia, no histórico e na numeração DESSA loja.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Admin sem nenhuma loja ativa: o servidor barraria o cadastro
+                        com "escolha a loja" e ninguém entenderia por quê. */}
+                    {ehAdmin && lojas.length === 0 && (
+                        <div className="bg-amber-900/40 text-amber-200 p-4 rounded-xl border border-amber-700 text-sm">
+                            Nenhuma loja ativa cadastrada. Como admin você precisa escolher a loja da
+                            corrida — ative (ou cadastre) uma loja antes de lançar.
+                        </div>
+                    )}
+
+                    {/* Lançamento atrasado: a corrida de terça, digitada na quinta.
+                        Vazio = hoje, que é o caso de quase todo cadastro. */}
+                    <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
+                        <label htmlFor="data-da-rota" className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                            <CalendarDays size={14} />
+                            Data da corrida (opcional)
+                        </label>
+                        <input
+                            id="data-da-rota"
+                            name="deliveryDate"
+                            type="date"
+                            min={limitesData.min}
+                            max={limitesData.max}
+                            className="w-full px-4 py-2.5 min-h-11 rounded-lg border border-zinc-600 bg-zinc-700 text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
+                        />
+                        <p className="text-xs text-zinc-500 mt-1">
+                            Deixe vazio pra hoje. Serve pra lançar corrida de dia passado (até {MAX_DIAS_ATRAS} dias atrás):
+                            ela entra no resumo daquele dia e ninguém recebe aviso no celular.
+                        </p>
+                    </div>
+
                     {motoboys.length > 0 && (
                         <div className="bg-zinc-800 p-6 rounded-xl border border-zinc-700">
                             <label htmlFor="motoboy-da-rota" className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1 block">
@@ -169,6 +254,10 @@ export default function NewRoutePage() {
                             <select
                                 id="motoboy-da-rota"
                                 name="motoboyId"
+                                // `key` na loja: trocar de loja troca a equipe, e o
+                                // motoboy que estava escolhido pode não ser mais
+                                // dessa loja — o campo volta pro "deixar na fila".
+                                key={lojaId}
                                 defaultValue=""
                                 className="w-full px-4 py-2.5 min-h-11 rounded-lg border border-zinc-600 bg-zinc-700 text-white focus:border-green-500 focus:ring-2 focus:ring-green-500/30 outline-none transition-all"
                             >
