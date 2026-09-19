@@ -391,7 +391,16 @@ export default function DraftConfirmForm({
                 </div>
             )}
 
-            {mostrarTaxa ? (
+            {/* Quem NÃO pode ver o ganho do motoboy não recebe o campo de jeito
+                nenhum — nem escondido. Um `type="hidden"` continua escrito no
+                código-fonte da página, e a fila da loja roda DENTRO do painel do
+                EpicStore: bastaria o vendedor abrir o inspetor pra ler quanto o
+                motoboy ganha.
+
+                Quem guarda a taxa nesse caminho é o servidor: a conferência pela
+                fila relê o valor do banco (src/app/actions/queue.ts) e a edição
+                pela fila nem toca no campo. */}
+            {mostrarTaxa && (
                 <div>
                     <label className="block text-sm font-medium text-zinc-300 mb-2">Taxa da corrida (R$)</label>
                     <input
@@ -403,12 +412,6 @@ export default function DraftConfirmForm({
                     />
                     <p className="text-xs text-zinc-500 mt-1">É o que o motoboy ganha por essa entrega.</p>
                 </div>
-            ) : (
-                // Escondido, mas VIAJANDO: o campo some da vista de quem não pode
-                // ver o ganho do motoboy — e o valor que já estava gravado vai
-                // junto assim mesmo. Sem este campo oculto, salvar zeraria a taxa
-                // que a regra da loja tinha calculado.
-                <input type="hidden" name="fee" value={money(draft.fee)} />
             )}
 
             <div>

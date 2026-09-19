@@ -109,7 +109,9 @@ export default async function EditarPelaFilaPage({
                         customerName: corrida.customerName,
                         customerPhone: corrida.customerPhone,
                         value: corrida.value,
-                        fee: corrida.fee,
+                        // Mesma regra da tela de conferência: a taxa do motoboy
+                        // não desce pro navegador do vendedor nem como prop.
+                        fee: null,
                         observation: corrida.observation,
                         createdAt: corrida.createdAt,
                         geoPrecision: corrida.geoPrecision,

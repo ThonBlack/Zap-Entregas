@@ -108,7 +108,11 @@ export default async function ConferirPelaFilaPage({
                         customerName: rascunho.customerName,
                         customerPhone: rascunho.customerPhone,
                         value: rascunho.value,
-                        fee: rascunho.fee,
+                        // A taxa do motoboy NÃO desce pra esta tela. Prop que vai
+                        // pro componente de cliente é serializada no código-fonte
+                        // da página — mandar o número aqui o entregaria ao painel
+                        // do EpicStore mesmo sem nada aparecer na tela.
+                        fee: null,
                         observation: rascunho.observation,
                         createdAt: rascunho.createdAt,
                         geoPrecision: rascunho.geoPrecision,
