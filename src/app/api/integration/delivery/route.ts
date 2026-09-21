@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { deliveries, users, shopSettings } from "@/db/schema";
+import { deliveries, shopSettings } from "@/db/schema";
 import { eq, and, ne, inArray, desc, sql } from "drizzle-orm";
 import { NextRequest, NextResponse, after } from "next/server";
 import { geocodeAddress } from "@/lib/routeUtils";
@@ -11,6 +11,7 @@ import { calcularTaxa, dependeDaDistancia } from "@/lib/fee";
 import { logServerError } from "@/lib/serverLog";
 import { aplicarLimite } from "@/lib/rateLimit";
 import { normalizarChargeMode } from "@/lib/chargeMode";
+import { autenticarChaveDeApi } from "@/lib/apiKeyAuth";
 
 /**
  * API de Integração para PDV
@@ -194,17 +195,10 @@ function agendarGeocode(
     void trabalho();
 }
 
-async function authenticateApiKey(apiKey: string | null) {
-    if (!apiKey || !apiKey.startsWith("zap_")) return null;
-    return db.query.users.findFirst({
-        where: and(eq(users.apiKey, apiKey), eq(users.role, "shopkeeper")),
-    });
-}
-
 export async function POST(request: NextRequest) {
     try {
         const apiKey = request.headers.get("X-API-KEY");
-        const user = await authenticateApiKey(apiKey);
+        const user = await autenticarChaveDeApi(apiKey);
 
         if (!user) {
             return NextResponse.json(
@@ -430,7 +424,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
     const apiKey = request.headers.get("X-API-KEY");
-    const user = await authenticateApiKey(apiKey);
+    const user = await autenticarChaveDeApi(apiKey);
 
     if (!user) {
         return NextResponse.json({ success: false, error: "API Key inválida" }, { status: 401 });

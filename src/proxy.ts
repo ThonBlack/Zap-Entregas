@@ -30,7 +30,14 @@ export default function proxy(request: NextRequest) {
     res.headers.set("X-Content-Type-Options", "nosniff");
     res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
 
-    if (request.nextUrl.pathname.startsWith("/confirmar/")) {
+    // As DUAS telas que o PDV embute por cima da venda:
+    //   /confirmar/<código>  → o caixa confere UMA corrida que acabou de vender;
+    //   /fila/<código>       → o vendedor cuida da fila da loja o expediente todo.
+    // As duas são autorizadas por código na URL, não por cookie — dentro do
+    // quadro de outro domínio o navegador não manda cookie nosso de qualquer
+    // jeito (é o "cookie de terceiro" que os navegadores já bloqueiam).
+    const caminho = request.nextUrl.pathname;
+    if (caminho.startsWith("/confirmar/") || caminho.startsWith("/fila/")) {
         const permitidos = (process.env.PDV_FRAME_ANCESTORS || "").trim();
         res.headers.set(
             "Content-Security-Policy",

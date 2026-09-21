@@ -1,10 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { deliveries, shopSettings } from "@/db/schema";
+import { deliveries } from "@/db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { geocodeAddress, type GeocodeOpts } from "@/lib/routeUtils";
+import { resolverPontoEditado } from "@/lib/deliveryEdit";
 import { getAuthUserWithRole } from "@/lib/session";
 import { parseMoney } from "@/lib/money";
 import { normalizarChargeMode, type ChargeMode } from "@/lib/chargeMode";
@@ -69,42 +69,18 @@ export async function updatePendingDeliveryAction(formData: FormData): Promise<A
 
     // O pino do mapa manda coordenadas. Se a pessoa não encostou no pino e mudou o
     // endereço, o ponto antigo não vale mais: geocodifica de novo.
-    const pinTouched = formData.get("pinTouched") === "1";
-    let lat = Number(formData.get("lat"));
-    let lng = Number(formData.get("lng"));
-    const pinValid = Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && lng !== 0;
-    const enderecoMudou = address !== atual.address;
-
-    let geoPrecision: string | null = atual.geoPrecision ?? null;
-
-    if (pinTouched && pinValid) {
-        geoPrecision = "exata";
-    } else if (enderecoMudou || !pinValid) {
-        lat = 0; lng = 0;
-        geoPrecision = null;
-        try {
-            const s = await db.query.shopSettings.findFirst({
-                where: eq(shopSettings.userId, atual.shopkeeperId ?? -1),
-                columns: { defaultCity: true, defaultState: true, shopLat: true, shopLng: true },
-            });
-            const opts: GeocodeOpts = {
-                defaultCity: s?.defaultCity ?? null,
-                defaultState: s?.defaultState ?? null,
-                shopLat: s?.shopLat ?? null,
-                shopLng: s?.shopLng ?? null,
-            };
-            const coords = await geocodeAddress(address, opts);
-            if (coords) { lat = coords.lat; lng = coords.lng; geoPrecision = coords.precision; }
-        } catch (e) {
-            console.error("[EDITAR] geocode falhou:", e);
-        }
-        // Geocode falhou mas o pino que veio da tela é válido: melhor ele do que 0,0.
-        if (lat === 0 && lng === 0 && pinValid) {
-            lat = Number(formData.get("lat"));
-            lng = Number(formData.get("lng"));
-            geoPrecision = atual.geoPrecision ?? null;
-        }
-    }
+    // A régua inteira mora em src/lib/deliveryEdit.ts — a Fila da loja corrige
+    // corrida pela mesma porta e tem que gravar o pino do mesmo jeito.
+    const { lat, lng, geoPrecision } = await resolverPontoEditado({
+        shopkeeperId: atual.shopkeeperId,
+        address,
+        enderecoAnterior: atual.address,
+        geoPrecisionAnterior: atual.geoPrecision ?? null,
+        pinTouched: formData.get("pinTouched") === "1",
+        lat: Number(formData.get("lat")),
+        lng: Number(formData.get("lng")),
+        origem: "EDITAR",
+    });
 
     const updated = await db.update(deliveries)
         .set({

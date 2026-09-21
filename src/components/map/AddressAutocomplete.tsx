@@ -21,6 +21,13 @@ interface AddressAutocompleteProps {
      * código, senão a chave paga do Google ficaria aberta pra internet.
      */
     confirmToken?: string | null;
+    /**
+     * Código da Fila da loja. Mesma história do `confirmToken`: a tela
+     * `/fila/<código>` roda dentro do painel do EpicStore, sem cookie nosso —
+     * sem mandar o código junto, a busca de endereço volta 401 e o campo fica
+     * mudo.
+     */
+    filaToken?: string | null;
 }
 
 interface Suggestion {
@@ -46,6 +53,7 @@ export default function AddressAutocomplete({
     shopLat = null,
     shopLng = null,
     confirmToken = null,
+    filaToken = null,
 }: AddressAutocompleteProps) {
     const [inputValue, setInputValue] = useState(value);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -74,6 +82,7 @@ export default function AddressAutocomplete({
                 params.set("lng", String(shopLng));
             }
             if (confirmToken) params.set("confirmToken", confirmToken);
+            if (filaToken) params.set("filaToken", filaToken);
             const g = await fetch(`/api/places/autocomplete?${params}`);
             if (g.ok) {
                 const data = await g.json();
@@ -117,7 +126,7 @@ export default function AddressAutocomplete({
         } finally {
             setIsLoading(false);
         }
-    }, [defaultCity, defaultState, shopLat, shopLng, confirmToken]);
+    }, [defaultCity, defaultState, shopLat, shopLng, confirmToken, filaToken]);
 
     // Debounce input
     useEffect(() => {
@@ -151,6 +160,7 @@ export default function AddressAutocomplete({
             try {
                 const detalhe = new URLSearchParams({ place_id: suggestion.place_id });
                 if (confirmToken) detalhe.set("confirmToken", confirmToken);
+                if (filaToken) detalhe.set("filaToken", filaToken);
                 const res = await fetch(`/api/places/details?${detalhe}`);
                 const data = await res.json();
                 const loc = data?.result?.geometry?.location;
