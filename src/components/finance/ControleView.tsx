@@ -62,6 +62,14 @@ type Props = {
 /** Mais que isto na lista de devoluções vira rolagem infinita no celular. */
 const MAX_DEVOLUCOES = 60;
 
+/**
+ * Só a PRIMEIRA letra em maiúscula. O `capitalize` do CSS mexe em toda palavra
+ * e escrevia "Sexta-Feira" e "14/09 A 20/09".
+ */
+function comMaiuscula(texto: string): string {
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 export default function ControleView({
     ledger, devolucoes, visao, month, year, basePath, perspective,
     hrefDoDia, hrefRegistrarDevolucao, hrefRegistrarDoDia,
@@ -119,8 +127,9 @@ export default function ControleView({
                 >
                     <ChevronLeft size={20} />
                 </Link>
-                <span className="font-bold text-white text-center">
-                    {visao === "mes" ? "Últimos 6 meses até " : ""}{MESES_CURTOS[month - 1]} / {year}
+                <span className="font-bold text-white text-center px-1">
+                    {visao === "mes" && <span className="block text-xs font-normal text-zinc-400">6 meses até</span>}
+                    {MESES_CURTOS[month - 1]} / {year}
                 </span>
                 {temProximo ? (
                     <Link
@@ -282,7 +291,7 @@ function CartaoDoDia({
     hrefRegistrar?: string;
 }) {
     const ele = perspective === "loja" ? "com ele" : "com você";
-    const titulo = <span className="font-bold text-white capitalize">{fmtDiaLegivel(dia.dia)}</span>;
+    const titulo = <span className="font-bold text-white">{comMaiuscula(fmtDiaLegivel(dia.dia))}</span>;
 
     return (
         <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-3 space-y-2">
@@ -351,7 +360,7 @@ function CartaoDoPeriodo({ periodo, perspective }: { periodo: PeriodoDoLedger; p
     return (
         <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-3 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="font-bold text-white capitalize">{periodo.rotulo}</span>
+                <span className="font-bold text-white">{comMaiuscula(periodo.rotulo)}</span>
                 <span className="text-xs text-zinc-400">
                     {t.corridas} {t.corridas === 1 ? "corrida" : "corridas"} · {periodo.dias.length}{" "}
                     {periodo.dias.length === 1 ? "dia com movimento" : "dias com movimento"}
