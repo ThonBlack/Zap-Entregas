@@ -9,6 +9,7 @@ import { requireShopkeeper } from "@/lib/session";
 import { carregarMotoboyGerenciado } from "@/lib/team";
 import { getDailySummary } from "@/lib/dailySummary";
 import { getClosing } from "@/lib/dailyClosing";
+import { getLedgerPorDia } from "@/lib/ledgerDiario";
 import { ehDiaISO, fmtDiaLegivel, hojeBrasiliaISO, somaDiasISO } from "@/lib/datetime";
 import ResumoDoDia from "@/components/finance/ResumoDoDia";
 
@@ -34,10 +35,21 @@ export default async function FechamentoPage({
     const pedido = (await searchParams).d;
     const day = ehDiaISO(pedido) ? pedido : hoje;
 
-    const [summary, closing] = await Promise.all([
+    const [summary, closing, ledger] = await Promise.all([
         getDailySummary(motoboy.id, motoboy.shopkeeperId ?? null, day),
         getClosing(motoboy.id, day),
+        // O que ele devolveu NESTE dia sai da mesma lib do Controle — nenhuma
+        // conta do fechamento (daily_closings) muda por causa disto.
+        getLedgerPorDia(motoboy.id, day, day),
     ]);
+
+    const devolvidoNoDia = ledger.dias[0]?.devolveu ?? 0;
+    // Sugere devolver o dinheiro em espécie do dia que ainda não voltou.
+    const aDevolver = Math.max(0, Math.round((summary.cashTotal - devolvidoNoDia) * 100) / 100);
+    const voltarPara = encodeURIComponent(`/motoboys/${motoboy.id}/fechamento?d=${day}`);
+    const hrefRegistrarDevolucao =
+        `/finance/new?motoboyId=${motoboy.id}&entry=recebi&d=${day}&returnTo=${voltarPara}`
+        + (aDevolver > 0 ? `&amount=${aDevolver.toFixed(2)}` : "");
 
     const basePath = `/motoboys/${motoboy.id}/fechamento`;
     const ontem = somaDiasISO(day, -1);
@@ -117,6 +129,8 @@ export default async function FechamentoPage({
                         net: closing.net,
                     }}
                     podeEditar
+                    devolvidoNoDia={devolvidoNoDia}
+                    hrefRegistrarDevolucao={hrefRegistrarDevolucao}
                 />
             </main>
         </div>

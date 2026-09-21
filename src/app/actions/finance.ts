@@ -6,9 +6,9 @@ import { eq, and, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getAuthUser, getAuthUserWithRole } from "@/lib/session";
-import { MANUAL_ENTRY_OPTIONS, safeReturnTo, type ManualEntryKey } from "@/lib/wallet";
+import { safeReturnTo } from "@/lib/wallet";
 import { carregarMotoboyGerenciado } from "@/lib/team";
-import { parseMoney } from "@/lib/money";
+import { AVISO_CAMPOS, registrarLancamentoManual } from "@/lib/lancamentoManual";
 
 export type ManualEntryState = { error?: string } | null;
 
@@ -18,25 +18,15 @@ export async function createTransactionAction(_prev: ManualEntryState, formData:
     const me = auth.user;
 
     const targetUserId = Number(formData.get("motoboyId"));
-    const amountStr = String(formData.get("amount") ?? "");
-    const entryKey = String(formData.get("entry") ?? "") as ManualEntryKey;
-    const description = String(formData.get("description") ?? "").trim();
-    const needsConfirmation = formData.get("needsConfirmation") === "on";
     const returnTo = String(formData.get("returnTo") ?? "") || "/app";
 
-    const entry = MANUAL_ENTRY_OPTIONS[entryKey];
-    if (!Number.isInteger(targetUserId) || targetUserId <= 0 || !amountStr || !entry) {
-        return { error: "Preencha motoboy, tipo e valor." };
+    // Sem motoboy escolhido o aviso é o do formulário incompleto, não o
+    // "motoboy não encontrado" (que confundiria quem só esqueceu de escolher).
+    if (!Number.isInteger(targetUserId) || targetUserId <= 0) {
+        return { error: AVISO_CAMPOS };
     }
     if (targetUserId === me.id) {
         return { error: "Não dá pra lançar na sua própria carteira." };
-    }
-
-    // `parseMoney` entende "1.850,00" (o conversor antigo lia R$ 1,85 e o acerto
-    // do mês virava centavos). Texto ilegível é erro na tela, nunca zero.
-    const amount = parseMoney(amountStr);
-    if (amount === null || amount <= 0) {
-        return { error: "Valor inválido. Escreva assim: 1.850,00" };
     }
 
     // Lançar dinheiro na carteira de um motoboy de OUTRA loja mexeria na dívida
@@ -46,41 +36,26 @@ export async function createTransactionAction(_prev: ManualEntryState, formData:
         return { error: "Motoboy não encontrado." };
     }
 
-    // Trava de reenvio: o link "Acertar R$ X" é um GET com o valor na URL, então
-    // apertar "voltar" no navegador reabre o formulário preenchido e salvava de
-    // novo — dois pagamentos iguais na carteira. Lançamento idêntico (mesmo
-    // motoboy, valor e tipo) em menos de 1 minuto é recusado.
-    // `datetime()` normaliza os dois formatos de data que existem no banco.
-    const repetido = await db.query.transactions.findFirst({
-        where: and(
-            eq(transactions.userId, targetUserId),
-            eq(transactions.amount, amount),
-            eq(transactions.type, entry.type),
-            eq(transactions.kind, entry.kind),
-            sql`datetime(${transactions.createdAt}) >= datetime('now', '-60 seconds')`,
-        ),
-        columns: { id: true },
-    });
-    if (repetido) {
-        return { error: "Este mesmo lançamento acabou de ser salvo. Confira o extrato antes de repetir." };
-    }
-
-    await db.insert(transactions).values({
-        userId: targetUserId,
+    // O resto da regra (valor, data do lançamento e trava de cópia) mora em
+    // src/lib/lancamentoManual.ts, pra poder ser testada sem sessão.
+    const r = await registrarLancamentoManual({
+        motoboyId: targetUserId,
         creatorId: me.id,
-        amount,
-        type: entry.type,
-        kind: entry.kind,
-        description: description || entry.label,
-        status: needsConfirmation ? "pending" : "confirmed",
-        // ISO explícito: o CURRENT_TIMESTAMP do banco grava noutro formato.
-        createdAt: new Date().toISOString(),
+        valorDigitado: String(formData.get("amount") ?? ""),
+        entryKey: String(formData.get("entry") ?? ""),
+        descricao: String(formData.get("description") ?? ""),
+        precisaConfirmar: formData.get("needsConfirmation") === "on",
+        dataDigitada: formData.get("data"),
     });
+    if (!r.ok) return { error: r.erro };
 
     revalidatePath("/app");
     revalidatePath("/motoboys");
     revalidatePath(`/motoboys/${targetUserId}/financeiro`);
+    revalidatePath(`/motoboys/${targetUserId}/financeiro/controle`);
+    revalidatePath(`/motoboys/${targetUserId}/fechamento`);
     revalidatePath("/finance/extrato");
+    revalidatePath("/finance/extrato/controle");
     redirect(safeReturnTo(returnTo));
 }
 
