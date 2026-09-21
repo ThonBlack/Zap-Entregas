@@ -3,7 +3,7 @@ export const metadata = { title: "Financeiro do motoboy · Zap Entregas" };
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Plus, HandCoins, User, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, Plus, HandCoins, User, ClipboardCheck, CalendarCheck } from "lucide-react";
 import { requireShopkeeper } from "@/lib/session";
 import { carregarMotoboyGerenciado } from "@/lib/team";
 import { getStatement, formatBRL } from "@/lib/wallet";
@@ -84,12 +84,20 @@ export default async function MotoboyFinanceiroPage({
                     )}
                 </div>
 
-                <Link
-                    href={`/motoboys/${motoboy.id}/fechamento`}
-                    className="flex items-center justify-center gap-2 bg-zinc-800 border-2 border-green-600 text-white p-3 rounded-2xl font-bold min-h-11 active:scale-[0.98] hover:bg-zinc-700"
-                >
-                    <ClipboardCheck size={20} className="text-green-400" /> Resumo do dia
-                </Link>
+                <div className="grid grid-cols-2 gap-3">
+                    <Link
+                        href={`/motoboys/${motoboy.id}/fechamento`}
+                        className="flex items-center justify-center gap-2 bg-zinc-800 border-2 border-green-600 text-white p-3 rounded-2xl font-bold min-h-11 active:scale-[0.98] hover:bg-zinc-700"
+                    >
+                        <ClipboardCheck size={20} className="text-green-400" /> Resumo do dia
+                    </Link>
+                    <Link
+                        href={`/motoboys/${motoboy.id}/financeiro/controle`}
+                        className="flex items-center justify-center gap-2 bg-zinc-800 border-2 border-green-600 text-white p-3 rounded-2xl font-bold min-h-11 active:scale-[0.98] hover:bg-zinc-700"
+                    >
+                        <CalendarCheck size={20} className="text-green-400" /> Controle
+                    </Link>
+                </div>
 
                 <StatementView
                     statement={statement}

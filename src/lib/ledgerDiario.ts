@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { deliveries, transactions, users } from "@/db/schema";
 import { and, eq, isNull, or, sql, type SQL } from "drizzle-orm";
-import { type DiaDoLedger } from "./ledgerDiario-shared";
+import { type DiaDoLedger, type LedgerPorDia, type LinhaDeDevolucao } from "./ledgerDiario-shared";
 
 export * from "./ledgerDiario-shared";
 
@@ -46,19 +46,6 @@ export type OpcoesDoLedger = {
      * assim que as telas usam, pra o saldo bater com o extrato.
      */
     shopkeeperId?: number | null;
-};
-
-export type LedgerPorDia = {
-    deDia: string;
-    ateDia: string;
-    /** Saldo com tudo que foi confirmado ANTES de `deDia`. */
-    saldoInicial: number;
-    /** Saldo no fim de `ateDia` (= saldoInicial + as variações dos dias). */
-    saldoFinal: number;
-    /** Saldo de hoje, sem recorte de data — o número do cabeçalho. */
-    saldoAtual: number;
-    /** Só os dias COM movimento, do mais antigo pro mais novo. */
-    dias: DiaDoLedger[];
 };
 
 /** Soma centavo a centavo sem herdar o lixo de ponto flutuante. */
@@ -149,15 +136,6 @@ export async function getLedgerPorDia(
         dias,
     };
 }
-
-/** Um "ele me entregou dinheiro" do período, do jeito que aparece na lista. */
-export type LinhaDeDevolucao = {
-    id: number;
-    amount: number;
-    description: string | null;
-    createdAt: string;
-    creatorName: string | null;
-};
 
 /**
  * As devoluções (credit/pagamento) do período, da mais nova pra mais velha.

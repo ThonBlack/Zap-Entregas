@@ -332,6 +332,19 @@ test("a semana que atravessa o mês não é cortada em duas", () => {
     assert.equal(meses[1].saldoFinal, 15);
 });
 
+test("o pedaço do calendário que cada visão pede", async () => {
+    const { intervaloDaTela } = await import("@/lib/ledgerDiario-shared");
+
+    assert.deepEqual(intervaloDaTela("dia", 9, 2026), { deDia: "2026-09-01", ateDia: "2026-09-30" });
+    // Semana: estica até fechar as semanas das pontas (31/08 é segunda; 04/10 é domingo).
+    assert.deepEqual(intervaloDaTela("semana", 9, 2026), { deDia: "2026-08-31", ateDia: "2026-10-04" });
+    // Mês: os seis últimos, inclusive o escolhido.
+    assert.deepEqual(intervaloDaTela("mes", 9, 2026), { deDia: "2026-04-01", ateDia: "2026-09-30" });
+    // E atravessando o ano.
+    assert.deepEqual(intervaloDaTela("mes", 2, 2026), { deDia: "2025-09-01", ateDia: "2026-02-28" });
+    assert.deepEqual(intervaloDaTela("dia", 2, 2028), { deDia: "2028-02-01", ateDia: "2028-02-29" });
+});
+
 test("agrupar lista vazia não estoura", () => {
     assert.deepEqual(agruparEmSemanas([], 42), []);
     assert.deepEqual(agruparEmMeses([], 42), []);

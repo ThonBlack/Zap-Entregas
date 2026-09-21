@@ -41,6 +41,29 @@ export type DiaDoLedger = {
     saldoNoFim: number;
 };
 
+/** O que `getLedgerPorDia` devolve (a busca no banco mora em ledgerDiario.ts). */
+export type LedgerPorDia = {
+    deDia: string;
+    ateDia: string;
+    /** Saldo com tudo que foi confirmado ANTES de `deDia`. */
+    saldoInicial: number;
+    /** Saldo no fim de `ateDia` (= saldoInicial + as variações dos dias). */
+    saldoFinal: number;
+    /** Saldo de hoje, sem recorte de data — o número do cabeçalho. */
+    saldoAtual: number;
+    /** Só os dias COM movimento, do mais antigo pro mais novo. */
+    dias: DiaDoLedger[];
+};
+
+/** Um "ele me entregou dinheiro" do período, do jeito que aparece na lista. */
+export type LinhaDeDevolucao = {
+    id: number;
+    amount: number;
+    description: string | null;
+    createdAt: string;
+    creatorName: string | null;
+};
+
 /** Os mesmos números de um dia, somados num período (semana, mês, tela toda). */
 export type TotaisDoLedger = {
     corridas: number;
@@ -203,6 +226,45 @@ function agrupar(
         saldo = saldoFinal;
     }
     return periodos;
+}
+
+/** Como a tela de Controle está agrupando o movimento. */
+export type VisaoDoControle = "dia" | "semana" | "mes";
+
+export function ehVisaoDoControle(v: unknown): v is VisaoDoControle {
+    return v === "dia" || v === "semana" || v === "mes";
+}
+
+/** Quantos meses a visão "Mês" mostra de uma vez. */
+export const MESES_NA_VISAO_MES = 6;
+
+/**
+ * Que pedaço do calendário a tela precisa buscar no banco.
+ *
+ *   dia    → o mês escolhido, do dia 1 ao último;
+ *   semana → o mesmo mês esticado até fechar as semanas das pontas, senão a
+ *            semana que começa em 28/09 apareceria com três dias só;
+ *   mes    → os últimos seis meses até o escolhido.
+ */
+export function intervaloDaTela(
+    visao: VisaoDoControle,
+    month: number,
+    year: number,
+): { deDia: string; ateDia: string } {
+    const chave = `${year}-${String(month).padStart(2, "0")}`;
+    const primeiro = `${chave}-01`;
+    const ultimo = ultimoDiaDoMes(chave);
+
+    if (visao === "semana") {
+        return { deDia: inicioDaSemanaISO(primeiro), ateDia: fimDaSemanaISO(ultimo) };
+    }
+    if (visao === "mes") {
+        const mesesAtras = month - (MESES_NA_VISAO_MES - 1);
+        const ano = mesesAtras > 0 ? year : year - 1;
+        const mes = mesesAtras > 0 ? mesesAtras : mesesAtras + 12;
+        return { deDia: `${ano}-${String(mes).padStart(2, "0")}-01`, ateDia: ultimo };
+    }
+    return { deDia: primeiro, ateDia: ultimo };
 }
 
 /** Semanas de segunda a domingo, da mais antiga pra mais nova. */

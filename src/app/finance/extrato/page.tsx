@@ -2,7 +2,7 @@
 export const metadata = { title: "Meu extrato · Zap Entregas" };
 
 import Link from "next/link";
-import { ArrowLeft, BarChart3 } from "lucide-react";
+import { ArrowLeft, BarChart3, CalendarCheck } from "lucide-react";
 import { requireMotoboy } from "@/lib/session";
 import { getStatement } from "@/lib/wallet";
 import StatementView, { type MarcadorFechamento } from "@/components/finance/StatementView";
@@ -30,12 +30,23 @@ export default async function ExtratoPage({ searchParams }: { searchParams: Prom
                     <ArrowLeft size={24} />
                 </Link>
                 <h1 className="text-xl font-bold text-white flex-1">Meu extrato</h1>
+                <Link href="/finance/extrato/controle" className="text-zinc-400 hover:text-green-400" title="Controle por dia, semana e mês">
+                    <CalendarCheck size={22} />
+                </Link>
                 <Link href="/finance/dashboard" className="text-zinc-400 hover:text-green-400" title="Gráfico do mês">
                     <BarChart3 size={22} />
                 </Link>
             </header>
             <main className="max-w-2xl mx-auto p-4 space-y-4">
                 <FechamentoPendente motoboyId={user.id} />
+
+                <Link
+                    href="/finance/extrato/controle"
+                    className="min-h-11 flex items-center justify-center gap-2 bg-zinc-800 border-2 border-green-600 text-white p-3 rounded-2xl font-bold active:scale-[0.98] hover:bg-zinc-700"
+                >
+                    <CalendarCheck size={20} className="text-green-400" /> Controle por dia, semana e mês
+                </Link>
+
                 <StatementView
                     statement={statement}
                     basePath="/finance/extrato"

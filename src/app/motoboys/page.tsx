@@ -5,7 +5,7 @@ import Link from "next/link";
 import { db } from "@/db";
 import { users, deliveries, transactions, reviews } from "@/db/schema";
 import { eq, desc, inArray } from "drizzle-orm";
-import { ArrowLeft, Plus, Edit2, User, Users, Wallet, Send, RotateCcw, AlertTriangle, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, Plus, Edit2, User, Users, Wallet, Send, RotateCcw, AlertTriangle, ClipboardCheck, CalendarCheck } from "lucide-react";
 import { createMotoboyAction, reactivateMotoboyAction } from "@/app/actions/motoboy";
 import { requireShopkeeper } from "@/lib/session";
 import { getBalances, formatBRL } from "@/lib/wallet";
@@ -238,6 +238,9 @@ export default async function MotoboysPage({
                                                 </Link>
                                                 <Link href={`/motoboys/${motoboy.id}/fechamento`} className="p-2 text-zinc-400 hover:text-green-400 transition-colors bg-zinc-700 rounded-lg hover:bg-zinc-600" title="Resumo do dia">
                                                     <ClipboardCheck size={20} />
+                                                </Link>
+                                                <Link href={`/motoboys/${motoboy.id}/financeiro/controle`} className="p-2 text-zinc-400 hover:text-green-400 transition-colors bg-zinc-700 rounded-lg hover:bg-zinc-600" title="Controle: devolveu ou não devolveu">
+                                                    <CalendarCheck size={20} />
                                                 </Link>
                                                 <Link href={`/motoboys/${motoboy.id}/financeiro`} className="p-2 text-zinc-400 hover:text-green-400 transition-colors bg-zinc-700 rounded-lg hover:bg-zinc-600" title="Financeiro">
                                                     <Wallet size={20} />
