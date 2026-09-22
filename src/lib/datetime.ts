@@ -122,6 +122,33 @@ export function fmtDiaCurto(day: string): string {
     return `${day.slice(8, 10)}/${day.slice(5, 7)}`;
 }
 
+/**
+ * A segunda-feira da semana de um dia ("YYYY-MM-DD").
+ *
+ * A semana do controle é de SEGUNDA a DOMINGO — é como a loja conta ("essa
+ * semana ele devolveu tudo"), e não o domingo-a-sábado que o `getUTCDay()`
+ * devolve de graça. Dia ilegível volta como veio, pra nunca inventar semana.
+ */
+export function inicioDaSemanaISO(dia: string): string {
+    if (!ehDiaISO(dia)) return dia;
+    // getUTCDay(): 0 = domingo … 6 = sábado. O meio-dia evita virada de fuso.
+    const diaDaSemana = new Date(`${dia}T12:00:00Z`).getUTCDay();
+    const desdeSegunda = (diaDaSemana + 6) % 7; // segunda = 0, domingo = 6
+    return somaDiasISO(dia, -desdeSegunda);
+}
+
+/** O domingo que fecha a semana de um dia ("YYYY-MM-DD"). */
+export function fimDaSemanaISO(dia: string): string {
+    if (!ehDiaISO(dia)) return dia;
+    return somaDiasISO(inicioDaSemanaISO(dia), 6);
+}
+
+/** "2026-09-15" → "15/09 a 21/09" — o nome da semana na tela. */
+export function rotuloDaSemana(dia: string): string {
+    if (!ehDiaISO(dia)) return dia;
+    return `${fmtDiaCurto(inicioDaSemanaISO(dia))} a ${fmtDiaCurto(fimDaSemanaISO(dia))}`;
+}
+
 /** Em que dia de Brasília ("YYYY-MM-DD") caiu esta data do banco? */
 export function diaBrasiliaDe(raw: string | Date | null | undefined): string | null {
     const d = parseDbDate(raw);

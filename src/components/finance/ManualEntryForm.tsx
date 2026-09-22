@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { createTransactionAction, type ManualEntryState } from "@/app/actions/finance";
 import { MANUAL_ENTRY_OPTIONS, type ManualEntryKey, formatBRL } from "@/lib/wallet-shared";
+import { limitesDoCampoData } from "@/lib/lancamentoRetroativo";
 
 type Motoboy = { id: number; name: string; phone: string | null; balance?: number };
 
@@ -12,16 +13,26 @@ type Props = {
     defaultMotoboyId?: number;
     defaultEntry?: ManualEntryKey;
     defaultAmount?: number;
+    /**
+     * Hoje em Brasília ("YYYY-MM-DD"), calculado no servidor. Vem de fora pra
+     * a tela não discordar do servidor perto da meia-noite.
+     */
+    hoje: string;
+    /** Dia já escolhido (o botão "registrar a devolução DESTE dia"). */
+    defaultDate?: string;
     returnTo: string;
 };
 
 const ORDER: ManualEntryKey[] = ["paguei", "recebi", "bonus", "desconto", "abertura_devo", "abertura_deve"];
 
-export default function ManualEntryForm({ motoboys, defaultMotoboyId, defaultEntry = "paguei", defaultAmount, returnTo }: Props) {
+export default function ManualEntryForm({ motoboys, defaultMotoboyId, defaultEntry = "paguei", defaultAmount, hoje, defaultDate, returnTo }: Props) {
     const [state, formAction, pending] = useActionState<ManualEntryState, FormData>(createTransactionAction, null);
     const [entry, setEntry] = useState<ManualEntryKey>(defaultEntry);
     const [motoboyId, setMotoboyId] = useState<number>(defaultMotoboyId ?? motoboys[0]?.id ?? 0);
+    const [data, setData] = useState<string>(defaultDate ?? hoje);
     const selected = motoboys.find(m => m.id === motoboyId);
+    // Os mesmos limites que o servidor aplica (60 dias pra trás, nada no futuro).
+    const { min, max } = limitesDoCampoData(hoje);
 
     return (
         <form action={formAction} className="space-y-6">
@@ -93,6 +104,27 @@ export default function ManualEntryForm({ motoboys, defaultMotoboyId, defaultEnt
                         required
                     />
                 </div>
+            </div>
+
+            <div>
+                <label htmlFor="data-do-lancamento" className="block text-sm font-bold text-zinc-700 mb-2">
+                    Data
+                </label>
+                <input
+                    id="data-do-lancamento"
+                    type="date"
+                    name="data"
+                    value={data}
+                    min={min}
+                    max={max}
+                    onChange={e => setData(e.target.value)}
+                    className="w-full p-4 bg-zinc-50 text-zinc-900 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <p className="text-xs text-zinc-500 mt-1">
+                    {data === hoje
+                        ? "Hoje. Mude só se o dinheiro passou de mão num dia que já foi."
+                        : "Dia que já passou: o lançamento vai contar naquele dia, não hoje."}
+                </p>
             </div>
 
             <div>

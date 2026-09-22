@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, Check, Loader2, Pencil, Send, RotateCcw, X } from "lucide-react";
+import { AlertCircle, Check, HandCoins, Loader2, Pencil, Send, RotateCcw, X } from "lucide-react";
 
 import {
     adjustDeliveryReceiptAction,
@@ -45,6 +46,14 @@ type Props = {
     closing: ClosingResumo;
     /** Loja consegue mexer (lojista dono ou admin). */
     podeEditar: boolean;
+    /**
+     * Quanto o motoboy devolveu de dinheiro NESTE dia (credit/pagamento da
+     * carteira, pela lib do controle). Não entra em nenhuma conta do
+     * fechamento — está aqui só pra responder "ele já me entregou ou não?".
+     */
+    devolvidoNoDia?: number;
+    /** Link pra lançar a devolução deste dia, já com a data e o valor sugerido. */
+    hrefRegistrarDevolucao?: string | null;
 };
 
 /** Dinheiro em texto pro campo de edição: 12.5 → "12,50". */
@@ -53,7 +62,10 @@ function paraCampo(n: number | null | undefined): string {
     return n.toFixed(2).replace(".", ",");
 }
 
-export default function ResumoDoDia({ motoboyId, motoboyName, summary, closing, podeEditar }: Props) {
+export default function ResumoDoDia({
+    motoboyId, motoboyName, summary, closing, podeEditar,
+    devolvidoNoDia = 0, hrefRegistrarDevolucao = null,
+}: Props) {
     const router = useRouter();
     const [pendente, iniciar] = useTransition();
     const [erro, setErro] = useState<string | null>(null);
@@ -140,7 +152,23 @@ export default function ResumoDoDia({ motoboyId, motoboyName, summary, closing, 
                         cor={summary.adjustmentsTotal > 0 ? "text-green-400" : "text-red-400"}
                     />
                 )}
+                <div className="col-span-2">
+                    <Total
+                        label="Devolvido neste dia"
+                        valor={formatBRL(devolvidoNoDia)}
+                        cor={devolvidoNoDia > 0 ? "text-green-400" : "text-zinc-400"}
+                    />
+                </div>
             </div>
+
+            {hrefRegistrarDevolucao && (
+                <Link
+                    href={hrefRegistrarDevolucao}
+                    className="min-h-11 flex items-center justify-center gap-2 bg-zinc-800 border-2 border-green-600 text-white rounded-xl font-bold active:scale-[0.98] hover:bg-zinc-700"
+                >
+                    <HandCoins size={18} className="text-green-400" /> Registrar devolução deste dia
+                </Link>
+            )}
 
             {erro && (
                 <div className="bg-red-900/30 border border-red-700/50 text-red-300 p-3 rounded-xl flex items-start gap-2 text-sm">

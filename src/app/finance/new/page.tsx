@@ -6,11 +6,13 @@ import { requireShopkeeper } from "@/lib/session";
 import { motoboyScope } from "@/lib/team";
 import { getBalances, MANUAL_ENTRY_OPTIONS, safeReturnTo, type ManualEntryKey } from "@/lib/wallet";
 import ManualEntryForm from "@/components/finance/ManualEntryForm";
+import { ehDiaISO, hojeBrasiliaISO } from "@/lib/datetime";
+import { limitesDoCampoData } from "@/lib/lancamentoRetroativo";
 
 export default async function NewTransactionPage({
     searchParams,
 }: {
-    searchParams: Promise<{ motoboyId?: string; entry?: string; amount?: string; returnTo?: string }>;
+    searchParams: Promise<{ motoboyId?: string; entry?: string; amount?: string; d?: string; returnTo?: string }>;
 }) {
     const me = await requireShopkeeper();
     const sp = await searchParams;
@@ -27,6 +29,12 @@ export default async function NewTransactionPage({
     const defaultEntry = sp.entry && sp.entry in MANUAL_ENTRY_OPTIONS ? (sp.entry as ManualEntryKey) : undefined;
     const defaultAmount = sp.amount ? Number(sp.amount) : undefined;
     const returnTo = safeReturnTo(sp.returnTo);
+
+    // "Hoje" e o dia pré-escolhido saem daqui (servidor) pra tela não discordar
+    // do servidor na virada do dia. Dia impossível na URL é ignorado, não erro.
+    const hoje = hojeBrasiliaISO();
+    const { min } = limitesDoCampoData(hoje);
+    const defaultDate = ehDiaISO(sp.d) && sp.d >= min && sp.d <= hoje ? sp.d : undefined;
 
     return (
         <div className="min-h-screen bg-zinc-50 pb-20">
@@ -50,6 +58,8 @@ export default async function NewTransactionPage({
                             defaultMotoboyId={defaultMotoboyId}
                             defaultEntry={defaultEntry}
                             defaultAmount={Number.isFinite(defaultAmount) ? defaultAmount : undefined}
+                            hoje={hoje}
+                            defaultDate={defaultDate}
                             returnTo={returnTo}
                         />
                     )}
