@@ -9,6 +9,7 @@ import { requireMotoboy } from "@/lib/session";
 import Link from "next/link";
 import { ArrowLeft, Settings } from "lucide-react";
 import MotoboySettingsForm from "@/components/admin/MotoboySettingsForm";
+import NavegadorPreferidoCard from "@/components/admin/NavegadorPreferidoCard";
 import AvatarForm from "@/components/auth/AvatarForm";
 import GoogleAccountCard from "@/components/auth/GoogleAccountCard";
 import PasskeyCard from "@/components/auth/PasskeyCard";
@@ -71,6 +72,9 @@ export default async function MotoboySettingsPage({
                     userId={user.id}
                     currentGoal={user.dailyGoal || 10}
                 />
+                {/* Fica logo depois da meta porque é a outra coisa do dia a dia
+                    dele. Não tem prop nenhuma: a escolha mora no celular. */}
+                <NavegadorPreferidoCard />
                 <ChangePasswordCard temSenha={Boolean(user.password)} />
                 <PasskeyCard passkeys={passkeys} />
                 <GoogleAccountCard

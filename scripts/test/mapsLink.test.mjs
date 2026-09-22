@@ -9,7 +9,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { temCoordenada, alvoDoMaps, linkNavegacao, linkRota } = await import("@/lib/mapsLink");
+const {
+    temCoordenada, alvoDoMaps, linkNavegacao, linkRota, linkWaze, linkNavegacaoEm, NOME_DO_APP,
+} = await import("@/lib/mapsLink");
 
 test("coordenada de verdade é reconhecida", () => {
     assert.equal(temCoordenada({ lat: -19.75, lng: -47.93, address: "x" }), true);
@@ -70,4 +72,33 @@ test("rota de uma parada só não põe waypoints vazio", () => {
 
 test("rota vazia devolve string vazia (a tela não mostra botão nenhum)", () => {
     assert.equal(linkRota([]), "");
+});
+
+// ------------------------------------------------------------------- WAZE ---
+// O João pediu pra poder escolher: uns dias ele anda de Waze, outros de Maps.
+
+test("Waze com pino usa ll= (o Waze não geocodifica de novo)", () => {
+    const url = linkWaze({ lat: -19.75, lng: -47.93, address: "Rua A, 100" });
+    assert.equal(url, "https://waze.com/ul?ll=-19.75%2C-47.93&navigate=yes");
+});
+
+test("Waze sem pino usa q= com o endereço escrito", () => {
+    const url = linkWaze({ lat: 0, lng: 0, address: "Rua A, 100 - Uberaba" });
+    assert.equal(url, "https://waze.com/ul?q=Rua%20A%2C%20100%20-%20Uberaba&navigate=yes");
+});
+
+test("Waze sempre começa a navegação (navigate=yes)", () => {
+    assert.ok(linkWaze({ lat: -19.75, lng: -47.93, address: "x" }).includes("navigate=yes"));
+    assert.ok(linkWaze({ address: "x" }).includes("navigate=yes"));
+});
+
+test("linkNavegacaoEm manda pro app escolhido", () => {
+    const ponto = { lat: -19.75, lng: -47.93, address: "Rua A, 100" };
+    assert.equal(linkNavegacaoEm("maps", ponto), linkNavegacao(ponto));
+    assert.equal(linkNavegacaoEm("waze", ponto), linkWaze(ponto));
+});
+
+test("nome do app é o que o motoboy lê na tela", () => {
+    assert.equal(NOME_DO_APP.maps, "Google Maps");
+    assert.equal(NOME_DO_APP.waze, "Waze");
 });
