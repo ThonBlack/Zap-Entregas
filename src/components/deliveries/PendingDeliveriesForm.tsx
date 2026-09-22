@@ -11,7 +11,9 @@ import { rotuloCorrida } from "@/lib/dailySeq-shared";
 import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import CompleteDeliveryModal from "@/components/deliveries/CompleteDeliveryModal";
 import RefreshButton from "@/components/shared/RefreshButton";
-import { linkNavegacao } from "@/lib/mapsLink";
+import EscolherNavegadorModal from "@/components/deliveries/EscolherNavegadorModal";
+import { useNavegadorPreferido } from "@/components/shared/useNavegadorPreferido";
+import { linkNavegacaoEm, type AppDeNavegacao } from "@/lib/mapsLink";
 import {
     avaliarCerca,
     precisaJustificar,
@@ -343,6 +345,24 @@ export default function PendingDeliveriesForm({
         });
     };
 
+    /** Aplicativo de navegação escolhido. `null` = ainda vai perguntar. */
+    const { navegador, escolher: lembrarNavegador } = useNavegadorPreferido();
+    /** Corrida esperando o motoboy dizer em qual aplicativo quer abrir. */
+    const [perguntandoNavegador, setPerguntandoNavegador] = useState<Delivery | null>(null);
+
+    /**
+     * Abre o aplicativo escolhido na hora do clique.
+     *
+     * O `window.open` fica aqui dentro, no mesmo instante do toque, porque
+     * abrir depois de qualquer espera faz o celular tratar como pop-up e
+     * bloquear (foi o que aconteceu com a "Gerar Rota" no 4G).
+     */
+    const abrirNavegacao = (app: AppDeNavegacao, alvo: Delivery, lembrar: boolean) => {
+        if (lembrar) lembrarNavegador(app);
+        window.open(linkNavegacaoEm(app, alvo), "_blank", "noopener,noreferrer");
+        setPerguntandoNavegador(null);
+    };
+
     /** "Gerar Rota": trava enquanto roda e o link vira um botão de verdade. */
     const [gerandoRota, setGerandoRota] = useState(false);
     const [urlRota, setUrlRota] = useState("");
@@ -409,6 +429,14 @@ export default function PendingDeliveriesForm({
                         setCompletingId(escolhendo.id);
                         setEscolhendo(null);
                     }}
+                />
+            )}
+
+            {perguntandoNavegador && (
+                <EscolherNavegadorModal
+                    endereco={perguntandoNavegador.address}
+                    onCancelar={() => setPerguntandoNavegador(null)}
+                    onEscolher={(app, lembrar) => abrirNavegacao(app, perguntandoNavegador, lembrar)}
                 />
             )}
 
@@ -674,14 +702,26 @@ export default function PendingDeliveriesForm({
                                     )}
 
                                     {/* Navegar: link direto, sem depender da "Gerar Rota". Vai com
-                                        lat/lng quando a corrida tem pino conferido. */}
+                                        lat/lng quando a corrida tem pino conferido.
+
+                                        Continua sendo um <a> de verdade: com preferência gravada o
+                                        toque já abre o aplicativo, sem window.open nenhum no meio
+                                        (é o que nunca é bloqueado). Sem preferência, o clique é
+                                        segurado e a perguntinha aparece. */}
                                     {!delivery.masked && (
                                         <a
-                                            href={linkNavegacao(delivery)}
+                                            href={linkNavegacaoEm(navegador ?? "maps", delivery)}
+                                            onClick={(e) => {
+                                                if (navegador) return;
+                                                e.preventDefault();
+                                                setPerguntandoNavegador(delivery);
+                                            }}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className={`${BOTAO} bg-zinc-700 text-white hover:bg-zinc-600`}
-                                            title="Abrir o endereço no Google Maps"
+                                            title={navegador === "waze"
+                                                ? "Abrir o endereço no Waze"
+                                                : "Abrir o endereço no Google Maps"}
                                         >
                                             <Navigation size={16} />
                                             Navegar
