@@ -1,0 +1,32 @@
+# Zap Entregas - so a apresentacao e a politica de privacidade vao pro Google.
+# O resto e o sistema (precisa de login) ou link com codigo pessoal.
+User-agent: *
+Allow: /$
+Allow: /privacidade
+Allow: /register
+Disallow: /api/
+Disallow: /admin
+Disallow: /master
+Disallow: /app
+Disallow: /login
+Disallow: /completar-cadastro
+Disallow: /confirmar/
+Disallow: /convite/
+Disallow: /fila/
+Disallow: /review/
+Disallow: /tracking/
+Disallow: /deliveries
+Disallow: /finance
+Disallow: /motoboys
+Disallow: /routes
+Disallow: /settings
+Disallow: /security
+Disallow: /upgrade
+Disallow: /relatorio-do-dia
+Disallow: /uploads/
+Disallow: /offline.html
+# Copia antiga da apresentacao (epic-sites) e download do APK: evita pagina duplicada.
+Disallow: /landing
+Disallow: /baixar/
+
+Sitemap: https://zapentregas.duckdns.org/sitemap.xml
