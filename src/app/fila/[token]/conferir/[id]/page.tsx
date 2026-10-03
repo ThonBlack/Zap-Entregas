@@ -8,6 +8,7 @@ import FilaExpirada from "@/components/fila/FilaExpirada";
 import { carregarSessaoValida } from "@/lib/queueSession";
 import { isAddressSuspicious } from "@/lib/routeUtils";
 import { getBrowserMapsKey } from "@/lib/mapsKey";
+import { listarMotoboysDaLoja } from "@/lib/team";
 
 export const metadata = { title: "Conferir corrida · Fila da loja" };
 export const dynamic = "force-dynamic";
@@ -69,9 +70,14 @@ export default async function ConferirPelaFilaPage({
         );
     }
 
-    const settings = await db.query.shopSettings.findFirst({
-        where: eq(shopSettings.userId, sessao.shopkeeperId),
-    });
+    const [settings, equipe] = await Promise.all([
+        db.query.shopSettings.findFirst({
+            where: eq(shopSettings.userId, sessao.shopkeeperId),
+        }),
+        // Quem pode levar: só a equipe ativa DESTA loja. Vazio = o campo nem
+        // aparece e a corrida vai pra fila aberta, como sempre.
+        listarMotoboysDaLoja(sessao.shopkeeperId),
+    ]);
 
     const isSuspect = isAddressSuspicious(
         rascunho.lat ?? 0, rascunho.lng ?? 0, settings?.shopLat, settings?.shopLng, 100
@@ -131,6 +137,7 @@ export default async function ConferirPelaFilaPage({
                     // balcão. O valor calculado pela regra da loja continua
                     // gravado — ele só não aparece nem é editável aqui.
                     mostrarTaxa={false}
+                    motoboys={equipe}
                 />
             </main>
         </div>

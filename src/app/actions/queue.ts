@@ -4,10 +4,9 @@ import { db } from "@/db";
 import { deliveries } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { carregarSessaoValida, type SessaoDaFila } from "@/lib/queueSession";
-import { aplicarLimite } from "@/lib/rateLimit";
-import { newConfirmToken, confirmTokenExpiry } from "@/lib/trackingToken";
-import { confirmDraftAction } from "@/app/actions/drafts";
+import { autorizarFila, corridaDaLoja } from "@/lib/filaPorteiro";
+import { conferirMotoboyDaCorrida } from "@/lib/trocaDeMotoboy";
+import { liberarRascunho } from "@/lib/liberarRascunho";
 import { criarCorridaDaLoja } from "@/lib/novaCorrida";
 import { resolverPontoEditado } from "@/lib/deliveryEdit";
 import { parseMoney } from "@/lib/money";
@@ -43,45 +42,6 @@ type ResultadoDaFila = { error: string } | { success: true };
 
 const PAGINA = "/fila";
 
-type Autorizado =
-    | { ok: true; sessao: SessaoDaFila }
-    | { ok: false; erro: string };
-
-/**
- * Porteiro de toda ação: código válido e dentro do ritmo.
- *
- * O limite é por CÓDIGO (não por IP): é ele que autoriza, então é ele que tem
- * que cansar se alguém sair chamando em laço.
- */
-async function autorizar(token: unknown): Promise<Autorizado> {
-    const codigo = typeof token === "string" ? token : "";
-    const sessao = await carregarSessaoValida(codigo);
-    if (!sessao) {
-        return { ok: false, erro: "A fila da loja expirou. Feche e abra de novo pelo painel." };
-    }
-
-    const ritmo = aplicarLimite("fila", `token:${sessao.token}`);
-    if (!ritmo.permitido) {
-        return { ok: false, erro: `Muitos cliques seguidos. Espere ${ritmo.esperarSegundos} segundos.` };
-    }
-
-    return { ok: true, sessao };
-}
-
-/** A corrida, só se ela for DESTA loja. Fora do escopo = não existe. */
-async function corridaDaLoja(sessao: SessaoDaFila, idBruto: unknown) {
-    const id = Number(idBruto);
-    if (!Number.isInteger(id) || id <= 0) return null;
-
-    const corrida = await db.query.deliveries.findFirst({
-        where: and(
-            eq(deliveries.id, id),
-            eq(deliveries.shopkeeperId, sessao.shopkeeperId),
-        ),
-    });
-    return corrida ?? null;
-}
-
 /** Dinheiro digitado na tela: vazio é zero, ilegível é `null` (vira erro). */
 function lerDinheiro(raw: FormDataEntryValue | null): number | null {
     const texto = String(raw ?? "").trim();
@@ -95,19 +55,21 @@ function lerDinheiro(raw: FormDataEntryValue | null): number | null {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Libera pros motoboys um rascunho que veio da venda.
+ * Libera pros motoboys um rascunho que veio da venda — na fila aberta ou já no
+ * nome de um motoboy da equipe da loja.
  *
  * Não reescreve a conferência: depois de provar que o rascunho é DESTA loja,
- * gera pra ele um código de conferência novo e entrega o trabalho pro
- * `confirmDraftAction` de sempre (src/app/actions/drafts.ts) — o mesmo que o
- * caixa usa pela janelinha do PDV. Assim a regra do pino, do "Corrida N", do
- * push e da condição de corrida existe num lugar só.
+ * entrega o trabalho pro mesmo miolo da conferência de sempre
+ * (src/lib/liberarRascunho.ts). Assim a regra do pino, do "Corrida N", do push
+ * e da condição de corrida existe num lugar só.
  *
- * O código gerado é de uso único e o próprio confirmDraftAction o apaga ao usar.
+ * O motoboy escolhido é conferido contra a equipe da loja DA SESSÃO
+ * (conferirMotoboyDaCorrida): número de motoboy de outra loja vindo do
+ * navegador é recusado como se não existisse.
  */
 export async function conferirRascunhoDaFilaAction(formData: FormData): Promise<ResultadoDaFila> {
     try {
-        const porta = await autorizar(formData.get("queueToken"));
+        const porta = await autorizarFila(formData.get("queueToken"));
         if (!porta.ok) return { error: porta.erro };
         const { sessao } = porta;
 
@@ -115,25 +77,31 @@ export async function conferirRascunhoDaFilaAction(formData: FormData): Promise<
         if (!corrida) return { error: "Corrida não encontrada." };
         if (corrida.status !== "draft") return { error: "Essa corrida já foi liberada." };
 
-        const confirmToken = newConfirmToken();
-        const trocou = await db.update(deliveries)
-            .set({ confirmToken, confirmTokenExpiresAt: confirmTokenExpiry() })
-            .where(and(eq(deliveries.id, corrida.id), eq(deliveries.status, "draft")))
-            .returning({ id: deliveries.id });
-        if (!trocou.length) return { error: "Essa corrida já foi liberada." };
+        // Vazio = "Qualquer um (fila aberta)", o comportamento de sempre.
+        const quem = { papel: "fila" as const, shopkeeperId: sessao.shopkeeperId, operador: sessao.operatorName };
+        let destinatario: { id: number; name: string } | null = null;
+        const motoboyIdBruto = String(formData.get("motoboyId") ?? "").trim();
+        if (motoboyIdBruto) {
+            const conferido = await conferirMotoboyDaCorrida(quem, corrida, Number(motoboyIdBruto));
+            if (!conferido.ok) return { error: conferido.erro };
+            destinatario = conferido.motoboy;
+        }
 
-        formData.set("confirmToken", confirmToken);
         // A taxa do motoboy vem do BANCO, nunca do formulário: o campo viaja
         // escondido na tela e quem abrisse o inspetor do navegador poderia
         // trocar o valor. Vendedor não mexe em dinheiro da operação.
         formData.set("fee", String(corrida.fee ?? 0).replace(".", ","));
-        const resultado = await confirmDraftAction(formData);
+        const resultado = await liberarRascunho(corrida, formData, {
+            destinatario,
+            autoria: sessao.operatorName ? `pela loja (${sessao.operatorName})` : "pela loja",
+        });
         if ("error" in resultado) return resultado;
 
         await logServerEvent("fila_conferida", `Corrida ${corrida.id} liberada pela fila da loja`, {
             page: PAGINA,
             userId: sessao.shopkeeperId,
             deliveryId: corrida.id,
+            motoboyId: destinatario?.id ?? null,
             operatorName: sessao.operatorName,
         });
 
@@ -166,7 +134,7 @@ export async function conferirRascunhoDaFilaAction(formData: FormData): Promise<
  */
 export async function editarCorridaDaFilaAction(formData: FormData): Promise<ResultadoDaFila> {
     try {
-        const porta = await autorizar(formData.get("queueToken"));
+        const porta = await autorizarFila(formData.get("queueToken"));
         if (!porta.ok) return { error: porta.erro };
         const { sessao } = porta;
 
@@ -257,7 +225,7 @@ export async function editarCorridaDaFilaAction(formData: FormData): Promise<Res
  */
 export async function cancelarCorridaDaFilaAction(formData: FormData): Promise<ResultadoDaFila> {
     try {
-        const porta = await autorizar(formData.get("queueToken"));
+        const porta = await autorizarFila(formData.get("queueToken"));
         if (!porta.ok) return { error: porta.erro };
         const { sessao } = porta;
 
@@ -332,7 +300,7 @@ export async function cancelarCorridaDaFilaAction(formData: FormData): Promise<R
  */
 export async function lancarCorridaDaFilaAction(formData: FormData): Promise<ResultadoDaFila> {
     try {
-        const porta = await autorizar(formData.get("queueToken"));
+        const porta = await autorizarFila(formData.get("queueToken"));
         if (!porta.ok) return { error: porta.erro };
         const { sessao } = porta;
 

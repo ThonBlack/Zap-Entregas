@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import LocationTracker from "@/components/map/LocationTracker";
 import AdBanner from "@/components/billing/AdBanner";
+import AutoRefresh from "@/components/shared/AutoRefresh";
 
 interface MotoboyViewProps {
     balance: number;
@@ -183,6 +184,11 @@ export function MotoboyView({ balance, pendingDeliveries, myDeliveries, deliveri
                     </Card>
                 </Link>
             )}
+
+            {/* A lista se atualiza sozinha: corrida que a loja/admin passou pra
+                outro motoboy (ou cancelou) some da tela sem ele precisar puxar
+                pra baixo — e corrida nova aparece. Para com a aba escondida. */}
+            <AutoRefresh segundos={30} />
 
             {/* Pending Deliveries */}
             <section>

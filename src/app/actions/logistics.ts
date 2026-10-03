@@ -21,7 +21,7 @@ import { chargeModeDaCorrida, normalizarChargeMode, type ChargeMode } from "@/li
 import { pushDeCorridaNova, pushToUser, pushDeCorridaDestinada } from "@/lib/push";
 import { validarRecebimento, type DeliveryReceipt, type RecebimentoValidado } from "@/lib/receipt";
 import { fecharCorridaNoBanco } from "@/lib/deliveryLedger";
-import { planejarDestino } from "@/lib/deliveryAssign";
+import { trocarMotoboyDaCorrida } from "@/lib/trocaDeMotoboy";
 import { parseMoney } from "@/lib/money";
 import { calcularTaxa, distanciaDaLoja } from "@/lib/fee";
 import { logServerError } from "@/lib/serverLog";
@@ -388,7 +388,8 @@ export async function acceptDeliveryAction(id: number) {
 }
 
 /**
- * A LOJA destina uma corrida a um motoboy (ou devolve pra fila).
+ * A LOJA destina uma corrida a um motoboy (ou devolve pra fila) — e o ADMIN
+ * troca o motoboy de qualquer corrida ainda não entregue.
  *
  * Até aqui só existia fila aberta: a loja cadastrava e torcia pra alguém pegar.
  * Com uma equipe fixa isso é ruim — o lojista sabe quem está livre.
@@ -396,9 +397,11 @@ export async function acceptDeliveryAction(id: number) {
  * `motoboyId = null` devolve pra fila (status volta pra "pending" e a corrida
  * some da mão de quem estava com ela).
  *
- * Janela: só enquanto a corrida está "pending" ou "assigned". Depois que o
- * motoboy COLETOU o pedido (picked_up) ele já está com a mercadoria — trocar o
- * dono aí deixaria a corrida no nome de quem não está com o pacote.
+ * Janela da loja: só enquanto a corrida está "pending" ou "assigned". Depois
+ * que o motoboy COLETOU o pedido (picked_up) ele já está com a mercadoria.
+ * O admin vai além: troca também a coletada (que segue coletada no nome do
+ * novo motoboy). Regras em src/lib/deliveryAssign.ts; o UPDATE, os avisos e o
+ * rastro em src/lib/trocaDeMotoboy.ts — o mesmo miolo da Fila da loja.
  */
 export async function assignDeliveryAction(id: number, motoboyId: number | null) {
     const auth = await getAuthUserWithRole(["shopkeeper", "admin"]);
@@ -415,52 +418,15 @@ export async function assignDeliveryAction(id: number, motoboyId: number | null)
         const delivery = await db.query.deliveries.findFirst({ where: ownership });
         if (!delivery) return { error: "Corrida não encontrada." };
 
-        // Lojista só destina pra motoboy DELE (motoboyScope, via carregarMotoboyGerenciado).
-        let escolhido: { id: number; name: string } | null = null;
-        if (motoboyId != null) {
-            const achado = await carregarMotoboyGerenciado(me, Number(motoboyId));
-            if (!achado) return { error: "Esse motoboy não é da sua equipe." };
-            if (achado.isActive === false) return { error: "Esse motoboy está desativado." };
-            escolhido = { id: achado.id, name: achado.name };
-        }
-
-        // A decisão (janela, status, rastro na observação) mora em
-        // src/lib/deliveryAssign.ts — lá ela é testável sem subir o servidor.
-        const agora = new Date().toISOString();
-        const plano = planejarDestino(delivery, escolhido, agora);
-        if (!plano.ok) return { error: plano.erro };
-        if (plano.jaEra) return { success: true, jaEra: true };
-
-        // O WHERE repete a condição: se o motoboy coletar (ou outro lojista mexer)
-        // entre a leitura e agora, nada é gravado.
-        const mudou = await db.update(deliveries)
-            .set({
-                motoboyId: plano.motoboyId,
-                status: plano.status,
-                acceptedAt: plano.acceptedAt,
-                observation: plano.observation,
-                updatedAt: agora,
-            })
-            .where(and(
-                eq(deliveries.id, id),
-                inArray(deliveries.status, ["pending", "assigned"]),
-            ))
-            .returning({ id: deliveries.id });
-
-        if (!mudou.length) return { error: "Essa corrida mudou de situação. Atualize a tela." };
-
-        if (escolhido) {
-            // Só o escolhido é avisado, e sem endereço/telefone no corpo.
-            pushDeCorridaDestinada(escolhido.id, id, resumoDoLocal(delivery.address), me.name)
-                .catch(() => { });
-        } else if (delivery.motoboyId) {
-            pushToUser(delivery.motoboyId, {
-                title: "↩️ Corrida devolvida pra fila",
-                body: `A loja tirou a corrida #${id} de você.`,
-                url: "/app",
-                tag: `entrega-${id}`,
-            }).catch(() => { });
-        }
+        const troca = await trocarMotoboyDaCorrida(
+            delivery,
+            motoboyId,
+            me.role === "admin"
+                ? { papel: "admin", id: me.id, nome: me.name }
+                : { papel: "loja", id: me.id, nome: me.name },
+        );
+        if (!troca.ok) return { error: troca.erro };
+        if (troca.jaEra) return { success: true, jaEra: true };
 
         revalidatePath("/app");
         return { success: true };
@@ -609,6 +575,11 @@ export async function completeDeliveryAction(
             if (motoboyIdEscolhido != null) {
                 const escolhido = await carregarMotoboyGerenciado(me, Number(motoboyIdEscolhido));
                 if (!escolhido) return { error: "Esse motoboy não é da sua equipe." };
+                // O admin gerencia todo mundo, mas a corrida é de UMA loja: a
+                // taxa não pode cair na carteira do motoboy de outra loja.
+                if (delivery.shopkeeperId != null && !motoboyServeALoja(escolhido, delivery.shopkeeperId)) {
+                    return { error: "Esse motoboy não é da equipe dessa loja." };
+                }
                 if (escolhido.id !== delivery.motoboyId) atribuirMotoboyId = escolhido.id;
             } else if (delivery.motoboyId == null) {
                 return { error: "Escolha quem fez a entrega — a taxa e o dinheiro precisam de dono." };

@@ -84,3 +84,40 @@ test("observação gigante é cortada em 1000 (o tamanho da coluna)", () => {
     const p = planejarDestino(corrida({ observation: "a".repeat(1200) }), JOAO, AGORA);
     assert.equal(p.observation.length, 1000);
 });
+
+// ── Admin: troca até a entrega ──────────────────────────────────────────────
+
+test("admin troca a corrida coletada: ela segue coletada no nome do novo", () => {
+    const p = planejarDestino(
+        corrida({ status: "picked_up", motoboyId: 7, pickedUpAt: "2026-09-14T11:50:00.000Z" }),
+        MARIA, AGORA, { permitirColetada: true, autoria: "pelo admin" },
+    );
+    assert.equal(p.ok, true);
+    assert.equal(p.status, "picked_up", "o pedido já saiu da loja — não volta pra 'Peguei o pedido'");
+    assert.equal(p.motoboyId, 8);
+    assert.equal(p.pickedUpAt, undefined, "a hora da coleta fica como estava");
+    assert.equal(p.observation, "destinada pelo admin a Maria");
+});
+
+test("admin devolve pra fila uma corrida coletada: apaga o carimbo da coleta", () => {
+    const p = planejarDestino(
+        corrida({ status: "picked_up", motoboyId: 7, pickedUpAt: "2026-09-14T11:50:00.000Z" }),
+        null, AGORA, { permitirColetada: true },
+    );
+    assert.equal(p.ok, true);
+    assert.equal(p.status, "pending");
+    assert.equal(p.pickedUpAt, null);
+    assert.equal(p.acceptedAt, null);
+});
+
+test("nem o admin troca corrida entregue ou cancelada", () => {
+    for (const status of ["delivered", "canceled"]) {
+        const p = planejarDestino(corrida({ status, motoboyId: 7 }), MARIA, AGORA, { permitirColetada: true });
+        assert.equal(p.ok, false, status);
+    }
+});
+
+test("a autoria do carimbo muda conforme quem trocou", () => {
+    const p = planejarDestino(corrida(), JOAO, AGORA, { autoria: "pela loja (Ana)" });
+    assert.equal(p.observation, "destinada pela loja (Ana) a João");
+});

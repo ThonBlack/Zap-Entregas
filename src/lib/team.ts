@@ -274,6 +274,23 @@ export function motoboyScopeDaLoja(shopkeeperId: number): SQL | undefined {
     );
 }
 
+/**
+ * A equipe ATIVA de uma loja, só id e nome — o que a Fila da loja mostra pro
+ * vendedor escolher quem leva a corrida.
+ *
+ * É a mesma lista que o lojista vê no app (motoboyScope com a loja como ator):
+ * só quem tem `shopkeeper_id` = a loja. Os "da casa" (sem loja) ficam de fora —
+ * quem destina pra eles é o admin, não o balcão.
+ */
+export async function listarMotoboysDaLoja(shopkeeperId: number): Promise<{ id: number; name: string }[]> {
+    if (!Number.isInteger(shopkeeperId) || shopkeeperId <= 0) return [];
+    return db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(motoboyScope({ id: shopkeeperId, role: "shopkeeper" }))
+        .orderBy(users.name);
+}
+
 /** Ids dos motoboys da equipe — pra filtrar extrato, lançamentos etc. */
 export async function idsDaEquipe(
     me: Ator,
