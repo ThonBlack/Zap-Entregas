@@ -14,7 +14,7 @@ interface ShopkeeperViewProps {
     /** Contagens vindas do servidor (a lista aqui só tem as pendentes). */
     counts: { pendentes: number; emRota: number; feitasHoje: number; hoje: number };
     /** Motoboys ativos da equipe — pra destinar corrida e dizer quem entregou. */
-    motoboys: { id: number; name: string }[];
+    motoboys: { id: number; name: string; shopkeeperId?: number | null }[];
     user: any;
 }
 
@@ -138,6 +138,7 @@ export function ShopkeeperView({ pendingDeliveries, recentTransactions, counts, 
                 <PendingDeliveriesForm
                     deliveries={pendingDeliveries}
                     motoboys={motoboys}
+                    isAdmin={user.role === "admin"}
                     baseUrl={process.env.APP_URL ?? ""}
                 />
             </section>

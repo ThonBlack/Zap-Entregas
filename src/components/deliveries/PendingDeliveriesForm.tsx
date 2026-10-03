@@ -12,6 +12,7 @@ import ConfirmationModal from "@/components/shared/ConfirmationModal";
 import CompleteDeliveryModal from "@/components/deliveries/CompleteDeliveryModal";
 import RefreshButton from "@/components/shared/RefreshButton";
 import EscolherNavegadorModal from "@/components/deliveries/EscolherNavegadorModal";
+import EscolherMotoboy from "@/components/deliveries/EscolherMotoboy";
 import { useNavegadorPreferido } from "@/components/shared/useNavegadorPreferido";
 import { linkNavegacaoEm, type AppDeNavegacao } from "@/lib/mapsLink";
 import {
@@ -37,6 +38,8 @@ interface Delivery {
     lng: number | null;
     status: 'pending' | 'assigned' | 'picked_up' | 'delivered' | 'canceled';
     motoboyId: number | null;
+    /** De qual loja é a corrida — o admin só escolhe motoboy que serve a ela. */
+    shopkeeperId?: number | null;
     /** "Corrida N" do dia (por loja). Ausente em corrida antiga: o rótulo some. */
     dailySeq?: number | null;
     /** "receber" | "conferir" | "pago". Ausente = corrida antiga (cai na régua do valor). */
@@ -63,7 +66,12 @@ interface PendingDeliveriesFormProps {
      * Motoboys ativos da equipe (só vai pra tela da loja). É com esta lista que
      * a loja destina uma corrida e diz quem fez a entrega ao finalizar sem GPS.
      */
-    motoboys?: { id: number; name: string }[];
+    motoboys?: { id: number; name: string; shopkeeperId?: number | null }[];
+    /**
+     * Quem está vendo é o ADMIN: ele troca o motoboy até depois da coleta, e a
+     * lista de motoboys de cada corrida é filtrada pela loja dela.
+     */
+    isAdmin?: boolean;
 }
 
 /**
@@ -90,7 +98,7 @@ function montarLinkWhatsApp(delivery: Delivery, baseUrl: string) {
 const BOTAO = "min-h-11 px-3 rounded-lg text-sm font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 export default function PendingDeliveriesForm({
-    deliveries, isMotoboy = false, currentUserId, baseUrl = "", motoboys = [],
+    deliveries, isMotoboy = false, currentUserId, baseUrl = "", motoboys = [], isAdmin = false,
 }: PendingDeliveriesFormProps) {
     const router = useRouter();
     const [selected, setSelected] = useState<number[]>([]);
@@ -238,12 +246,32 @@ export default function PendingDeliveriesForm({
     const [escolhendo, setEscolhendo] = useState<{ id: number; para: "entregue" | "destinar" } | null>(null);
     const [destinando, setDestinando] = useState(false);
 
+    /**
+     * Motoboys que podem ficar com ESTA corrida. Pro lojista a lista já vem só
+     * com a equipe dele; o admin recebe todo mundo e aqui sobra quem serve a
+     * loja da corrida (os dela + os "da casa") — a mesma régua de
+     * motoboyServeALoja, que o servidor confere de novo.
+     */
+    /**
+     * A corrida ainda está nesta tela? Ela pode sumir com um modal aberto: a
+     * loja/admin passou pra outro motoboy (ou cancelou) e o refresh trouxe a
+     * lista nova. Aí o modal simplesmente não aparece mais — derivado na hora
+     * de desenhar, sem efeito nenhum — em vez de deixar o motoboy finalizar
+     * uma corrida que não é mais dele.
+     */
+    const naTela = (id: number | null | undefined) => id != null && deliveries.some(d => d.id === id);
+
+    const motoboysPara = (d: Delivery | undefined) =>
+        !isAdmin || !d
+            ? motoboys
+            : motoboys.filter(m => m.shopkeeperId == null || m.shopkeeperId === (d.shopkeeperId ?? null));
+
     const handleCompleteClick = (id: number) => {
         limparErro(id);
         const alvo = deliveries.find(d => d.id === id);
         // Loja finalizando corrida que ninguém aceitou: primeiro "quem entregou?".
         if (!isMotoboy && alvo && alvo.motoboyId == null) {
-            if (!motoboys.length) {
+            if (!motoboysPara(alvo).length) {
                 mostrarErro(id, "Cadastre um motoboy na sua equipe antes de marcar a entrega.");
                 return;
             }
@@ -407,13 +435,15 @@ export default function PendingDeliveriesForm({
                 confirmText="Confirmar"
                 pendingText="Excluindo…"
             />
-            {escolhendo && (
+            {escolhendo && naTela(escolhendo.id) && (
                 <EscolherMotoboy
                     titulo={escolhendo.para === "entregue" ? "Quem fez essa entrega?" : "Destinar a corrida"}
                     ajuda={escolhendo.para === "entregue"
                         ? "A taxa e o dinheiro recebido entram na conta de quem você escolher."
-                        : "Só esse motoboy vai receber o aviso. Ele não precisa aceitar de novo."}
-                    motoboys={motoboys}
+                        : deliveries.find(d => d.id === escolhendo.id)?.status === "picked_up"
+                            ? "O pedido já foi coletado: a corrida continua \"em rota\" no nome do novo motoboy. Quem sair dela é avisado no celular."
+                            : "Só esse motoboy vai receber o aviso. Ele não precisa aceitar de novo."}
+                    motoboys={motoboysPara(deliveries.find(d => d.id === escolhendo.id))}
                     atual={deliveries.find(d => d.id === escolhendo.id)?.motoboyId ?? null}
                     permiteFila={escolhendo.para === "destinar"}
                     salvando={destinando || completing || pendente}
@@ -440,7 +470,7 @@ export default function PendingDeliveriesForm({
                 />
             )}
 
-            {completingId != null && justificativa == null && escolhendo == null && (() => {
+            {naTela(completingId) && justificativa == null && escolhendo == null && (() => {
                 const alvo = deliveries.find(d => d.id === completingId);
                 return (
                     <CompleteDeliveryModal
@@ -456,7 +486,7 @@ export default function PendingDeliveriesForm({
                 );
             })()}
 
-            {justificativa && (
+            {justificativa && naTela(justificativa.id) && (
                 <ConfirmacaoForaDoRaio
                     pergunta={perguntaDaCerca(justificativa.situacao)}
                     motivo={motivo}
@@ -542,8 +572,10 @@ export default function PendingDeliveriesForm({
                         const podeEntregar = (isMotoboy && delivery.status === 'picked_up' && delivery.motoboyId === currentUserId) || !isMotoboy;
                         // Destinar/trocar de motoboy só enquanto ninguém coletou: depois
                         // disso a mercadoria já está na mão de alguém.
-                        const podeDestinar = !isMotoboy && motoboys.length > 0
-                            && (delivery.status === 'pending' || delivery.status === 'assigned');
+                        // O admin vai além: troca também a corrida já coletada.
+                        const podeDestinar = !isMotoboy && motoboysPara(delivery).length > 0
+                            && (delivery.status === 'pending' || delivery.status === 'assigned'
+                                || (isAdmin && delivery.status === 'picked_up'));
 
                         return (
                             <div key={delivery.id} className={`block bg-zinc-800 p-4 rounded-xl shadow-sm border transition-all ${selected.includes(delivery.id) ? 'border-green-500 ring-1 ring-green-500 bg-zinc-700' : 'border-zinc-700'}`}>
@@ -697,7 +729,7 @@ export default function PendingDeliveriesForm({
                                             title={delivery.motoboyId ? "Trocar o motoboy ou devolver pra fila" : "Mandar essa corrida pra um motoboy específico"}
                                         >
                                             <UserPlus size={16} />
-                                            {delivery.motoboyId ? "Trocar" : "Destinar"}
+                                            {delivery.motoboyId ? "Trocar motoboy" : "Destinar"}
                                         </button>
                                     )}
 
@@ -783,112 +815,6 @@ export default function PendingDeliveriesForm({
                 )}
             </div>
         </>
-    );
-}
-
-/**
- * "Quem faz essa corrida?" — a escolha do motoboy pela LOJA.
- *
- * Serve pras duas coisas que a loja passou a poder fazer: destinar uma corrida
- * a alguém da equipe (em vez de jogar na fila aberta) e dizer quem fez a
- * entrega na hora de marcar como entregue sem GPS. Nos dois casos o dono da
- * corrida é o que decide em qual carteira o dinheiro cai.
- */
-function EscolherMotoboy({
-    titulo, ajuda, motoboys, atual, permiteFila, salvando, erro, onCancelar, onEscolher,
-}: {
-    titulo: string;
-    ajuda: string;
-    motoboys: { id: number; name: string }[];
-    atual: number | null;
-    /** Mostra o "devolver pra fila" (só faz sentido ao destinar). */
-    permiteFila: boolean;
-    salvando: boolean;
-    erro: string;
-    onCancelar: () => void;
-    onEscolher: (motoboyId: number | null) => void;
-}) {
-    const [escolhido, setEscolhido] = useState<number | null>(atual);
-
-    useEffect(() => {
-        const aoTeclar = (e: KeyboardEvent) => { if (e.key === "Escape" && !salvando) onCancelar(); };
-        document.addEventListener("keydown", aoTeclar);
-        return () => document.removeEventListener("keydown", aoTeclar);
-    }, [onCancelar, salvando]);
-
-    return (
-        <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-            onClick={() => { if (!salvando) onCancelar(); }}
-        >
-            <div
-                role="dialog"
-                aria-modal="true"
-                aria-label={titulo}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto"
-            >
-                <div className="flex items-center gap-3 mb-2">
-                    <div className="p-2 bg-indigo-100 rounded-full"><UserPlus className="w-6 h-6 text-indigo-600" /></div>
-                    <h3 className="text-lg font-bold text-gray-900">{titulo}</h3>
-                </div>
-                <p className="text-sm text-gray-600 mb-4">{ajuda}</p>
-
-                <div className="space-y-2 mb-4">
-                    {motoboys.map((m) => (
-                        <label
-                            key={m.id}
-                            className={`flex items-center gap-3 p-3 min-h-11 rounded-lg border cursor-pointer transition-colors ${escolhido === m.id ? "border-green-500 bg-green-50" : "border-gray-200 hover:bg-gray-50"}`}
-                        >
-                            <input
-                                type="radio"
-                                name="motoboy-escolhido"
-                                checked={escolhido === m.id}
-                                onChange={() => setEscolhido(m.id)}
-                                className="w-4 h-4 text-green-600 focus:ring-green-500"
-                            />
-                            <span className="text-sm text-gray-800">
-                                {m.name}{atual === m.id ? " (está com ela)" : ""}
-                            </span>
-                        </label>
-                    ))}
-                    {permiteFila && (
-                        <label className={`flex items-center gap-3 p-3 min-h-11 rounded-lg border cursor-pointer transition-colors ${escolhido === null ? "border-green-500 bg-green-50" : "border-gray-200 hover:bg-gray-50"}`}>
-                            <input
-                                type="radio"
-                                name="motoboy-escolhido"
-                                checked={escolhido === null}
-                                onChange={() => setEscolhido(null)}
-                                className="w-4 h-4 text-green-600 focus:ring-green-500"
-                            />
-                            <span className="text-sm text-gray-800">↩️ Deixar na fila (qualquer motoboy pega)</span>
-                        </label>
-                    )}
-                </div>
-
-                {erro && <p className="mb-3 text-sm font-medium text-red-600">{erro}</p>}
-
-                <div className="flex gap-3 justify-end">
-                    <button
-                        type="button"
-                        onClick={onCancelar}
-                        disabled={salvando}
-                        className="min-h-11 px-4 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 font-medium transition-colors disabled:opacity-50"
-                    >
-                        Voltar
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onEscolher(escolhido)}
-                        disabled={salvando || (!permiteFila && escolhido === null)}
-                        className="min-h-11 px-4 rounded-lg font-bold bg-green-600 hover:bg-green-700 text-white transition-all disabled:opacity-50 flex items-center gap-2"
-                    >
-                        {salvando && <Loader2 size={16} className="animate-spin" />}
-                        {salvando ? "Salvando…" : "Confirmar"}
-                    </button>
-                </div>
-            </div>
-        </div>
     );
 }
 

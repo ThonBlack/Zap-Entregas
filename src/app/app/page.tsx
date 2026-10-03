@@ -200,7 +200,7 @@ export default async function Dashboard({
     let recentTransactions: Awaited<ReturnType<typeof getRecentTransactions>> = [];
     let painelCounts: PainelCounts = { pendentes: 0, emRota: 0, feitasHoje: 0, hoje: 0 };
     let draftDeliveries: { id: number; address: string; customerName: string | null; createdAt: string | null }[] = [];
-    let motoboysDaEquipe: { id: number; name: string }[] = [];
+    let motoboysDaEquipe: { id: number; name: string; shopkeeperId: number | null }[] = [];
 
     const pendingConfirmations = await getPendingConfirmations(user.id);
 
@@ -249,7 +249,9 @@ export default async function Dashboard({
 
         // Equipe da loja: é com ela que o lojista destina uma corrida e diz quem
         // fez a entrega ao marcar como entregue (motoboyScope = só os dele).
-        motoboysDaEquipe = await db.select({ id: users.id, name: users.name })
+        // O admin recebe todo mundo + de que loja é cada um: a tela filtra, por
+        // corrida, só quem serve à loja dela (e o servidor confere de novo).
+        motoboysDaEquipe = await db.select({ id: users.id, name: users.name, shopkeeperId: users.shopkeeperId })
             .from(users)
             .where(motoboyScope(user))
             .orderBy(users.name);
