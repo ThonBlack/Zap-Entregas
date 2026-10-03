@@ -380,7 +380,7 @@ export default function DraftConfirmForm({
                         onChange={(e) => setMotoboyId(e.target.value)}
                         className="w-full px-3 py-2.5 min-h-11 rounded-lg border border-zinc-600 bg-zinc-700 text-white outline-none focus:border-green-500"
                     >
-                        <option value="">Deixar na fila (qualquer motoboy pega)</option>
+                        <option value="">Qualquer um (fila aberta)</option>
                         {motoboys.map((m) => (
                             <option key={m.id} value={m.id}>{m.name}</option>
                         ))}

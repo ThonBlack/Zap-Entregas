@@ -96,6 +96,17 @@ export function podeEditarNaFila(corrida: CorridaDaFila): boolean {
 }
 
 /**
+ * Dá pra TROCAR o motoboy (ou devolver pra fila aberta) pela fila?
+ *
+ * Mesma janela da correção: até a coleta. É a mesma regra que a loja tem no
+ * app (src/lib/deliveryAssign.ts). Depois da coleta a tela só mostra quem está
+ * com o pedido — tirar de quem já está na rua é decisão do admin.
+ */
+export function podeTrocarMotoboyNaFila(corrida: CorridaDaFila): boolean {
+    return podeEditarNaFila(corrida);
+}
+
+/**
  * Dá pra CANCELAR esta corrida?
  *
  * Mesma janela da edição, mais o rascunho que ainda nem foi conferido. Corrida

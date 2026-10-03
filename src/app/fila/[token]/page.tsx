@@ -6,6 +6,8 @@ import { Bike, CheckCircle2, ClipboardCheck, Clock, Pencil, Plus } from "lucide-
 import AutoRefresh from "@/components/shared/AutoRefresh";
 import FilaExpirada from "@/components/fila/FilaExpirada";
 import BotaoCancelarDaFila from "@/components/fila/BotaoCancelarDaFila";
+import TrocarMotoboyDaFila from "@/components/fila/TrocarMotoboyDaFila";
+import { listarMotoboysDaLoja } from "@/lib/team";
 import { carregarSessaoValida } from "@/lib/queueSession";
 import {
     COLUNAS_DA_FILA,
@@ -13,6 +15,7 @@ import {
     STATUS_FILA_LABEL,
     podeCancelarNaFila,
     podeEditarNaFila,
+    podeTrocarMotoboyNaFila,
 } from "@/lib/fila-shared";
 import { rotuloCorrida } from "@/lib/dailySeq-shared";
 import { chargeModeDaCorrida, rotuloCobranca } from "@/lib/chargeMode";
@@ -45,9 +48,13 @@ function comoChamar(id: number, dailySeq: number | null): string {
  * (src/lib/queueSession.ts). TUDO nesta tela é filtrado pelo `shopkeeperId` que
  * vem dele — nunca por um número que o navegador mandou.
  *
- * O que esta tela NÃO faz, de propósito: marcar entrega como feita, escolher ou
- * trocar motoboy, mostrar taxa/carteira/fechamento, abrir Configurações. Isso é
- * da loja e do motoboy, não de quem está atendendo no balcão.
+ * Motoboy: o vendedor escolhe quem leva ao liberar e pode trocar (ou devolver
+ * pra fila aberta) até a coleta — só entre os motoboys da equipe DESTA loja.
+ * Depois da coleta a tela só mostra quem está com o pedido.
+ *
+ * O que esta tela NÃO faz, de propósito: marcar entrega como feita, mostrar
+ * taxa/carteira/fechamento, abrir Configurações. Isso é da loja e do motoboy,
+ * não de quem está atendendo no balcão.
  */
 export default async function FilaDaLojaPage({
     params,
@@ -100,10 +107,14 @@ export default async function FilaDaLojaPage({
             .limit(30),
     ]);
 
-    const nomeDaLoja = await db.query.users.findFirst({
-        where: eq(users.id, sessao.shopkeeperId),
-        columns: { name: true },
-    });
+    const [nomeDaLoja, equipe] = await Promise.all([
+        db.query.users.findFirst({
+            where: eq(users.id, sessao.shopkeeperId),
+            columns: { name: true },
+        }),
+        // Só a equipe ativa DESTA loja — a régua do lojista no app.
+        listarMotoboysDaLoja(sessao.shopkeeperId),
+    ]);
 
     const base = `/fila/${token}`;
 
@@ -209,6 +220,7 @@ export default async function FilaDaLojaPage({
                             {abertas.map((c) => {
                                 const podeEditar = podeEditarNaFila(c);
                                 const podeCancelar = podeCancelarNaFila(c);
+                                const podeTrocar = podeTrocarMotoboyNaFila(c) && equipe.length > 0;
                                 return (
                                     <li
                                         key={c.id}
@@ -233,6 +245,16 @@ export default async function FilaDaLojaPage({
                                                 {c.motoboy?.name ? ` · Motoboy: ${c.motoboy.name}` : ""}
                                             </p>
                                         </div>
+
+                                        {podeTrocar && (
+                                            <TrocarMotoboyDaFila
+                                                deliveryId={c.id}
+                                                queueToken={token}
+                                                motoboyAtual={c.motoboyId}
+                                                nomeAtual={c.motoboy?.name ?? null}
+                                                motoboys={equipe}
+                                            />
+                                        )}
 
                                         {(podeEditar || podeCancelar) && (
                                             <div className="flex flex-col sm:flex-row gap-2">
