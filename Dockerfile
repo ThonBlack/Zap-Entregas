@@ -7,7 +7,7 @@
 # Dívidas conhecidas e ACEITAS por enquanto (Docker Desktop estava fora do ar
 # quando isto foi escrito, então não dava pra validar a mudança buildando):
 #
-#  1. `node:20` completa em vez de multi-stage + `node:20-slim`. A imagem tem
+#  1. `node:22` completa em vez de multi-stage + `node:22-slim`. A imagem tem
 #     3,22 GB (código-fonte, node_modules de desenvolvimento, compilador). Com
 #     `output: "standalone"` no next.config e dois estágios, cairia pra
 #     ~300 MB — e cada deploy transfere isso pela internet. Fazer quando o
@@ -15,7 +15,11 @@
 #  2. Roda como root. `USER node` exige acertar o dono do `sqlite.db` e da pasta
 #     `uploads` na VPS (hoje `644 root:root`); trocar sem isso derruba o app na
 #     hora do deploy. Não vale arriscar às cegas.
-FROM node:20
+#
+# Versão do Node travada (22.23.4, bookworm = mesmo Debian 12 da imagem node:20
+# anterior). 24/10/2026: a 22.23.4 corrige 10 falhas de segurança do Node
+# (CVE-2026-111497 e outras); a linha 20 não recebe mais correção.
+FROM node:22.23.4-bookworm
 
 WORKDIR /app
 
